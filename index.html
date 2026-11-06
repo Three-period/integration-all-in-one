@@ -2418,7 +2418,7 @@ render();
     if(start>=0){var end=html.indexOf('</div></div>',start);if(end>=0)html=html.slice(0,start)+html.slice(end+11)}
     return html;
   };
-  var stageLabels=[['planning','流程视图'],['requirements','需求阶段'],['design','设计阶段'],['development','开发阶段'],['testing','测试阶段'],['closing','结项阶段'],['release','发布阶段']];
+  var stageLabels=[['planning','流程视图'],['requirements','需求阶段'],['design','设计阶段'],['development','开发阶段'],['testing','测试阶段'],['release','发布阶段'],['closing','结项阶段']];
   function started(stage){
     if(stage==='planning')return true;
     if(stage==='closing')return !!v47StageDone('release');
