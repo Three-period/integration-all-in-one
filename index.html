@@ -3424,53 +3424,68 @@ render();
  render();
 })();
 
-/* V55.5: global role is the only role switch; reconnect the V54 testing UI.
- * Keep the responsible-developer selector and remove duplicate local role controls. */
+/* V55.5: canonical role mapping and canonical testing-stage renderer.
+ * state.role is the only role source. v35Data().role is a render mirror only.
+ * Testing uses the latest V54 report-list/editor workflow and V52 version lineage. */
 (function(){
- var v55PrevRenderDevelopment=renderDevelopment;
- renderDevelopment=function(){
-  var html=v55PrevRenderDevelopment();
-  if(state.role!=='developer'&&state.role!=='reviewer')return html;
-  var d=v35Data();
-  d.role=state.role; // render mirror only; state.role remains the source of truth.
-  var roleName=state.role==='reviewer'?'检视工程师':'开发工程师';
-  var people=['孙宁','李明','何盈'];
-  if(d.developer&&people.indexOf(d.developer)<0)people.unshift(d.developer);
-  var options=people.map(function(name){
-   return '<option value="'+v35E(name)+'" '+(name===d.developer?'selected':'')+'>'+v35E(name)+'</option>';
-  }).join('');
-  var header='<div class="v35-head v55-global-role-head"><div><h2>开发阶段 · '+roleName+'工作台</h2>'
-   +'<div class="v35-sub">项目：'+v35E(project().name)+' · 任务：'+v35E(d.task)+' · 演示数据（Mock）</div></div>'
-   +'<div class="v35-tools"><span class="v35-badge ok">全局角色：'+roleName+'</span>'
-   +'<label>责任开发人 <select class="input" data-v35-change="developer">'+options+'</select></label></div></div>';
-  var marker='<div class="development-reference-page v35-root">';
-  if(html.indexOf(marker)<0)return html;
-  return html.replace(marker,marker+header);
- };
+  var v55BaseRenderDevelopment=renderDevelopment;
 
- // Render the latest V54 report index and V54 section navigation, not the captured V38 legacy page.
- renderTesting=function(){
-  testingInit();
-  var section=state.testingSection||'cases';
-  if(!testingSections().some(function(item){return item[0]===section;}))section='cases';
-  state.testingSection=section;
-  var content=section==='cases'?renderTestingCases():
-   section==='defects'?renderTestingDefects():renderTestingReport(section);
-  return v52VersionBanner()
-   +'<div class="testing-reference-page"><div class="testing-stage-layout">'
-   +testingSubnav()
-   +'<main class="testing-main">'+content+'</main></div></div>';
- };
+  // Keep the responsibility-developer selector, but remove the local role selector.
+  v35ShellTitle=function(d){
+    var roleName=state.role==='reviewer'?'检视工程师':'开发工程师';
+    var people=['孙宁','李明','何盈'];
+    if(d.developer&&people.indexOf(d.developer)<0)people.unshift(d.developer);
+    var options=people.map(function(name){
+      return '<option value="'+v35E(name)+'" '+(name===d.developer?'selected':'')+'>'+v35E(name)+'</option>';
+    }).join('');
+    return '<div class="v35-head v55-global-role-head"><div><h2>开发阶段 · '+roleName+'工作台</h2>'
+      +'<div class="v35-sub">项目：'+v35E(project().name)+' · 任务：'+v35E(d.task)+' · 演示数据（Mock）</div></div>'
+      +'<div class="v35-tools"><span class="v35-badge ok">全局角色：'+roleName+'</span>'
+      +'<label>责任开发人 <select class="input" data-v35-change="developer">'+options+'</select></label></div></div>';
+  };
 
- var css=document.createElement('style');
- css.textContent='.v55-global-role-head{margin-bottom:13px;padding:13px 15px;background:#fff;border:1px solid #e5eaf2;border-radius:6px}'
-  +'.v55-global-role-head h2{font-size:15px;margin:0 0 5px}'
-  +'.v55-global-role-head .v35-tools{align-items:center;gap:12px}'
-  +'.v55-global-role-head label{display:flex;align-items:center;gap:7px;color:#667085;font-size:11px}'
-  +'.v55-global-role-head select{min-width:105px}';
- document.head.appendChild(css);
- document.title='一体化产品研发系统 · V55.5 原型';
- render();
+  // Synchronize the render mirror BEFORE the workbench reads it.
+  // The old local role tabs are removed; all role changes come from #roleSelect.
+  renderDevelopment=function(){
+    var d=v35Data();
+    d.role=state.role;
+    var html=v55BaseRenderDevelopment();
+    return html.replace(/<div class="v35-tabs">[\s\S]*?<\/div>/,'');
+  };
+
+  // V53 introduced the smoke-report entry. Keep it explicit and guarantee
+  // the six required destinations even if an earlier section list is changed.
+  var v55BaseTestingSections=testingSections;
+  testingSections=function(){
+    var items=v55BaseTestingSections().filter(function(item){return item[0]!=='smoke'});
+    items.splice(1,0,['smoke','冒烟测试报告']);
+    return items;
+  };
+
+  // One final render entry: latest case/defect views and V54 report lists.
+  // V49's outer stage-block read-only gate and V54's report/Commit rules remain intact.
+  renderTesting=function(){
+    testingInit();
+    var section=state.testingSection||'cases';
+    if(!testingSections().some(function(item){return item[0]===section;}))section='cases';
+    state.testingSection=section;
+    var content=section==='cases'?renderTestingCases():
+      section==='defects'?renderTestingDefects():renderTestingReport(section);
+    return v52VersionBanner()
+      +'<div class="testing-reference-page"><div class="testing-stage-layout">'
+      +testingSubnav()
+      +'<main class="testing-main">'+content+'</main></div></div>';
+  };
+
+  var css=document.createElement('style');
+  css.textContent='.v55-global-role-head{margin-bottom:13px;padding:13px 15px;background:#fff;border:1px solid #e5eaf2;border-radius:6px}'
+    +'.v55-global-role-head h2{font-size:15px;margin:0 0 5px}'
+    +'.v55-global-role-head .v35-tools{align-items:center;gap:12px}'
+    +'.v55-global-role-head label{display:flex;align-items:center;gap:7px;color:#667085;font-size:11px}'
+    +'.v55-global-role-head select{min-width:105px}';
+  document.head.appendChild(css);
+  document.title='一体化产品研发系统 · V55.5 原型';
+  render();
 })();
 
 </script>
