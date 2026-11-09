@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="codex-preview" content="development" />
-  <title>一体化产品研发系统 · V55.0 原型</title>
+  <title>一体化产品研发系统 · V55.1 原型</title>
   <style>
     :root{--nav:#10284f;--nav2:#173d75;--blue:#165dff;--blue2:#0f4bc2;--blue-soft:#eaf2ff;--ink:#17233d;--text:#344054;--muted:#667085;--light:#98a2b3;--line:#e6eaf0;--bg:#f4f6fa;--white:#fff;--green:#12b76a;--green-soft:#e9f9f0;--orange:#f79009;--orange-soft:#fff4e5;--red:#f04438;--red-soft:#feeceb;--purple:#7a5af8;--purple-soft:#f0ecff;--shadow:0 10px 30px rgba(16,24,40,.08)}
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--ink);background:var(--bg)}body{overflow:hidden}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.48}.app{height:100%;display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:60px minmax(0,1fr)}
@@ -3282,6 +3282,7 @@ render();
  function complete(r){return !!(r&&(r.result==='无新增问题'||(r.result==='发现问题'&&String(r.text||'').trim())))}
  function all(d){return !!(d.commit&&kinds.every(function(k){return complete(latest(d,k))}))}
  function aiDone(d){var r=v35Latest();return !!(r&&r.commit===d.commit&&r.result==='完成'&&Array.isArray(r.checks)&&r.checks.length&&r.checks.every(function(c){return c.result==='通过'}))}
+ function canRecord(d){return !!(d&&d.formalRequest&&d.formalRequest.commit===d.commit&&aiDone(d)&&!d.v47NeedsNewCommit)}
  function valid(d){return !!(state.role==='reviewer'&&d.role==='reviewer'&&v35FormalReady()&&all(d)&&aiDone(d)&&v35Pending().length===0&&!d.v47NeedsNewCommit)}
  function initDraft(d){
    if(d.v55DraftCommit!==d.commit){d.v55DraftCommit=d.commit;d.v55Drafts={};d.v55Tab=kinds[0]}
@@ -3300,7 +3301,7 @@ render();
  }
  function esc55(v){return v35E(v==null?'':v)}
  v35Formal=function(d){
-   var formal=v35FormalReady(),draft=initDraft(d),kind=d.v55Tab,r=latest(d,kind);
+   var formal=canRecord(d),draft=initDraft(d),kind=d.v55Tab,r=latest(d,kind);
    var left=v35Panel('检视资料',
      '<div class="v55-evidence"><b>Git 仓库 / Commit</b><p><button class="v43-evidence-link" data-v43="commit" '+(d.commit?'':'disabled')+'>'+esc55(d.commit||'尚无提交')+' ↗</button></p><small>'+esc55(d.repo||'Mock GitLab')+' / '+esc55(d.branch||'—')+'</small></div>'
      +'<div class="v55-evidence"><b>设计与需求依据</b><p>软件规格书、架构 / 概要 / 详细设计与关联需求</p><button class="v43-evidence-link" data-v43="design">查看设计依据 ›</button></div>'
@@ -3356,7 +3357,7 @@ render();
      document.execCommand(['p','h2','h3'].includes(x)?'formatBlock':x,false,['p','h2','h3'].includes(x)?x:null);return;
    }
    if(act==='save'){
-     if(!v35FormalReady()){showToast('请先完成 R3 正式检视准入','warn');return}
+     if(!canRecord(d)){showToast('请先完成 R3 正式检视准入','warn');return}
      capture(d);
      var k=d.v55Tab,draft=initDraft(d),result=draft.result;
      if(!['无新增问题','发现问题'].includes(result)){showToast('请先选择本项检查结果','warn');return}
