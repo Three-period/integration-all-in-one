@@ -3281,7 +3281,7 @@ render();
 (function(){
  var kinds=['高风险必查','AI 未有效覆盖','独立抽检'];
  function latest(d,k){return d.manual.slice().reverse().find(function(r){return r.kind===k&&r.commit===d.commit})||null}
- function complete(r){return !!(r&&r.result==='无新增问题')}
+ function complete(r){return !!(r&&['无新增问题','规则反馈'].includes(r.result))}
  function ensureMockCommit(d){if(!d.commit){var key=String(state.projectId||'PROJECT').replace(/[^a-zA-Z0-9_-]/g,'-');d.commit='MOCK-R3-'+key;if(!d.commits)d.commits=[];if(!d.commits.some(function(x){return x.commit===d.commit}))d.commits.push({commit:d.commit,owner:d.developer||'Mock 检视',at:v35Stamp(),mock:true});v35Log('生成演示用 Mock Commit：'+d.commit)}return d.commit}
  function all(d){return !!(d&&d.commit&&kinds.every(function(k){return complete(latest(d,k))}))}
  function aiDone(d){var r=v35Latest();return !!(r&&r.commit===d.commit&&r.result==='完成'&&Array.isArray(r.checks)&&r.checks.length&&r.checks.every(function(c){return c.result==='通过'}))}
@@ -3316,24 +3316,25 @@ render();
      var x=latest(d,k);return '<button type="button" class="v55-tab '+(kind===k?'active':'')+'" data-v55="tab" data-kind="'+esc55(k)+'"><b>'+esc55(k)+'</b><small>'+(!x?'未检查':x.result==='发现问题'?'发现问题':complete(x)?'已通过':'未通过')+'</small></button>';
    }).join('');
    var radios='<div class="v55-radio"><label><input type="radio" name="v55Result" value="无新增问题" '+(draft.result==='无新增问题'?'checked ':'')+(formal?'':'disabled')+'>无问题</label>'
-     +'<label><input type="radio" name="v55Result" value="发现问题" '+(draft.result==='发现问题'?'checked ':'')+(formal?'':'disabled')+'>发现问题 / 需要修改</label></div>';
+     +'<label><input type="radio" name="v55Result" value="发现问题" '+(draft.result==='发现问题'?'checked ':'')+(formal?'':'disabled')+'>发现问题 / 需要修改</label>'
+     +'<label><input type="radio" name="v55Result" value="规则反馈" '+(draft.result==='规则反馈'?'checked ':'')+(formal?'':'disabled')+'>规则反馈</label></div>;
    var format=[['p','正文'],['h2','二级标题'],['h3','三级标题'],['bold','加粗'],['italic','斜体'],['insertUnorderedList','列表']].map(function(x){
-     return '<button type="button" data-v55="format" data-format="'+x[0]+'" '+(formal&&draft.result==='发现问题'?'':'disabled')+'>'+x[1]+'</button>';
+     return '<button type="button" data-v55="format" data-format="'+x[0]+'" '+(formal&&['发现问题','规则反馈'].includes(draft.result)?'':'disabled')+'>'+x[1]+'</button>';
    }).join('');
    var right=v35Panel('人工检视',
      '<div class="v55-tabs">'+tabs+'</div><div class="v55-subtitle"><b>'+esc55(kind)+'</b> '
      +(r?v35Badge('已记录 · '+r.result,r.result==='发现问题'?'warn':'ok'):v35Badge('待检视','warn'))+'</div>'
-     +radios+'<div class="v55-detail '+(draft.result==='发现问题'?'':'hidden')+'"><label>问题描述、证据与修改要求（必填）</label>'
-     +'<div class="v55-format">'+format+'</div><div id="v55Editor" class="v55-editor" contenteditable="'+(formal&&draft.result==='发现问题'?'true':'false')+'">'+(draft.html||'')+'</div></div>'
+     +radios+'<div class="v55-detail '+(['发现问题','规则反馈'].includes(draft.result)?'':'hidden')+'"><label>'+(draft.result==='规则反馈'?'规则反馈内容（必填）':'问题描述、证据与修改要求（必填）')+'</label>'
+     +'<div class="v55-format">'+format+'</div><div id="v55Editor" class="v55-editor" contenteditable="'+(formal&&['发现问题','规则反馈'].includes(draft.result)?'true':'false')+'">'+(draft.html||'')+'</div></div>'
      +'<div class="v55-save"><button class="btn primary" data-v55="save" '+(formal?'':'disabled')+'>保存本项检视结论</button></div>'
-     +'<div class="v35-notice">仅当高风险、AI 未覆盖、独立抽检三项均选择「无问题」并保存后，才开放准出确认。发现问题的回流开发流程暂不纳入本轮演示。</div>');
+     +'<div class="v35-notice">三项均保存为「无问题」或「规则反馈」即可通过门禁；「发现问题 / 需要修改」仍会阻断准出。</div>');
    return '<div class="v35-notice '+(formal?'':'warn')+'">'+(formal?'Mock 专业检视已开放，当前演示 Commit：'+esc55(d.commit):'请切换至检视工程师角色')+'</div>'
      +'<div class="v55-review-grid"><div>'+left+'</div><div>'+right+'</div></div>';
  };
  v35Exit=function(d){
-   var gates=[['高风险检视：无问题',!!latest(d,'高风险必查')&&complete(latest(d,'高风险必查'))],
-     ['AI 未覆盖检视：无问题',!!latest(d,'AI 未有效覆盖')&&complete(latest(d,'AI 未有效覆盖'))],
-     ['独立抽检：无问题',!!latest(d,'独立抽检')&&complete(latest(d,'独立抽检'))]];
+   var gates=[['高风险检视：无问题 / 规则反馈',!!latest(d,'高风险必查')&&complete(latest(d,'高风险必查'))],
+     ['AI 未覆盖检视：无问题 / 规则反馈',!!latest(d,'AI 未有效覆盖')&&complete(latest(d,'AI 未有效覆盖'))],
+     ['独立抽检：无问题 / 规则反馈',!!latest(d,'独立抽检')&&complete(latest(d,'独立抽检'))]];
    return v35Panel('R4 准出确认 · 检视工程师',
      '<div class="v35-list">'+gates.map(function(g){return '<div class="v35-check">'+v35Badge(g[1]?'通过':'阻断',g[1]?'ok':'bad')+' <span>'+esc55(g[0])+'</span></div>'}).join('')+'</div>'
      +'<div class="v35-notice">Mock 演示规则：三项人工检视全部通过即可确认检视通过并移交测试。本轮暂不校验 AI 检视、R3 申请及问题整改闭环。</div>'
@@ -3364,21 +3365,21 @@ render();
      ensureMockCommit(d);
      capture(d);
      var k=d.v55Tab,draft=initDraft(d),result=draft.result;
-     if(!['无新增问题','发现问题'].includes(result)){showToast('请先选择本项检查结果','warn');return}
+     if(!['无新增问题','发现问题','规则反馈'].includes(result)){showToast('请先选择本项检查结果','warn');return}
      var el=document.getElementById('v55Editor');
      var text=(el?(el.innerText||el.textContent||''):String(draft.html||'').replace(/<[^>]*>/g,'')).trim();
-     if(result==='发现问题'&&!text){showToast('发现问题必须填写问题说明与修改内容','warn');return}
+     if(['发现问题','规则反馈'].includes(result)&&!text){showToast(result==='规则反馈'?'规则反馈必须填写具体内容':'发现问题必须填写问题说明与修改内容','warn');return}
      d.manual=d.manual.filter(function(x){return !(x.kind===k&&x.commit===d.commit)});
-     d.manual.push({kind:k,commit:d.commit,result:result,text:result==='发现问题'?text:'',
-       richHtml:result==='发现问题'?draft.html:'',issueId:'',at:v35Stamp()});
-     d.v55Drafts[k]={result:result,html:result==='发现问题'?draft.html:''};
+     d.manual.push({kind:k,commit:d.commit,result:result,text:['发现问题','规则反馈'].includes(result)?text:'',
+       richHtml:['发现问题','规则反馈'].includes(result)?draft.html:'',issueId:'',at:v35Stamp()});
+     d.v55Drafts[k]={result:result,html:['发现问题','规则反馈'].includes(result)?draft.html:''};
      v35Log('人工检视记录：'+k+' · '+result);
      v35Refresh();
-     showToast('已保存'+k+'的 Mock 检视结论'+(result==='发现问题'?'；本轮暂不执行问题回流，需三项均无问题才能准出':''));
+     showToast('已保存'+k+'的 Mock 检视结论'+(result==='发现问题'?'；该项存在问题，准出门禁保持阻断':result==='规则反馈'?'；规则反馈已保存并计入通过门禁':''));
      return;
    }
    if(act==='exit'){
-     if(!valid(d)){showToast('准出失败：请确认三项检查均已选择「无问题」并保存','warn');return}
+     if(!valid(d)){showToast('准出失败：请确认三项均已保存为「无问题」或「规则反馈」','warn');return}
      ensureMockCommit(d);
      if(!d.approval||d.approval.commit!==d.commit||!d.handoff){
        d.approval={commit:d.commit,at:v35Stamp(),reviewer:'检视工程师'};
@@ -3390,7 +3391,7 @@ render();
      if(v52CurrentCommit()!==d.commit){showToast('移交版本校验失败，请核对当前 Commit','warn');return}
      var p=project();p.status='进行中';p.flowStatus='测试阶段';p.progress=Math.max(Number(p.progress)||0,60);
      state.lifecycleStage='testing';state.projectSection='lifecycle';state.view='project-lifecycle';
-     render();showToast('三项检视全部通过，已进入测试阶段（Mock）');return;
+     render();showToast('三项检视均已通过，已进入测试阶段（Mock）');return;
    }
  },true);
  document.addEventListener('change',function(e){
@@ -3431,18 +3432,7 @@ render();
   var v55BaseRenderDevelopment=renderDevelopment;
 
   // Keep the responsibility-developer selector, but remove the local role selector.
-  v35ShellTitle=function(d){
-    var roleName=state.role==='reviewer'?'检视工程师':'开发工程师';
-    var people=['孙宁','李明','何盈'];
-    if(d.developer&&people.indexOf(d.developer)<0)people.unshift(d.developer);
-    var options=people.map(function(name){
-      return '<option value="'+v35E(name)+'" '+(name===d.developer?'selected':'')+'>'+v35E(name)+'</option>';
-    }).join('');
-    return '<div class="v35-head v55-global-role-head"><div><h2>开发阶段 · '+roleName+'工作台</h2>'
-      +'<div class="v35-sub">项目：'+v35E(project().name)+' · 任务：'+v35E(d.task)+' · 演示数据（Mock）</div></div>'
-      +'<div class="v35-tools"><span class="v35-badge ok">全局角色：'+roleName+'</span>'
-      +'<label>责任开发人 <select class="input" data-v35-change="developer">'+options+'</select></label></div></div>';
-  };
+  v35ShellTitle=function(){return ''};
 
   // Synchronize the render mirror BEFORE the workbench reads it.
   // The old local role tabs are removed; all role changes come from #roleSelect.
@@ -3486,6 +3476,29 @@ render();
   document.head.appendChild(css);
   document.title='一体化产品研发系统 · V55.5 原型';
   render();
+})();
+
+
+/* V55.6: richer AI review detail drawer; uses current AI run and issue records. */
+(function(){
+ var e=function(v){return esc(String(v==null?'':v))};
+ v43OpenAiResults=function(){
+  var d=v35Data(),r=v35Latest(),names=['文件一致性','文件正确性','方案与代码一致性','点检项检查'];
+  var issues=(d.issues||[]).filter(function(i){return i.source==='AI 检视'&&(!i.commit||i.commit===d.commit)});
+  function checkAt(i){return r&&r.commit===d.commit&&r.checks?r.checks.find(function(c){return c.name===names[i]})||r.checks[i]||null:null}
+  function stateText(i){var c=checkAt(i);return c?e(c.result):'未执行'}
+  function stateClass(i){var c=checkAt(i);return c&&c.result==='通过'?'green':c?'orange':'gray'}
+  function item(title,detail,i){var c=checkAt(i),done=!!(c&&r&&r.result==='完成');return '<div class="v55-ai-detail-row"><div><b>'+e(title)+'</b><p>'+e(detail)+'</p></div><span class="tag '+stateClass(i)+'">'+(done?'已检视 · ':'')+stateText(i)+'</span></div>'}
+  var groups=[
+   [item('src/device/connection.ts','源文件清单匹配；核对文件是否纳入当前 Commit。',0),item('config/reconnect.yaml','配置文件存在性、版本匹配与缺失检查。',0),item('interfaces/device.proto','接口文件是否纳入本次检视范围。',0)].join(''),
+   [item('YAML 语法与引用','检查配置语法、引用路径及配置项有效性。',1),item('TypeScript 导入关系','检查基础格式、模块导入与引用关系。',1),item('接口字段完整性','检查接口定义、字段及依赖完整性。',1)].join(''),
+   (function(){var c=checkAt(2),done=!!(c&&r&&r.result==='完成'),html=item('D-009 · 断线重试规则一致性','对照软件规格书中的重试间隔要求与当前实现；'+(c&&c.detail?c.detail:'当前批次暂无更细粒度的模型说明。'),2);if(issues.length){html+=issues.map(function(x){return '<div class="v55-ai-detail-row"><div><b>'+e(x.id+' · '+x.title)+'</b><p>'+e(x.evidence||'AI 检视问题记录')+'</p><small>状态：'+e(x.status||'待确认')+' · Commit：'+e(x.commit||d.commit)+'</small></div><span class="tag orange">'+e(x.status||'待确认')+'</span></div>'}).join('')}else{html+='<div class="v55-ai-detail-row"><div><b>当前批次问题清单</b><p>'+(done?'当前批次未记录待处理的方案一致性问题。':'当前批次尚未形成可核验的方案一致性结果。')+'</p></div><span class="tag '+(done?'green':'gray')+'">'+(done?'已检查':'待检查')+'</span></div>'}return html})(),
+   [item('R-017 · 异常状态回收','检查异常状态是否存在回收与恢复处理。',3),item('N-021 · 错误日志追踪标识','检查关键错误日志是否包含关联追踪标识。',3),item('R-025 · 函数长度阈值','检查函数长度是否符合点检规则阈值。',3),item('R-031 · 重复逻辑','检查重复条件判断及可复用逻辑。',3),item('N-013 · 接口异常错误码','检查服务异常是否统一返回错误码。',3)].join('')
+  ];
+  var body='<div class="notice">当前 Commit：'+e(d.commit||'—')+' · AI 批次：'+e(r&&r.commit===d.commit?r.id:'暂无当前版本批次')+' · 以下展示当前版本 Mock 检视明细。</div>'+names.map(function(n,i){return '<section class="v47-ai-group"><button class="v47-ai-trigger" data-v47="ai-expand" data-ai="'+i+'"><b>'+(i+1)+'. '+n+'</b><span>'+stateText(i)+'　⌄</span></button><div class="v47-ai-body" data-ai-detail="'+i+'" '+(i===2?'':'hidden')+'>'+groups[i]+'</div></section>'}).join('');
+  openDrawer('AI 检视资料 · 四项检查详情',body);
+ };
+ var st=document.createElement('style');st.textContent='.v55-ai-detail-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 12px;border:1px solid #e7ebf1;border-radius:6px;margin:8px 0;background:#fff}.v55-ai-detail-row>div{min-width:0}.v55-ai-detail-row b{font-size:12px;color:#344054}.v55-ai-detail-row p{font-size:11px;color:#667085;line-height:1.65;margin:5px 0}.v55-ai-detail-row small{font-size:10px;color:#98a2b3}.v55-ai-detail-row .tag{flex:none;white-space:nowrap}';document.head.appendChild(st);
 })();
 
 </script>
