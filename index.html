@@ -2462,8 +2462,62 @@ var v47PrevReady=v35Ready;v35Ready=function(){var r=v47PrevReady(),d=v35Data();i
 var v47PrevCard=v35SummaryCard;v35SummaryCard=function(title,status,note,type,badge){if(type==='repo'&&v35Data().v47NeedsNewCommit){status='待提交 · 整改新 Commit';badge='warn'}return v47PrevCard(title,status,note,type,badge)};
 var v47PrevDevelopment=renderDevelopment;renderDevelopment=function(){if(state.role!=='reviewer'&&state.role!=='developer')return '<div class="notice warn">开发阶段仅研发人员或检视工程师可以查看。请前往个人工作台切换角色。</div>';var d=v35Data();d.role=state.role==='reviewer'?'reviewer':'developer';var html=v47PrevDevelopment();html=html.replace(/<div class="v35-head">[\s\S]*?<\/div><\/div><div class="v35-tabs">[\s\S]*?<\/div>/,'');return html};
 var v47PrevAI=v43OpenAiResults;
-v43OpenAiResults=function(){var d=v35Data(),r=v35Latest();if(state.role!=='reviewer'||!v35FormalReady()){showToast('请先进入正式人工检视任务','warn');return}var row=function(t,meta){return '<div class="v47-ai-item"><b>'+esc(t)+'</b><small>'+esc(meta)+'</small></div>'};var aiIssues=d.issues.filter(function(i){return i.source==='AI 检视'});var names=['文件一致性','文件正确性','方案与代码一致性','点检项检查'];var blocks=[[
-row('src/device/connection.ts','源文件：匹配 · 文件版本与 Commit 一致'),row('config/reconnect.yaml','配置文件：匹配 · 缺失 0'),row('interfaces/device.proto','接口文件：匹配 · 校验通过')],[row('config/reconnect.yaml','语法与引用检查：通过'),row('src/device/connection.ts','基础格式、导入关系：通过'),row('interfaces/device.proto','依赖与字段完整性：通过')],aiIssues.length?aiIssues.map(function(i){return row(i.id+' · '+i.title+' · '+i.status,'设计依据：'+(i.evidence||'方案一致性规则')+'；原 Commit：'+i.commit+'；当前 Commit：'+d.commit+'；整改/裁定：'+(i.recheckedAt||i.verdict||i.reply||'持续跟踪中'))}).join(''):row('D-009 · 断线重试规则一致','未发现待处理问题；当前 Commit 通过方案一致性检查'),[row('R-017 · 异常状态回收','通过'),row('N-021 · 错误日志追踪标识','通过'),row('R-025 · 函数长度阈值','通过'),row('R-031 · 重复逻辑','通过'),row('N-013 · 接口异常错误码','通过'),row('D-009 · 设计与代码一致性','通过')].join('')];var body='<div class="notice">正式人工检视任务：'+esc(d.commit)+' · '+esc(r?r.id:'未找到批次')+'；以下是完整四类检查的 Mock 展开数据，查看不依赖三项必检完成。</div>'+names.map(function(n,i){var check=r&&r.checks&&r.checks[i],result=check?check.result:'未执行';return '<div class="v47-ai-group"><button class="v47-ai-trigger" data-v47="ai-expand" data-ai="'+i+'"><b>'+(i+1)+'. '+n+'</b><span>'+esc(result)+'　⌄</span></button><div class="v47-ai-body" data-ai-detail="'+i+'" '+(i===2?'':'hidden')+'>'+(typeof blocks[i]==='string'?blocks[i]:blocks[i].join(''))+'</div></div>'}).join('');openDrawer('AI 四类检查 · 文件/规则/整改闭环',body)};
+v43OpenAiResults=function(){
+  if(state.role!=='reviewer'){
+    showToast('请切换至检视工程师角色后查看 AI 检视资料','warn');return;
+  }
+  var d=v35Data(),r=v35Latest();
+  var names=['文件一致性','文件正确性','方案与代码一致性','点检项检查'];
+  var aiIssues=d.issues.filter(function(issue){
+    return issue.source==='AI 检视'&&(issue.commit===d.commit||issue.recheckedCommit===d.commit);
+  });
+  function row(title,detail){
+    return '<div class="v47-ai-item"><b>'+esc(title)+'</b><small>'+esc(detail)+'</small></div>';
+  }
+  // Show example evidence only where a current-Commit AI check actually exists.
+  // The illustrative Mock rows below do not imply real GitLab or model execution.
+  function detailFor(index,check){
+    if(!check)return row('尚未执行','当前 Commit 无此项 AI 检视结果，不展示已完成结论。');
+    var info=row('检查结果：'+check.result,'AI 批次 '+r.id+' · '+(check.detail||'未提供详细说明'));
+    if(check.result!=='通过')return info+row('待核实','本项尚未通过，不能标记为 AI 已检视通过。');
+    var examples=[
+      [row('src/device/connection.ts','Mock：文件与 Commit 匹配'),
+       row('config/reconnect.yaml','Mock：文件存在且版本匹配'),
+       row('interfaces/device.proto','Mock：接口文件核对完成')],
+      [row('config/reconnect.yaml','Mock：语法与引用检查通过'),
+       row('src/device/connection.ts','Mock：基础格式、导入关系检查通过'),
+       row('interfaces/device.proto','Mock：依赖与字段完整性检查通过')],
+      [row('D-009 · 断线重试规则一致','Mock：已执行方案与代码一致性检查并通过')],
+      [row('R-017 · 异常状态回收','Mock：通过'),
+       row('N-021 · 错误日志追踪标识','Mock：通过'),
+       row('R-025 · 函数长度阈值','Mock：通过'),
+       row('R-031 · 重复逻辑','Mock：通过'),
+       row('N-013 · 接口异常错误码','Mock：通过'),
+       row('D-009 · 设计与代码一致性','Mock：通过')]
+    ];
+    var rows=examples[index].join('');
+    if(index===2&&aiIssues.length){
+      rows+=aiIssues.map(function(issue){
+        return row(issue.id+' · '+issue.title+' · '+issue.status,
+          '对应依据：'+(issue.evidence||'未提供')+'；原 Commit：'+issue.commit+
+          '；当前 Commit：'+d.commit+'；整改或复检：'+
+          (issue.recheckedAt||issue.verdict||issue.reply||'待处理'));
+      }).join('');
+    }
+    return info+row('下列是已完成检查的 Mock 明细','仅用于原型展示，不代表真实文件已接受 AI 检视。')+rows;
+  }
+  var notice='<div class="notice">当前 Commit：'+esc(d.commit||'未关联')+
+    ' · AI 批次：'+esc(r?r.id:'尚未执行')+
+    '。点击任一检查项展开该项下一级详情；仅显示当前 Commit 的 AI 检视状态。演示数据（Mock）。</div>';
+  var groups=names.map(function(name,i){
+    var check=r&&Array.isArray(r.checks)?(r.checks.find(function(item){return item.name===name})||r.checks[i]):null;
+    var result=check?check.result:'未执行';
+    return '<div class="v47-ai-group"><button type="button" class="v47-ai-trigger" data-v47="ai-expand" data-ai="'+i+
+      '" aria-expanded="false"><b>'+(i+1)+'. '+esc(name)+'</b><span>'+esc(result)+'　⌄</span></button>'+
+      '<div class="v47-ai-body" data-ai-detail="'+i+'" hidden>'+detailFor(i,check)+'</div></div>';
+  }).join('');
+  openDrawer('AI 四类检查 · 文件/规则/整改闭环',notice+groups);
+};
 var v47PrevReviewer=v35Reviewer;v35Reviewer=function(d){var h=v47PrevReviewer(d);h=h.replace(/(先保存当前 Commit 的独立抽检结论，再查看 AI 对照结果。)/g,'正式检视阶段即可查看四类 AI 检查；三项必检影响准出，不影响查看。');h=h.replace(/(<button[^>]*data-v35="show-ai-manual"[^>]*?)\sdisabled(?:\s+title="[^"]*")?/g,'$1');return h};
 function v47StagePanel(){var f=v47Flow(),cur=state.lifecycleStage,k=cur==='closing'?'release':cur;if(!v47Labels[k])return '';var prior=v47Prereq(k),done=v47StageDone(k),steps=v47Stages.map(function(n){return '<span class="v47-step '+(v47StageDone(n)?'ok':'')+'">'+esc(v47Labels[n])+' · '+(v47StageDone(n)?'已完成':'待完成')+'</span>'}).join('');var actions='';if(k==='planning'){actions='<button class="v47-cta" data-v47="approve-stage" data-stage="planning" '+(done?'disabled':'')+'>模拟立项审核通过</button>'}if(k==='requirements'){actions='<button class="v47-btn" data-v47="doc-open" data-doc="requirement">在线编写规格书</button><button class="v47-cta" data-v47="approve-stage" data-stage="requirements" '+(!prior||done?'disabled':'')+'>提交并模拟需求审核通过</button>'}if(k==='design'){actions='<select id="v47DesignType" class="input" style="max-width:105px"><option value="I" '+(f.designType==='I'?'selected':'')+'>I 类</option><option value="II" '+(f.designType==='II'?'selected':'')+'>II 类</option><option value="III" '+(f.designType==='III'?'selected':'')+'>III 类</option><option value="IV" '+(f.designType==='IV'?'selected':'')+'>IV 类</option></select><button class="v47-btn" data-v47="doc-open" data-doc="design">在线编写设计文档</button><button class="v47-cta" data-v47="approve-stage" data-stage="design" '+(!prior||done?'disabled':'')+'>模拟设计评审通过</button>'}if(k==='development'){actions='<span class="mini-note">以当前检视工作台完成 AI / 人工检视及测试移交后准出</span>'}if(k==='testing'){actions='<button class="v47-cta" data-v47="demo-testing" '+(!prior||done?'disabled':'')+'>填写并模拟整机测试报告审核</button>'}if(k==='release'){actions='<button class="v47-cta" data-v47="demo-release" '+(!prior||done?'disabled':'')+'>模拟发布评审、归档并正式发布</button>'}return '<div class="v47-gate"><div class="v47-row"><div><b>全链路演示 · '+v47Labels[k]+'</b><div class="mini-note">当前项目：'+esc(project().name)+' · '+(done?'本阶段已完成':prior?'前置条件已满足':'前置阶段尚未完成，当前操作受阻')+'</div></div><div class="v47-row">'+actions+'</div></div><div class="v47-steps">'+steps+'</div></div>'}
 var v47PrevLifecycle=renderLifecycle;renderLifecycle=function(){var html=v47PrevLifecycle();if(state.lifecycleStage==='development')html=html.replace(/<div class="notice" style="align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border-color:#e4e7ec;color:#475467">[\s\S]*?data-v39="load">载入场景<\/button><\/div>/,'');var panel=v47StagePanel();return html.replace(/(<section class="page"[^>]*>)/,'$1'+panel)};
@@ -3281,7 +3335,7 @@ render();
 (function(){
  var kinds=['高风险必查','AI 未有效覆盖','独立抽检'];
  function latest(d,k){return d.manual.slice().reverse().find(function(r){return r.kind===k&&r.commit===d.commit})||null}
- function complete(r){return !!(r&&r.result==='无新增问题')}
+ function complete(r){return !!(r&&['无新增问题','规则反馈'].includes(r.result))}
  function ensureMockCommit(d){if(!d.commit){var key=String(state.projectId||'PROJECT').replace(/[^a-zA-Z0-9_-]/g,'-');d.commit='MOCK-R3-'+key;if(!d.commits)d.commits=[];if(!d.commits.some(function(x){return x.commit===d.commit}))d.commits.push({commit:d.commit,owner:d.developer||'Mock 检视',at:v35Stamp(),mock:true});v35Log('生成演示用 Mock Commit：'+d.commit)}return d.commit}
  function all(d){return !!(d&&d.commit&&kinds.every(function(k){return complete(latest(d,k))}))}
  function aiDone(d){var r=v35Latest();return !!(r&&r.commit===d.commit&&r.result==='完成'&&Array.isArray(r.checks)&&r.checks.length&&r.checks.every(function(c){return c.result==='通过'}))}
@@ -3310,33 +3364,34 @@ render();
    var left=v35Panel('检视资料',
      '<div class="v55-evidence"><b>Git 仓库 / Commit</b><p><button class="v43-evidence-link" data-v43="commit" '+(d.commit?'':'disabled')+'>'+esc55(d.commit||'尚无提交')+' ↗</button></p><small>'+esc55(d.repo||'Mock GitLab')+' / '+esc55(d.branch||'—')+'</small></div>'
      +'<div class="v55-evidence"><b>设计与需求依据</b><p>软件规格书、架构 / 概要 / 详细设计与关联需求</p><button class="v43-evidence-link" data-v43="design">查看设计依据 ›</button></div>'
-     +'<div class="v55-evidence"><b>AI 检视资料</b><p>文件一致性、正确性、方案一致性、点检项</p><small>本轮 Mock 演示不将 AI 检视作为人工检视前置条件。</small></div>'
+     +'<div class="v55-evidence"><b>AI 检视资料</b><p>文件一致性、文件正确性、方案与代码一致性、点检项检查</p>'+v35Btn('查看四项 AI 检视详情','show-ai-manual','')+'</div>'
      +'<div class="v55-evidence"><b>当前检视进度</b><p>已通过 '+kinds.filter(function(k){return complete(latest(d,k))}).length+' / 3 项</p><small>本轮为 Mock 演示，检视结论绑定演示 Commit。</small></div>');
    var tabs=kinds.map(function(k){
      var x=latest(d,k);return '<button type="button" class="v55-tab '+(kind===k?'active':'')+'" data-v55="tab" data-kind="'+esc55(k)+'"><b>'+esc55(k)+'</b><small>'+(!x?'未检查':x.result==='发现问题'?'发现问题':complete(x)?'已通过':'未通过')+'</small></button>';
    }).join('');
    var radios='<div class="v55-radio"><label><input type="radio" name="v55Result" value="无新增问题" '+(draft.result==='无新增问题'?'checked ':'')+(formal?'':'disabled')+'>无问题</label>'
-     +'<label><input type="radio" name="v55Result" value="发现问题" '+(draft.result==='发现问题'?'checked ':'')+(formal?'':'disabled')+'>发现问题 / 需要修改</label></div>';
+     +'<label><input type="radio" name="v55Result" value="发现问题" '+(draft.result==='发现问题'?'checked ':'')+(formal?'':'disabled')+'>发现问题 / 需要修改</label>'
+     +'<label><input type="radio" name="v55Result" value="规则反馈" '+(draft.result==='规则反馈'?'checked ':'')+(formal?'':'disabled')+'>规则反馈</label></div>';
    var format=[['p','正文'],['h2','二级标题'],['h3','三级标题'],['bold','加粗'],['italic','斜体'],['insertUnorderedList','列表']].map(function(x){
-     return '<button type="button" data-v55="format" data-format="'+x[0]+'" '+(formal&&draft.result==='发现问题'?'':'disabled')+'>'+x[1]+'</button>';
+     return '<button type="button" data-v55="format" data-format="'+x[0]+'" '+(formal&&['发现问题','规则反馈'].includes(draft.result)?'':'disabled')+'>'+x[1]+'</button>';
    }).join('');
    var right=v35Panel('人工检视',
      '<div class="v55-tabs">'+tabs+'</div><div class="v55-subtitle"><b>'+esc55(kind)+'</b> '
      +(r?v35Badge('已记录 · '+r.result,r.result==='发现问题'?'warn':'ok'):v35Badge('待检视','warn'))+'</div>'
-     +radios+'<div class="v55-detail '+(draft.result==='发现问题'?'':'hidden')+'"><label>问题描述、证据与修改要求（必填）</label>'
-     +'<div class="v55-format">'+format+'</div><div id="v55Editor" class="v55-editor" contenteditable="'+(formal&&draft.result==='发现问题'?'true':'false')+'">'+(draft.html||'')+'</div></div>'
+     +radios+'<div class="v55-detail '+(['发现问题','规则反馈'].includes(draft.result)?'':'hidden')+'"><label>'+(draft.result==='规则反馈'?'规则反馈内容（必填）':'问题描述、证据与修改要求（必填）')+'</label>'
+     +'<div class="v55-format">'+format+'</div><div id="v55Editor" class="v55-editor" contenteditable="'+(formal&&['发现问题','规则反馈'].includes(draft.result)?'true':'false')+'">'+(draft.html||'')+'</div></div>'
      +'<div class="v55-save"><button class="btn primary" data-v55="save" '+(formal?'':'disabled')+'>保存本项检视结论</button></div>'
-     +'<div class="v35-notice">仅当高风险、AI 未覆盖、独立抽检三项均选择「无问题」并保存后，才开放准出确认。发现问题的回流开发流程暂不纳入本轮演示。</div>');
+     +'<div class="v35-notice">三项均保存为「无问题」或「规则反馈」即可通过准出；任一项「发现问题」或未完成均阻断。</div>');
    return '<div class="v35-notice '+(formal?'':'warn')+'">'+(formal?'Mock 专业检视已开放，当前演示 Commit：'+esc55(d.commit):'请切换至检视工程师角色')+'</div>'
      +'<div class="v55-review-grid"><div>'+left+'</div><div>'+right+'</div></div>';
  };
  v35Exit=function(d){
-   var gates=[['高风险检视：无问题',!!latest(d,'高风险必查')&&complete(latest(d,'高风险必查'))],
-     ['AI 未覆盖检视：无问题',!!latest(d,'AI 未有效覆盖')&&complete(latest(d,'AI 未有效覆盖'))],
-     ['独立抽检：无问题',!!latest(d,'独立抽检')&&complete(latest(d,'独立抽检'))]];
+   var gates=[['高风险检视：无问题 / 规则反馈',!!latest(d,'高风险必查')&&complete(latest(d,'高风险必查'))],
+     ['AI 未覆盖检视：无问题 / 规则反馈',!!latest(d,'AI 未有效覆盖')&&complete(latest(d,'AI 未有效覆盖'))],
+     ['独立抽检：无问题 / 规则反馈',!!latest(d,'独立抽检')&&complete(latest(d,'独立抽检'))]];
    return v35Panel('R4 准出确认 · 检视工程师',
      '<div class="v35-list">'+gates.map(function(g){return '<div class="v35-check">'+v35Badge(g[1]?'通过':'阻断',g[1]?'ok':'bad')+' <span>'+esc55(g[0])+'</span></div>'}).join('')+'</div>'
-     +'<div class="v35-notice">Mock 演示规则：三项人工检视全部通过即可确认检视通过并移交测试。本轮暂不校验 AI 检视、R3 申请及问题整改闭环。</div>'
+     +'<div class="v35-notice">Mock 演示规则：三项人工检视均保存为「无问题」或「规则反馈」即可确认检视通过并移交测试；任一项发现问题或未完成均阻断。</div>'
      +'<div class="v35-row"><button class="btn primary" data-v55="exit" '+(valid(d)?'':'disabled')+'>确认检视通过并进入测试阶段</button></div>'
      +(d.approval?'<div class="v35-notice">已审批 Commit：'+esc55(d.approval.commit)+' · '+esc55(d.approval.at)+'</div>':''));
  };
@@ -3364,21 +3419,21 @@ render();
      ensureMockCommit(d);
      capture(d);
      var k=d.v55Tab,draft=initDraft(d),result=draft.result;
-     if(!['无新增问题','发现问题'].includes(result)){showToast('请先选择本项检查结果','warn');return}
+     if(!['无新增问题','发现问题','规则反馈'].includes(result)){showToast('请先选择本项检查结果','warn');return}
      var el=document.getElementById('v55Editor');
      var text=(el?(el.innerText||el.textContent||''):String(draft.html||'').replace(/<[^>]*>/g,'')).trim();
-     if(result==='发现问题'&&!text){showToast('发现问题必须填写问题说明与修改内容','warn');return}
+     if(['发现问题','规则反馈'].includes(result)&&!text){showToast(result==='规则反馈'?'规则反馈必须填写具体内容':'发现问题必须填写问题说明与修改内容','warn');return}
      d.manual=d.manual.filter(function(x){return !(x.kind===k&&x.commit===d.commit)});
-     d.manual.push({kind:k,commit:d.commit,result:result,text:result==='发现问题'?text:'',
-       richHtml:result==='发现问题'?draft.html:'',issueId:'',at:v35Stamp()});
-     d.v55Drafts[k]={result:result,html:result==='发现问题'?draft.html:''};
+     d.manual.push({kind:k,commit:d.commit,result:result,text:['发现问题','规则反馈'].includes(result)?text:'',
+       richHtml:['发现问题','规则反馈'].includes(result)?draft.html:'',issueId:'',at:v35Stamp(),feedbackType:result==='规则反馈'?'规则反馈':undefined});
+     d.v55Drafts[k]={result:result,html:['发现问题','规则反馈'].includes(result)?draft.html:''};
      v35Log('人工检视记录：'+k+' · '+result);
      v35Refresh();
-     showToast('已保存'+k+'的 Mock 检视结论'+(result==='发现问题'?'；本轮暂不执行问题回流，需三项均无问题才能准出':''));
+     showToast('已保存'+k+'的 Mock 检视结论'+(result==='发现问题'?'；当前结论阻断准出':result==='规则反馈'?'；规则反馈已记录并计入通过':'；本项已通过'));
      return;
    }
    if(act==='exit'){
-     if(!valid(d)){showToast('准出失败：请确认三项检查均已选择「无问题」并保存','warn');return}
+     if(!valid(d)){showToast('准出失败：请确认三项均已保存为「无问题」或「规则反馈」','warn');return}
      ensureMockCommit(d);
      if(!d.approval||d.approval.commit!==d.commit||!d.handoff){
        d.approval={commit:d.commit,at:v35Stamp(),reviewer:'检视工程师'};
@@ -3430,8 +3485,11 @@ render();
 (function(){
   var v55BaseRenderDevelopment=renderDevelopment;
 
-  // Keep the responsibility-developer selector, but remove the local role selector.
-  v35ShellTitle=function(d){
+  // Remove the entire redundant workbench header from both role views.
+  v35ShellTitle=function(){return ''};
+
+  // Legacy header renderer intentionally disabled; role and owner data remain intact.
+  var v55UnusedLegacyHeader=function(d){
     var roleName=state.role==='reviewer'?'检视工程师':'开发工程师';
     var people=['孙宁','李明','何盈'];
     if(d.developer&&people.indexOf(d.developer)<0)people.unshift(d.developer);
