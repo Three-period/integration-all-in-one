@@ -2462,8 +2462,62 @@ var v47PrevReady=v35Ready;v35Ready=function(){var r=v47PrevReady(),d=v35Data();i
 var v47PrevCard=v35SummaryCard;v35SummaryCard=function(title,status,note,type,badge){if(type==='repo'&&v35Data().v47NeedsNewCommit){status='待提交 · 整改新 Commit';badge='warn'}return v47PrevCard(title,status,note,type,badge)};
 var v47PrevDevelopment=renderDevelopment;renderDevelopment=function(){if(state.role!=='reviewer'&&state.role!=='developer')return '<div class="notice warn">开发阶段仅研发人员或检视工程师可以查看。请前往个人工作台切换角色。</div>';var d=v35Data();d.role=state.role==='reviewer'?'reviewer':'developer';var html=v47PrevDevelopment();html=html.replace(/<div class="v35-head">[\s\S]*?<\/div><\/div><div class="v35-tabs">[\s\S]*?<\/div>/,'');return html};
 var v47PrevAI=v43OpenAiResults;
-v43OpenAiResults=function(){var d=v35Data(),r=v35Latest();if(state.role!=='reviewer'){showToast('请切换至检视工程师角色后查看 AI 检视资料','warn');return}var row=function(t,meta){return '<div class="v47-ai-item"><b>'+esc(t)+'</b><small>'+esc(meta)+'</small></div>'};var aiIssues=d.issues.filter(function(i){return i.source==='AI 检视'});var names=['文件一致性','文件正确性','方案与代码一致性','点检项检查'];var blocks=[[
-row('src/device/connection.ts','源文件：匹配 · 文件版本与 Commit 一致'),row('config/reconnect.yaml','配置文件：匹配 · 缺失 0'),row('interfaces/device.proto','接口文件：匹配 · 校验通过')],[row('config/reconnect.yaml','语法与引用检查：通过'),row('src/device/connection.ts','基础格式、导入关系：通过'),row('interfaces/device.proto','依赖与字段完整性：通过')],row('D-009 · 断线重试规则一致','AI 已完成检视 · 当前 Commit 方案一致性核对通过')+(aiIssues.length?aiIssues.map(function(i){return row(i.id+' · '+i.title+' · '+i.status,'AI 检视发现项 · 设计依据：'+(i.evidence||'方案一致性规则')+'；原 Commit：'+i.commit+'；当前 Commit：'+d.commit+'；整改/裁定：'+(i.recheckedAt||i.verdict||i.reply||'持续跟踪中'))}).join(''):''),[row('R-017 · 异常状态回收','通过'),row('N-021 · 错误日志追踪标识','通过'),row('R-025 · 函数长度阈值','通过'),row('R-031 · 重复逻辑','通过'),row('N-013 · 接口异常错误码','通过'),row('D-009 · 设计与代码一致性','通过')].join('')];var body='<div class="notice">正式人工检视任务：'+esc(d.commit)+' · '+esc(r?r.id:'未找到批次')+'；以下是完整四类检查的 Mock 展开数据，查看不依赖三项必检完成。</div>'+names.map(function(n,i){var check=r&&r.checks&&r.checks[i],result=check?check.result:'未执行';return '<div class="v47-ai-group"><button class="v47-ai-trigger" data-v47="ai-expand" data-ai="'+i+'"><b>'+(i+1)+'. '+n+'</b><span>'+esc(result)+'　⌄</span></button><div class="v47-ai-body" data-ai-detail="'+i+'" '+'hidden'+'>'+(typeof blocks[i]==='string'?blocks[i]:blocks[i].join(''))+'</div></div>'}).join('');openDrawer('AI 四类检查 · 文件/规则/整改闭环',body)};
+v43OpenAiResults=function(){
+  if(state.role!=='reviewer'){
+    showToast('请切换至检视工程师角色后查看 AI 检视资料','warn');return;
+  }
+  var d=v35Data(),r=v35Latest();
+  var names=['文件一致性','文件正确性','方案与代码一致性','点检项检查'];
+  var aiIssues=d.issues.filter(function(issue){
+    return issue.source==='AI 检视'&&(issue.commit===d.commit||issue.recheckedCommit===d.commit);
+  });
+  function row(title,detail){
+    return '<div class="v47-ai-item"><b>'+esc(title)+'</b><small>'+esc(detail)+'</small></div>';
+  }
+  // Show example evidence only where a current-Commit AI check actually exists.
+  // The illustrative Mock rows below do not imply real GitLab or model execution.
+  function detailFor(index,check){
+    if(!check)return row('尚未执行','当前 Commit 无此项 AI 检视结果，不展示已完成结论。');
+    var info=row('检查结果：'+check.result,'AI 批次 '+r.id+' · '+(check.detail||'未提供详细说明'));
+    if(check.result!=='通过')return info+row('待核实','本项尚未通过，不能标记为 AI 已检视通过。');
+    var examples=[
+      [row('src/device/connection.ts','Mock：文件与 Commit 匹配'),
+       row('config/reconnect.yaml','Mock：文件存在且版本匹配'),
+       row('interfaces/device.proto','Mock：接口文件核对完成')],
+      [row('config/reconnect.yaml','Mock：语法与引用检查通过'),
+       row('src/device/connection.ts','Mock：基础格式、导入关系检查通过'),
+       row('interfaces/device.proto','Mock：依赖与字段完整性检查通过')],
+      [row('D-009 · 断线重试规则一致','Mock：已执行方案与代码一致性检查并通过')],
+      [row('R-017 · 异常状态回收','Mock：通过'),
+       row('N-021 · 错误日志追踪标识','Mock：通过'),
+       row('R-025 · 函数长度阈值','Mock：通过'),
+       row('R-031 · 重复逻辑','Mock：通过'),
+       row('N-013 · 接口异常错误码','Mock：通过'),
+       row('D-009 · 设计与代码一致性','Mock：通过')]
+    ];
+    var rows=examples[index].join('');
+    if(index===2&&aiIssues.length){
+      rows+=aiIssues.map(function(issue){
+        return row(issue.id+' · '+issue.title+' · '+issue.status,
+          '对应依据：'+(issue.evidence||'未提供')+'；原 Commit：'+issue.commit+
+          '；当前 Commit：'+d.commit+'；整改或复检：'+
+          (issue.recheckedAt||issue.verdict||issue.reply||'待处理'));
+      }).join('');
+    }
+    return info+row('下列是已完成检查的 Mock 明细','仅用于原型展示，不代表真实文件已接受 AI 检视。')+rows;
+  }
+  var notice='<div class="notice">当前 Commit：'+esc(d.commit||'未关联')+
+    ' · AI 批次：'+esc(r?r.id:'尚未执行')+
+    '。点击任一检查项展开该项下一级详情；仅显示当前 Commit 的 AI 检视状态。演示数据（Mock）。</div>';
+  var groups=names.map(function(name,i){
+    var check=r&&Array.isArray(r.checks)?(r.checks.find(function(item){return item.name===name})||r.checks[i]):null;
+    var result=check?check.result:'未执行';
+    return '<div class="v47-ai-group"><button type="button" class="v47-ai-trigger" data-v47="ai-expand" data-ai="'+i+
+      '" aria-expanded="false"><b>'+(i+1)+'. '+esc(name)+'</b><span>'+esc(result)+'　⌄</span></button>'+
+      '<div class="v47-ai-body" data-ai-detail="'+i+'" hidden>'+detailFor(i,check)+'</div></div>';
+  }).join('');
+  openDrawer('AI 四类检查 · 文件/规则/整改闭环',notice+groups);
+};
 var v47PrevReviewer=v35Reviewer;v35Reviewer=function(d){var h=v47PrevReviewer(d);h=h.replace(/(先保存当前 Commit 的独立抽检结论，再查看 AI 对照结果。)/g,'正式检视阶段即可查看四类 AI 检查；三项必检影响准出，不影响查看。');h=h.replace(/(<button[^>]*data-v35="show-ai-manual"[^>]*?)\sdisabled(?:\s+title="[^"]*")?/g,'$1');return h};
 function v47StagePanel(){var f=v47Flow(),cur=state.lifecycleStage,k=cur==='closing'?'release':cur;if(!v47Labels[k])return '';var prior=v47Prereq(k),done=v47StageDone(k),steps=v47Stages.map(function(n){return '<span class="v47-step '+(v47StageDone(n)?'ok':'')+'">'+esc(v47Labels[n])+' · '+(v47StageDone(n)?'已完成':'待完成')+'</span>'}).join('');var actions='';if(k==='planning'){actions='<button class="v47-cta" data-v47="approve-stage" data-stage="planning" '+(done?'disabled':'')+'>模拟立项审核通过</button>'}if(k==='requirements'){actions='<button class="v47-btn" data-v47="doc-open" data-doc="requirement">在线编写规格书</button><button class="v47-cta" data-v47="approve-stage" data-stage="requirements" '+(!prior||done?'disabled':'')+'>提交并模拟需求审核通过</button>'}if(k==='design'){actions='<select id="v47DesignType" class="input" style="max-width:105px"><option value="I" '+(f.designType==='I'?'selected':'')+'>I 类</option><option value="II" '+(f.designType==='II'?'selected':'')+'>II 类</option><option value="III" '+(f.designType==='III'?'selected':'')+'>III 类</option><option value="IV" '+(f.designType==='IV'?'selected':'')+'>IV 类</option></select><button class="v47-btn" data-v47="doc-open" data-doc="design">在线编写设计文档</button><button class="v47-cta" data-v47="approve-stage" data-stage="design" '+(!prior||done?'disabled':'')+'>模拟设计评审通过</button>'}if(k==='development'){actions='<span class="mini-note">以当前检视工作台完成 AI / 人工检视及测试移交后准出</span>'}if(k==='testing'){actions='<button class="v47-cta" data-v47="demo-testing" '+(!prior||done?'disabled':'')+'>填写并模拟整机测试报告审核</button>'}if(k==='release'){actions='<button class="v47-cta" data-v47="demo-release" '+(!prior||done?'disabled':'')+'>模拟发布评审、归档并正式发布</button>'}return '<div class="v47-gate"><div class="v47-row"><div><b>全链路演示 · '+v47Labels[k]+'</b><div class="mini-note">当前项目：'+esc(project().name)+' · '+(done?'本阶段已完成':prior?'前置条件已满足':'前置阶段尚未完成，当前操作受阻')+'</div></div><div class="v47-row">'+actions+'</div></div><div class="v47-steps">'+steps+'</div></div>'}
 var v47PrevLifecycle=renderLifecycle;renderLifecycle=function(){var html=v47PrevLifecycle();if(state.lifecycleStage==='development')html=html.replace(/<div class="notice" style="align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border-color:#e4e7ec;color:#475467">[\s\S]*?data-v39="load">载入场景<\/button><\/div>/,'');var panel=v47StagePanel();return html.replace(/(<section class="page"[^>]*>)/,'$1'+panel)};
