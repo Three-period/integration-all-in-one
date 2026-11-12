@@ -53,7 +53,7 @@ function canSubmit(d,m){
  if(!ready.commit||!ready.smoke||!ready.self)return {ok:false,reason:'请先完成冒烟、自测并提交当前 Commit'};
  if(!run)return {ok:false,reason:'当前 Commit 尚未生成 AI 检视批次'};
  if(own.length)return {ok:false,reason:'仍有 '+own.length+' 条开发/AI可自主处理问题：'+own.map(function(x){return x.id;}).join('、')};
- if(run.result!=='完成'&&!human.some(function(x){return x.source==='AI 执行异常';}))
+ if(run.result!=='完成'&&!human.some(function(x){return x.status==='待人工处置';}))
    return {ok:false,reason:'AI 执行异常，请先重试或登记人工处置异常'};
  if(!p)return {ok:true,type:'首次正式检视',issues:human};
  var unsettled=human.filter(function(i){return !i.humanTaskId;});
@@ -81,10 +81,16 @@ function createReview(d){
 function counts(d,m){return CHECKS.filter(function(k){return !!(m.process&&m.process.manualChecks[k]&&m.process.manualChecks[k].completed);}).length;}
 function chosenTask(m){return m.tasks.find(function(t){return t.taskId===m.selectedTaskId;})||m.tasks[m.tasks.length-1]||null;}
 function markTask(d,m){
- var t=chosenTask(m);if(!t)return;
- if(t.status==='已完成')return;
- var active=t.issueIds.some(function(id){var i=d.issues.find(function(x){return x.id===id;});return i&&['异议待裁定','待线下评审','待人工处置'].includes(i.status);});
- if(!active&&t.status!=='已返回整改')t.status='待准出确认';
+ var t=chosenTask(m);if(!t||t.status==='已完成')return;
+ var gate=approvalState(d,m);
+ var pending=t.issueIds.some(function(id){
+   var i=d.issues.find(function(x){return x.id===id;});
+   return i&&!CLOSED.includes(i.status);
+ });
+ if(gate.gate1&&gate.gate2)t.status='待准出确认';
+ else if(pending||gate.blockers.some(function(i){return i.status==='待整改'||i.status==='待复检';})){
+   if(t.status!=='已返回整改')t.status='处理中';
+ }else if(t.status!=='已返回整改')t.status='待处理';
 }
 function issueEligible(d,m,i){var t=chosenTask(m);return !!(t&&t.issueIds.indexOf(i.id)>=0&&['异议待裁定','待人工处置'].includes(i.status)&&!i.meetingGroupId);}
 function selectedIssues(d,m){return (d.issues||[]).filter(function(i){return m.selected.includes(i.id)&&issueEligible(d,m,i);});}
@@ -469,7 +475,8 @@ v46IsRecheck=function(){
 };
 v35PerformAi=function(mode){
  var d=data(),oldRun=(currentRun(d)||{}).id||'',oldCount=d.issues.length;
- if(mode==='pass'&&v46IsRecheck()){
+ var wasRecheck=v46IsRecheck();
+ if(mode==='pass'&&wasRecheck){
    // Recheck accepted issues; never close merely because Commit changed.
    d.issues.forEach(function(i){if(i.status==='待整改'&&i.commit!==d.commit)i.status='待复检';});
  }
@@ -479,6 +486,10 @@ v35PerformAi=function(mode){
  var m=model(d);
  if(mode==='pass'&&r.result==='完成'){
    d.issues.forEach(function(i){
+     if(i.status==='待人工处置'&&i.aiFailedRunId&&i.commit!==d.commit){
+       i.status='已闭环';i.recheckedCommit=d.commit;i.recheckRunId=r.id;
+       i.resolution='AI 再次有效复检通过（Mock）';
+     }
      if(['待复检','待整改'].includes(i.status)&&i.commit!==d.commit&&
       (i.source==='人工检视'||i.humanVerdictBy===ACTOR||i.meetingGroupId)){
        i.status='已关闭';i.latestCommit=d.commit;i.recheckedCommit=d.commit;
@@ -490,11 +501,27 @@ v35PerformAi=function(mode){
    });
  }else if(mode==='issues'){
    d.issues.forEach(function(i){if(i.status==='待复检'&&i.commit!==d.commit)i.status='待整改';});
+   if(wasRecheck){
+     // Distinct NEW finding in a recheck, rather than creating a second ID for a failed old finding.
+     var title='复检发现新增接口映射与设计方案不一致';
+     if(!d.issues.some(function(i){return i.title===title&&i.commit===d.commit;})){
+       d.issues.push({id:newId('ISS',d.issues),source:'AI 检视',title:title,
+         evidence:'当前复检批次 '+r.id+' · 独立新增问题（Mock）',commit:d.commit,run:r.id,
+         status:'待整改',createdAt:stamp(),dispute:'',reply:''});
+     }
+   }
  }
  if(mode==='fail'){
-   var id=newId('ERR',d.issues);
-   d.issues.push({id:id,source:'AI 执行异常',title:'AI 检视执行失败 / 无法判断',evidence:'批次 '+r.id+' · '+d.commit,
-     commit:d.commit,run:r.id,status:'待人工处置',createdAt:stamp(),dispute:'AI 无法判断'});
+   // Preserve existing issue IDs when AI cannot verify a recheck.
+   var candidates=openItems(d).filter(function(i){return ['待整改','待复检'].includes(i.status)&&i.commit!==d.commit;});
+   if(candidates.length){
+     candidates.forEach(function(i){i.status='待人工处置';i.aiFailedRunId=r.id;
+       i.reply=(i.reply||'')+'；'+r.id+' AI 复检无法判断，待人工处置';});
+   }else if(!d.issues.some(function(i){return i.source==='AI 执行异常'&&i.commit===d.commit&&i.status==='待人工处置';})){
+     var id=newId('ERR',d.issues);
+     d.issues.push({id:id,source:'AI 执行异常',title:'AI 检视执行失败 / 无法判断',evidence:'批次 '+r.id+' · '+d.commit,
+       commit:d.commit,run:r.id,status:'待人工处置',createdAt:stamp(),dispute:'AI 无法判断'});
+   }
  }
  if(m.process&&counts(d,m)===3&&openItems(d).length===0){
    var last=m.tasks[m.tasks.length-1];if(last&&last.status!=='已完成')last.status='待准出确认';
