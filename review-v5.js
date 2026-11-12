@@ -671,6 +671,4 @@ style.textContent=
 document.head.appendChild(style);
 document.title='一体化产品研发系统 · V56.0 检视流程原型';
 render();
-window.reviewV5Test={model:model,canSubmit:canSubmit,approvalState:approvalState,createReview:createReview,
-  openItems:openItems,issueEligible:issueEligible,counts:counts,entries:entries};
 })();
