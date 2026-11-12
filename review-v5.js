@@ -43,11 +43,22 @@ function model(d){
 function approvalState(d,m){
  var process=m.process,run=currentRun(d),blockers=openItems(d),
      missing=CHECKS.filter(function(k){return !(process&&process.manualChecks[k]&&process.manualChecks[k].completed);});
- var aiValid=!!(run&&run.result==='完成'&&(run.checks||[]).every(function(c){return c.result==='通过';}));
+ var aiValid=!!(run&&run.result==='完成'&&Array.isArray(run.checks)&&
+   run.checks.length>0&&run.checks.every(function(c){return c.result==='通过';}));
+ // A failed AI run can only be cleared through explicit, recorded per-issue human
+ // "no issue" verdicts. It must never silently pass on missing checks or a new Commit.
+ var failedRunIssues=run?(d.issues||[]).filter(function(i){
+   return (i.run===run.id&&i.source==='AI 执行异常')||i.aiFailedRunId===run.id;
+ }):[];
+ var manualResolution=!!(process&&run&&run.result==='执行失败'&&failedRunIssues.length>0&&
+   failedRunIssues.every(function(i){return CLOSED.includes(i.status)&&
+     (m.verdicts||[]).some(function(v){return v.issueId===i.id&&v.result==='无问题';});
+   }));
  var hasTask=!!(process&&process.firstFormalTaskId);
- var gate1=blockers.length===0&&aiValid,gate2=missing.length===0;
+ var gate1=blockers.length===0&&(aiValid||manualResolution),gate2=missing.length===0;
  return {process:process,gate1:gate1,gate2:gate2,passed:gate1&&gate2&&hasTask&&state.role==='reviewer'&&!process.approval,
-    missing:missing,blockers:blockers,aiValid:aiValid,hasTask:hasTask};
+    missing:missing,blockers:blockers,aiValid:aiValid||manualResolution,
+    aiManuallyResolved:manualResolution,hasTask:hasTask};
 }
 function canSubmit(d,m){
  var run=currentRun(d),ready=v35Ready(),own=selfItems(d),human=humanItems(d),p=m.process;
