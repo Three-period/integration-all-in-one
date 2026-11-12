@@ -403,14 +403,16 @@ function manualSave(){
  }
  if(!changes.length){showToast('请至少完成一项尚未保存的检查','warn');return;}
  changes.forEach(function(change){
-  var ids=change.rows.map(function(row){
+  // Allocate IDs after every insert: multiple findings in one check must never share an ID.
+  var ids=[];
+  change.rows.forEach(function(row){
    var issueId=newId('HUM',d.issues);
    var issue={id:issueId,source:'人工检视',title:row.title,evidence:parseText(row.richHtml),
     richHtml:row.richHtml,requirement:row.requirement,kind:change.kind,
     commit:d.commit,originCommit:d.commit,latestCommit:d.commit,
     run:(currentRun(d)||{}).id||'',status:'待整改',reviewTaskId:m.selectedTaskId,
     processId:p.id,createdBy:ACTOR,createdAt:stamp(),reply:''};
-   d.issues.push(issue);return issueId;
+   d.issues.push(issue);ids.push(issueId);
   });
   p.manualChecks[change.kind]={completed:true,result:change.result,findings:ids,
     commit:d.commit,at:stamp(),reviewTaskId:m.selectedTaskId};
