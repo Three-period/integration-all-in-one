@@ -22,12 +22,13 @@ function model(d){
      view:'todos',filter:'全部',query:'',batchDraft:{},manualDraft:{},candidateDraft:null,meetingDraft:{},counter:0};
  }
  var m=d.reviewV5;
+ if(m.process)m.process.currentCommit=d.commit;
  // Existing V55.6 demo/older state: import only a real formalRequest belonging to an existing Commit.
  if(!m.process&&d.formalRequest&&d.commit&&(d.commits||[]).some(function(c){return c.commit===d.formalRequest.commit;})){
    var id='PROC-001',task={taskId:'REV-001',processId:id,round:1,type:'首次正式检视',commit:d.formalRequest.commit,
      aiRunId:(currentRun(d)||{}).id||'',issueIds:humanItems(d).map(function(i){return i.id;}),
      status:d.approval?'已完成':'待处理',createdAt:d.formalRequest.at||stamp(),owner:d.formalRequest.owner||d.developer};
-   m.process={id:id,firstReviewCommit:d.formalRequest.commit,firstFormalTaskId:task.taskId,
+   m.process={id:id,currentCommit:d.commit,firstReviewCommit:d.formalRequest.commit,firstFormalTaskId:task.taskId,
      manualChecks:{},approval:d.approval||null};
    m.tasks.push(task);m.selectedTaskId=task.taskId;m.counter=1;
    (d.manual||[]).forEach(function(row){
@@ -65,7 +66,7 @@ function createReview(d){
  if(state.role!=='developer'){showToast('仅开发工程师可以提交人工检视申请','warn');return false;}
  var r=currentRun(d),p=m.process;
  if(!p){
-   p={id:newId('PROC',[{id:''}]),firstReviewCommit:d.commit,firstFormalTaskId:'',manualChecks:{},approval:null};
+   p={id:newId('PROC',[{id:''}]),currentCommit:d.commit,firstReviewCommit:d.commit,firstFormalTaskId:'',manualChecks:{},approval:null};
    m.process=p;
  }
  var taskId=newId('REV',m.tasks),task={taskId:taskId,processId:p.id,round:m.tasks.length+1,type:can.type,
@@ -73,7 +74,9 @@ function createReview(d){
    status:'待处理',createdAt:stamp(),owner:d.developer};
  if(!p.firstFormalTaskId)p.firstFormalTaskId=taskId;
  m.tasks.push(task);m.selectedTaskId=taskId;m.view='todos';m.selected=[];
- can.issues.forEach(function(i){i.humanTaskId=taskId;});
+ can.issues.forEach(function(i){i.humanTaskId=taskId;i.reviewTaskId=taskId;i.processId=p.id;
+   if(!i.originCommit)i.originCommit=i.commit;i.latestCommit=d.commit;
+ });
  d.formalRequest={commit:d.commit,at:task.createdAt,owner:d.developer,processId:p.id,reviewTaskId:taskId};
  v35Log('提交 '+task.taskId+' · '+task.type+'（过程 '+p.id+'）');
  return true;
@@ -484,6 +487,12 @@ v35PerformAi=function(mode){
  var r=currentRun(d);
  if(!r||r.id===oldRun)return;
  var m=model(d);
+ if(m.process)m.process.currentCommit=d.commit;
+ d.issues.slice(oldCount).forEach(function(i){
+   if(!i.originCommit)i.originCommit=i.commit;
+   i.latestCommit=d.commit;
+   if(m.process)i.processId=m.process.id;
+ });
  if(mode==='pass'&&r.result==='完成'){
    d.issues.forEach(function(i){
      if(i.status==='待人工处置'&&i.aiFailedRunId&&i.commit!==d.commit){
@@ -523,8 +532,9 @@ v35PerformAi=function(mode){
        commit:d.commit,run:r.id,status:'待人工处置',createdAt:stamp(),dispute:'AI 无法判断'});
    }
  }
- if(m.process&&counts(d,m)===3&&openItems(d).length===0){
-   var last=m.tasks[m.tasks.length-1];if(last&&last.status!=='已完成')last.status='待准出确认';
+ if(m.process){
+   var last=m.tasks[m.tasks.length-1];
+   if(last&&last.status!=='已完成')markTask(d,m);
  }
  v35AI();
 };
