@@ -136,8 +136,7 @@ function todoPage(d,m){
  return v35Panel('检视待办 · 人工介入轮次',control+
   '<div class="table-wrap"><table class="v5-table"><thead><tr><th>待办</th><th>过程</th><th>轮次</th><th>Commit / AI</th><th>裁定数</th><th>状态</th><th>发起人 / 时间</th><th>操作</th></tr></thead><tbody>'+
   (rows||'<tr><td colspan="8" class="v5-empty">暂无符合条件的人工检视待办。开发工程师提交正式人工检视后才会生成任务。</td></tr>')+
-  '</tbody></table></div>'+
-  '<div class="v35-notice">仅正式人工介入申请生成任务；开发异议暂存、单纯新 Commit 和 AI 复检不会自动创建待办。</div>');
+  '</tbody></table></div>');
 }
 function issueCard(d,m,t){
  var pending=(d.issues||[]).filter(function(i){return t.issueIds.includes(i.id);});
@@ -193,14 +192,8 @@ function professionalPage(d,m){
  var t=chosenTask(m),p=m.process;
  if(!p||!t)return '<div class="v35-notice warn">尚无正式人工检视任务。请由开发工程师完成自主整改后发起人工检视申请。</div>';
  if(t.status!=='已完成')markTask(d,m);
- var run=currentRun(d);
- var banner='<div class="v5-summary"><b>正式检视过程：'+h(p.id)+'</b><div>项目：'+h(project().name)+' · 开发任务：'+h(d.task)+
-   ' · 待办：'+h(t.taskId)+' · 第 '+t.round+' 轮 · '+h(t.status)+'</div>'+
-   '<div>当前 Commit：'+h(d.commit)+' · 首次人工检视基线：'+h(p.firstReviewCommit)+
-   ' · AI 批次：'+h(run&&run.id||'未执行')+' · 待裁定：'+humanItems(d).length+
-   ' · 待闭环：'+openItems(d).length+' · 人工检查：'+counts(d,m)+'/3</div></div>';
  var left=issueCard(d,m,t)+manualCard(d,m,t)+feedbackCard(d,m,t);
- return banner+'<div class="v5-columns"><section class="v5-left">'+left+'</section><aside class="v5-right">'+evidencePanel(d)+'</aside></div>'+
+ return '<div class="v5-columns"><section class="v5-left">'+left+'</section><aside class="v5-right">'+evidencePanel(d)+'</aside></div>'+
     exitPanel(d,m,t);
 }
 function reviewerPage(d){
@@ -661,7 +654,6 @@ style.textContent=
 '.v5-root{display:grid;gap:13px;font-size:12px}.v5-root .v35-panel{margin:0 0 12px}'+
 '.v5-tabs{display:flex;gap:8px;margin-bottom:13px}.v5-tabs button{border:1px solid #d3dce9;border-radius:6px;padding:10px 20px;background:#fff;cursor:pointer;color:#475467}.v5-tabs button.active{background:#e9f1ff;border-color:#416fc6;color:#174ea6;font-weight:700}'+
 '.v5-columns{display:grid;grid-template-columns:minmax(0,65fr) minmax(0,35fr);gap:15px;align-items:start}.v5-left,.v5-right{min-width:0}.v5-evidence{border-bottom:1px solid #e6eaf1;padding:11px 0}.v5-evidence:last-child{border-bottom:0}.v5-evidence p{margin:7px 0}'+
-'.v5-summary{border:1px solid #dce4f2;border-radius:7px;background:#f6faff;padding:13px;line-height:2}.v5-summary b{font-size:14px}'+
 '.v5-toolbar,.v5-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 0}.v5-row>*:first-child{margin-right:auto}.v5-toolbar input,.v5-toolbar select,.v5-root input,.v5-root textarea,.v5-root select{border:1px solid #d3dce9;border-radius:5px;padding:7px;font-size:12px;max-width:100%}.v5-root label{display:grid;gap:5px;margin:9px 0;color:#475467}'+
 '.v5-table{width:100%;border-collapse:collapse;font-size:11px}.v5-table th,.v5-table td{border-bottom:1px solid #e6eaf0;padding:9px;text-align:left;vertical-align:top;max-width:210px;word-break:break-word}.v5-table th{color:#667085;background:#f8fafc}.v5-table small{display:block;color:#98a2b3;margin-top:3px}.v5-empty{text-align:center;color:#98a2b3;padding:16px}'+
 '.v5-note{padding:8px 0;color:#667085;line-height:1.7}.v5-gates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}.v5-gate{border:1px solid #dae2ed;padding:12px;border-radius:6px}.v5-gate div{font-size:11px;color:#667085;margin-top:8px;line-height:1.6}'+
