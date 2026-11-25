@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Serve the static prototype with Vite for live reload.
-exec pnpm dlx vite@6 --port "$PORT" --strictPort --host
+exec pnpm exec vite --port "$PORT" --strictPort --host

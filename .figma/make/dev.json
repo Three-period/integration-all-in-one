@@ -1,0 +1,4 @@
+{
+  // Reinstall when dependency metadata changes.
+  "installOn": ["package.json", "pnpm-lock.yaml"]
+}

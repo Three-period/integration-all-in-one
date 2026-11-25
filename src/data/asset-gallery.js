@@ -1,0 +1,103 @@
+/** 业务资产画廊的 Mock 数据。 */
+/* V42: 业务资产管理 Gallery — scoped additions only */
+export const assetGalleryData = [
+  {
+    id: 'inspection',
+    title: '点检项库',
+    subtitle: '结构化研发点检项与适用场景',
+    symbol: '✓',
+    tone: 'blue',
+    items: [
+      {
+        id: 'CHK-001',
+        name: '禁止三元表达式嵌套',
+        type: '代码质量',
+        source: '编码点检项',
+        status: '示例',
+        summary: '检查复杂条件表达式中的嵌套三元运算符，建议改写为清晰的条件分支。',
+      },
+      {
+        id: 'CHK-002',
+        name: '函数长度阈值检查',
+        type: '可维护性',
+        source: '编码点检项',
+        status: '示例',
+        summary: '识别长度超过约定阈值的函数；具体阈值由项目规范确定。',
+      },
+      {
+        id: 'CHK-003',
+        name: '异常分支完整性检查',
+        type: '健壮性',
+        source: '研发点检项',
+        status: '示例',
+        summary: '检查关键调用失败后的返回、日志及清理路径是否完整。',
+      },
+    ],
+  },
+  {
+    id: 'standards',
+    title: '代码规范库',
+    subtitle: '研发编码规范、审查标准与参考说明',
+    symbol: '</>',
+    tone: 'purple',
+    items: [
+      {
+        id: 'STD-001',
+        name: '命名与代码可读性规范',
+        type: '编码规范',
+        source: '团队规范',
+        status: '示例',
+        summary: '演示命名约定、变量含义表达和注释原则。',
+      },
+      {
+        id: 'STD-002',
+        name: '异常处理与日志规范',
+        type: '设计规范',
+        source: '团队规范',
+        status: '示例',
+        summary: '演示异常捕获、错误传播、日志分级与敏感信息处理要求。',
+      },
+      {
+        id: 'STD-003',
+        name: 'Git Commit 提交规范',
+        type: '协作规范',
+        source: '研发规范',
+        status: '示例',
+        summary: '演示提交信息格式、提交粒度及代码审查关联要求。',
+      },
+    ],
+  },
+  {
+    id: 'experience',
+    title: 'AI 检视经验库',
+    subtitle: 'AI 检视完成后沉淀的案例与处理经验',
+    symbol: '✦',
+    tone: 'green',
+    items: [
+      {
+        id: 'EXP-001',
+        name: '重复逻辑识别与整改案例',
+        type: '整改经验',
+        source: 'AI 检视案例',
+        status: '示例',
+        summary: '记录重复逻辑如何定位、整改与复检，便于后续参考。',
+      },
+      {
+        id: 'EXP-002',
+        name: '疑似误报的异议处理案例',
+        type: '异议复盘',
+        source: '人工裁定',
+        status: '示例',
+        summary: '记录 AI 原始判断、开发异议依据及最终裁定过程。',
+      },
+      {
+        id: 'EXP-003',
+        name: '人工检视补充发现案例',
+        type: '漏检经验',
+        source: '专业检视',
+        status: '示例',
+        summary: '记录 AI 未覆盖的问题和人工新增问题的后续闭环路径。',
+      },
+    ],
+  },
+];

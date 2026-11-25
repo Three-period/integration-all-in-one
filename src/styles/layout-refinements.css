@@ -1,0 +1,91 @@
+.v49-stage-nav {
+  display: flex !important;
+  overflow-x: auto !important;
+  flex-wrap: nowrap !important;
+  gap: 0;
+  align-items: center;
+}
+.v49-stage-nav > .req-lifecycle-tab {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  visibility: visible !important;
+}
+.v49-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.v49-on {
+  background: #19ae68;
+  box-shadow: 0 0 0 2px rgba(25, 174, 104, 0.1);
+}
+.v49-off {
+  background: #a3aaba;
+}
+.v49-not-started {
+  color: #8992a2 !important;
+}
+.v49-locked-note {
+  border: 1px solid #e3e7ee;
+  background: #f8fafc;
+  color: #667085;
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.v49-locked-stage input,
+.v49-locked-stage textarea,
+.v49-locked-stage select,
+.v49-locked-stage [contenteditable] {
+  pointer-events: none !important;
+  opacity: 0.65;
+}
+.v49-locked-stage button,
+.v49-locked-stage a {
+  cursor: not-allowed !important;
+}
+.flow-view-diagram-viewport {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-width: auto;
+  overscroll-behavior-x: contain;
+}
+.flow-view-diagram {
+  min-width: 4540px !important;
+  max-width: none !important;
+}
+.flow-view-canvas {
+  min-width: 0 !important;
+  overflow: hidden;
+}
+.flow-view-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 300px) !important;
+}
+@media (max-width: 1050px) {
+  .flow-view-layout {
+    grid-template-columns: minmax(0, 1fr) 270px !important;
+  }
+}
+/* V56.1: collapse the approval rail without reserving its grid column. */
+.flow-view-layout.approval-collapsed {
+  grid-template-columns: minmax(0, 1fr) !important;
+  column-gap: 0;
+}
+.flow-view-layout.approval-collapsed > .flow-view-canvas {
+  grid-column: 1/-1;
+  width: 100%;
+  min-width: 0;
+}
+.flow-view-layout.approval-collapsed > .flow-view-approval {
+  display: none;
+}
+.flow-view-layout.approval-collapsed .flow-view-diagram-viewport {
+  width: 100%;
+  max-width: 100%;
+}

@@ -1,0 +1,25 @@
+.v55-global-role-head {
+  margin-bottom: 13px;
+  padding: 13px 15px;
+  background: #fff;
+  border: 1px solid #e5eaf2;
+  border-radius: 6px;
+}
+.v55-global-role-head h2 {
+  font-size: 15px;
+  margin: 0 0 5px;
+}
+.v55-global-role-head .v35-tools {
+  align-items: center;
+  gap: 12px;
+}
+.v55-global-role-head label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #667085;
+  font-size: 11px;
+}
+.v55-global-role-head select {
+  min-width: 105px;
+}

@@ -1,0 +1,239 @@
+.v47-reset {
+  margin: 12px 10px;
+  padding: 10px 12px;
+  width: calc(100% - 20px);
+  border: 1px solid #d5e0ef;
+  border-radius: 7px;
+  background: #f5f8ff;
+  color: #294878;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+.v47-gate {
+  margin: 14px 0;
+  padding: 17px;
+  background: #fff;
+  border: 1px solid #dae3f0;
+  border-radius: 9px;
+}
+.v47-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.v47-steps {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 11px;
+}
+.v47-step {
+  padding: 7px 10px;
+  border: 1px solid #dae1ec;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #475467;
+}
+.v47-step.ok {
+  background: #e7f7ed;
+  border-color: #b3e1c4;
+  color: #027a48;
+}
+.v47-cta {
+  background: #194a9c;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.v47-cta:disabled {
+  background: #c6ced9;
+  cursor: not-allowed;
+}
+.v47-btn {
+  background: #fff;
+  border: 1px solid #cfd9e8;
+  color: #344054;
+  border-radius: 6px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.v47-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.v47-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+}
+.v47-field input,
+.v47-field select,
+.v47-field textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #d3dae5;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 12px;
+}
+.v47-field.full {
+  grid-column: 1/-1;
+}
+.v47-field small {
+  color: #98a2b3;
+}
+.v47-field label {
+  font-weight: 600;
+  color: #344054;
+}
+.v47-ai-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  margin: 9px 0;
+  background: #fff;
+  overflow: hidden;
+}
+.v47-ai-trigger {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: #f7faff;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.v47-ai-body {
+  padding: 12px;
+}
+.v47-ai-item {
+  padding: 10px;
+  border-bottom: 1px solid #edf0f5;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.v47-ai-item:last-child {
+  border-bottom: 0;
+}
+.v47-ai-item small {
+  display: block;
+  color: #667085;
+  margin-top: 3px;
+}
+.v47-doc {
+  border: 1px solid #dce3ed;
+  border-radius: 8px;
+  background: white;
+  margin: 10px 0;
+  overflow: hidden;
+}
+.v47-doc-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 9px;
+  border-bottom: 1px solid #e4e8ee;
+  background: #f8fafc;
+}
+.v47-doc-bar button {
+  border: 1px solid #d8e1ed;
+  background: white;
+  border-radius: 5px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.v47-editor {
+  padding: 16px;
+  min-height: 160px;
+  line-height: 1.8;
+  outline: 0;
+  font-size: 13px;
+}
+.v47-editor h1 {
+  font-size: 20px;
+}
+.v47-editor h2 {
+  font-size: 17px;
+}
+.v47-editor h3 {
+  font-size: 15px;
+}
+.v47-comment {
+  padding: 9px 12px;
+  border-top: 1px solid #e3e8f0;
+  font-size: 12px;
+}
+.v47-comment textarea {
+  width: 100%;
+  min-height: 55px;
+  border: 1px solid #d3dae5;
+  border-radius: 5px;
+  padding: 8px;
+}
+.v47-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.v47-chart-card {
+  padding: 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+}
+.v47-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 11px;
+}
+.v47-bar span {
+  width: 86px;
+  flex: none;
+}
+.v47-bar div {
+  flex: 1;
+  background: #edf2fa;
+  border-radius: 4px;
+  height: 11px;
+  overflow: hidden;
+}
+.v47-bar i {
+  height: 100%;
+  display: block;
+  background: #517dd7;
+  border-radius: 4px;
+}
+.v47-line {
+  fill: none;
+  stroke: #356cc4;
+  stroke-width: 3;
+}
+.v47-stack {
+  display: flex;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #edf2fa;
+}
+@media (max-width: 900px) {
+  .v47-form,
+  .v47-ops-grid {
+    grid-template-columns: 1fr;
+  }
+}
