@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  aiRequestCheck,
   devReadiness,
   isAiReviewClear,
   isFormalReviewReady,
@@ -11,7 +12,7 @@ const dev = (over = {}) => ({
   developer: '孙宁',
   commit: 'c1',
   commits: [{ commit: 'c1', owner: '孙宁' }],
-  smokes: [{ commit: 'c1', owner: '孙宁' }],
+  smokes: [{ commit: 'c1', owner: '孙宁', result: '通过' }],
   selfTests: [{ commit: 'c1', owner: '孙宁' }],
   runs: [],
   issues: [],
@@ -23,6 +24,8 @@ describe('devReadiness', () => {
   it('is ready when the developer committed with smoke and self-test records', () => {
     expect(devReadiness(dev(), { smoke: {}, self: null })).toEqual({
       smoke: true,
+      smokeResult: '通过',
+      smokePassed: true,
       self: true,
       commit: true,
       stageSmoke: true,
@@ -90,5 +93,30 @@ describe('AI review results', () => {
       false,
     );
     expect(isFormalReviewReady(dev({ runs: [passRun] }))).toBe(false);
+  });
+});
+
+describe('aiRequestCheck', () => {
+  it('requires smoke, self-test and commit first', () => {
+    const r = devReadiness(dev({ selfTests: [] }), {});
+    expect(aiRequestCheck(r)).toEqual({
+      ok: false,
+      reason: '准入失败：须依次完成冒烟、自测和 Commit',
+    });
+  });
+
+  it('blocks failed or unconfirmed smoke results', () => {
+    for (const result of ['失败', '待确认']) {
+      const r = devReadiness(dev({ smokes: [{ commit: 'c1', owner: '孙宁', result }] }), {});
+      expect(r.smoke).toBe(true);
+      expect(aiRequestCheck(r)).toEqual({
+        ok: false,
+        reason: `冒烟测试结果为「${result}」，未通过，不能申请 AI 检视`,
+      });
+    }
+  });
+
+  it('allows the request when the bound smoke result passed', () => {
+    expect(aiRequestCheck(devReadiness(dev(), {}))).toEqual({ ok: true });
   });
 });

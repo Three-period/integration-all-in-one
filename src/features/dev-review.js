@@ -5,6 +5,7 @@ import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import {
+  aiRequestCheck,
   devReadiness,
   findCurrentRecord as findCurrentRecordRule,
   isAiReviewClear as isAiReviewClearRule,
@@ -13,6 +14,7 @@ import {
   pendingIssues as pendingIssuesRule,
 } from '../domain/dev-review.js';
 import { isRecheckRun as isRecheckRunRule } from '../domain/review-gates.js';
+import { syncHandoff } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
 /* V35: Same-task, same-developer, same-commit mock lifecycle for development & review. */
@@ -313,7 +315,7 @@ function openSmokeDrawer() {
         escText(record ? record.text : d.smokeText) +
         '</textarea></div><div class="v35-row">' +
         devButton('提交冒烟测试记录', 'submit-smoke', '', 'primary') +
-        '</div><div class="v35-notice warn">冒烟结果失败是否阻断 AI 申请，业务规则尚未确认。本原型仅校验该 Commit 已完成记录，不擅自将“通过”设为强制条件。</div>',
+        '</div><div class="v35-notice warn">冒烟结果为“通过”才能申请 AI 检视；“失败”或“待确认”需修复后重新执行冒烟。</div>',
     ) +
       devPanel(
         '历史冒烟记录',
@@ -356,7 +358,8 @@ function openAiReviewDrawer() {
   var d = getDevReview(),
     r = latestAiRun(),
     ready = getDevReadiness(),
-    can = ready.smoke && ready.self && ready.commit;
+    check = aiRequestCheck(ready),
+    can = check.ok;
   var tabs =
     '<div class="v35-section-tabs">' +
     [
@@ -382,7 +385,7 @@ function openAiReviewDrawer() {
     content =
       '<div class="v35-notice">准入校验：' +
       [
-        ['① 冒烟', ready.smoke],
+        ['① 冒烟通过', ready.smokePassed],
         ['② 自测', ready.self],
         ['③ Commit', ready.commit],
       ]
@@ -396,10 +399,11 @@ function openAiReviewDrawer() {
       devButton(
         '提交 AI 检视申请',
         'request-ai',
-        can ? '' : 'disabled title="须同一人员依次完成冒烟、自测、Commit 并绑定同一版本"',
+        can ? '' : 'disabled title="' + escText(check.reason) + '"',
         'primary',
       ) +
       '</div>' +
+      (can ? '' : '<div class="v35-notice warn">' + escText(check.reason) + '</div>') +
       (r
         ? devPanel(
             '当前检视批次 ' + escText(r.id) + ' · ' + escText(r.commit),
@@ -866,9 +870,9 @@ function applyReviewVerdict(i, result, comment) {
 
 function performAiReview(mode) {
   var d = getDevReview(),
-    ready = getDevReadiness();
-  if (!(ready.commit && ready.smoke && ready.self)) {
-    showToast('准入失败：须依次完成冒烟、自测和 Commit', 'warn');
+    check = aiRequestCheck(getDevReadiness());
+  if (!check.ok) {
+    showToast(check.reason, 'warn');
     return;
   }
   var recheck = isRecheckRun(),
@@ -1391,6 +1395,7 @@ export function initDevReview() {
         return;
       }
       d.approval = { commit: d.commit, at: nowStamp(), reviewer: '检视工程师' };
+      syncHandoff();
       logDevEvent('检视工程师确认准出');
       refreshDevView();
       return;
@@ -1406,6 +1411,7 @@ export function initDevReview() {
         return;
       }
       d.handoff = true;
+      syncHandoff();
       logDevEvent('拟提测 Commit 一致，已模拟移交测试阶段');
       state.lifecycleStage = 'testing';
       App.render();

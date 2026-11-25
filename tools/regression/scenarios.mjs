@@ -7,12 +7,13 @@ import { openPage, snapshot, hashSnapshot, tick } from './browser.mjs';
 const stage = (name) => ({ sel: `[data-action="lifecycle-stage"][data-stage="${name}"]` });
 const asRole = (role) => [{ nav: 'dashboard' }, { role }, { nav: 'project-lifecycle' }];
 
-const developerSubmitsForReview = (aiMode) => [
+const developerSubmitsForReview = (aiMode, smokeResult = '通过') => [
   { role: 'developer' },
   { nav: 'project-lifecycle' },
   stage('development'),
   { sel: '[data-v35=open][data-kind=smoke]' },
-  { fill: { '#v35SmokeText': '冒烟通过' } },
+  { select: { '#v35SmokeResult': smokeResult } },
+  { fill: { '#v35SmokeText': '冒烟执行记录' } },
   { sel: '[data-v35=submit-smoke]' },
   { sel: '[data-v35=open][data-kind=self]' },
   { fill: { '#v35SelfEditor': '自测全部通过' } },
@@ -58,6 +59,10 @@ const closeProject = [
 ];
 
 export const scenarios = [
+  {
+    name: '冒烟结果未通过时不能申请 AI 检视',
+    steps: [...developerSubmitsForReview('pass', '失败'), { sel: '[data-action=close-drawer]' }],
+  },
   {
     name: '主流程：开发 → AI 检视 → 专业检视 → 测试 → 发布 → 结项',
     steps: [

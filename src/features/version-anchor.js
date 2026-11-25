@@ -25,6 +25,10 @@ let baseResetDemoData;
 
 /* V52: unified cross-stage commit anchor and test/release/closing gates */
 
+/**
+ * 提测 Commit 变化时更新版本锚点：旧版本记入历史，并作废其测试审核、发布评审、发布与结项记录。
+ * 在检视通过、开发提测等改变提测状态的操作之后调用。
+ */
 export function syncHandoff() {
   var d = getDevReview(),
     x = getVersionAnchor();
@@ -55,11 +59,17 @@ export function syncHandoff() {
   return '';
 }
 
+/**
+ * 当前提测 Commit：开发已提测且与检视通过的 Commit 一致、版本锚点也已同步时返回，否则为空。
+ * 只读取，不修改数据；锚点在检视通过 / 提测时由 syncHandoff() 显式更新。
+ */
 export function getHandoffCommit() {
-  return syncHandoff();
+  var d = getDevReview(),
+    x = getVersionAnchor();
+  return isHandoffReady(d) && x.handoffCommit === d.approval.commit ? x.handoffCommit : '';
 }
 
-/** 当前项目的版本门禁（规则见 domain/release-gate.js）；读取前会先同步提测 Commit。 */
+/** 当前项目的版本门禁（规则见 domain/release-gate.js）。 */
 export function getReleaseGate() {
   var anchor = getVersionAnchor();
   return computeReleaseGate(anchor, getHandoffCommit());

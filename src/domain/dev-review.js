@@ -3,6 +3,9 @@
 /** AI 检视中视为已闭环的问题状态。 */
 export const AI_CLOSED_STATUSES = ['已关闭', '授权例外'];
 
+/** 冒烟测试通过的结果值；"失败"和"待确认"都不允许申请 AI 检视。 */
+export const SMOKE_PASSED = '通过';
+
 /** 当前 Commit 由当前开发人员提交的最新一条记录（冒烟 / 自测）。 */
 export function findCurrentRecord(dev, list) {
   return list
@@ -19,8 +22,11 @@ export function findCurrentRecord(dev, list) {
  */
 export function devReadiness(dev, prep) {
   const owner = dev.commits.find((c) => c.commit === dev.commit && c.owner === dev.developer);
+  const smokeRecord = owner ? findCurrentRecord(dev, dev.smokes) : undefined;
   const result = {
-    smoke: !!(owner && findCurrentRecord(dev, dev.smokes)),
+    smoke: !!smokeRecord,
+    smokeResult: smokeRecord ? smokeRecord.result || '' : '',
+    smokePassed: !!smokeRecord && smokeRecord.result === SMOKE_PASSED,
     self: !!(owner && findCurrentRecord(dev, dev.selfTests)),
     commit: !!dev.commit && !!owner,
     stageSmoke: !!prep.smoke,
@@ -28,10 +34,25 @@ export function devReadiness(dev, prep) {
   };
   if (dev.v47NeedsNewCommit) {
     result.smoke = false;
+    result.smokePassed = false;
     result.self = false;
     result.commit = false;
   }
   return result;
+}
+
+/**
+ * 能否申请 AI 检视：须依次完成冒烟、自测和 Commit，且绑定当前 Commit 的冒烟结果为"通过"。
+ */
+export function aiRequestCheck(readiness) {
+  if (!(readiness.commit && readiness.smoke && readiness.self))
+    return { ok: false, reason: '准入失败：须依次完成冒烟、自测和 Commit' };
+  if (!readiness.smokePassed)
+    return {
+      ok: false,
+      reason: `冒烟测试结果为「${readiness.smokeResult || '未填写'}」，未通过，不能申请 AI 检视`,
+    };
+  return { ok: true };
 }
 
 /** 当前 Commit 的最新 AI 检视批次。 */

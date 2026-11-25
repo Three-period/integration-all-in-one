@@ -5,6 +5,7 @@ import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import { isFormalReviewReady, logDevEvent, pendingIssues, nowStamp } from './dev-review.js';
 import { designKeysForProject, logFlowNote, isStageDone } from './lifecycle-flow.js';
+import { syncHandoff } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
 /** V48 阶段门禁与集中审批 */
@@ -142,6 +143,7 @@ export function initStageGate() {
       }
       d.approval = { commit: d.commit, at: nowStamp(), reviewer: '检视工程师' };
       d.handoff = true;
+      syncHandoff();
       logDevEvent('人工检视准出通过；已自动移交 Commit ' + d.commit + ' 至测试');
       var p = project();
       p.flowStatus = '测试阶段';

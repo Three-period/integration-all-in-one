@@ -175,9 +175,14 @@ async function main() {
     const sb = B.scenarios.results[i];
     scenarioDiffs.push(...compareSteps(sa.steps, sb.steps, sa.name));
     sa.steps.filter((s) => s.status !== 'ok').forEach((s) => broken.push(`${s.ctx}: ${s.status}`));
-    const lastToast = [...sa.steps].reverse().find((s) => s.toasts.length);
+    const endToast = (steps) => {
+      const last = [...steps].reverse().find((s) => s.toasts.length);
+      return last ? last.toasts.join(' / ') : '无';
+    };
+    const a = endToast(sa.steps);
+    const b = endToast(sb.steps);
     report.push(
-      `场景「${sa.name}」：${sa.steps.length} 步，终点提示「${lastToast ? lastToast.toasts.join(' / ') : '无'}」`,
+      `场景「${sa.name}」：${sa.steps.length} 步，终点提示「${a}」${a === b ? '' : ` → 当前「${b}」`}`,
     );
   });
   report.push(`业务场景差异：${scenarioDiffs.length}`);

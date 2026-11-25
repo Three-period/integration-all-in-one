@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   designDocTypes,
   designKeysFor,
+  flowNodeState,
   isHandoffReady,
   isStageDone,
+  isStageEditable,
   isStagePrereqMet,
+  isStageReached,
+  stageState,
 } from '../../src/domain/stages.js';
 
 const approvedDev = { approval: { commit: 'c1' }, handoff: true, commit: 'c1' };
@@ -88,5 +92,71 @@ describe('isStagePrereqMet', () => {
     expect(isStagePrereqMet('planning', isDone)).toBe(true);
     expect(isStagePrereqMet('requirements', isDone)).toBe(true);
     expect(isStagePrereqMet('design', isDone)).toBe(false);
+  });
+});
+
+describe('stageState / isStageReached', () => {
+  const doneSet =
+    (...stages) =>
+    (s) =>
+      stages.includes(s);
+
+  it('marks completed, reached and unreached stages', () => {
+    const isDone = doneSet('planning', 'requirements');
+    expect(stageState('planning', isDone)).toBe('done');
+    expect(stageState('design', isDone)).toBe('current');
+    expect(stageState('development', isDone)).toBe('pending');
+  });
+
+  it('reaches closing only after release is done', () => {
+    expect(isStageReached('closing', doneSet('testing'))).toBe(false);
+    expect(isStageReached('closing', doneSet('release'))).toBe(true);
+    expect(isStageReached('unknown', doneSet())).toBe(false);
+  });
+
+  it('lets unreached stages be viewed but not edited', () => {
+    const isDone = doneSet('planning');
+    expect(isStageEditable('requirements', isDone)).toBe(true);
+    expect(isStageEditable('design', isDone)).toBe(false);
+  });
+});
+
+describe('flowNodeState', () => {
+  const ctx = (over = {}) => ({
+    stageStateOf: (s) => ({ planning: 'done', requirements: 'current' })[s] || 'pending',
+    designType: 'II',
+    isTestEnabled: (k) => k !== 'long',
+    approvalStatus: () => '',
+    ...over,
+  });
+
+  it('follows the stage state for deliverable nodes', () => {
+    expect(flowNodeState({ stage: 'planning', kind: 'content' }, ctx())).toBe('done');
+    expect(flowNodeState({ stage: 'requirements', kind: 'content' }, ctx())).toBe('current');
+    expect(flowNodeState({ stage: 'design', kind: 'content' }, ctx())).toBe('pending');
+  });
+
+  it('lights an approval node only while its review is pending', () => {
+    const node = { stage: 'requirements', kind: 'approval' };
+    expect(flowNodeState(node, ctx())).toBe('pending');
+    expect(flowNodeState(node, ctx({ approvalStatus: () => '待审核' }))).toBe('current');
+    expect(flowNodeState({ stage: 'planning', kind: 'approval' }, ctx())).toBe('done');
+  });
+
+  it('skips design branches and tests the project does not use', () => {
+    expect(flowNodeState({ stage: 'design', kind: 'content', designTypes: ['I'] }, ctx())).toBe(
+      'skipped',
+    );
+    expect(flowNodeState({ stage: 'design', kind: 'content', designTypes: ['II'] }, ctx())).toBe(
+      'pending',
+    );
+    expect(flowNodeState({ stage: 'testing', kind: 'content', testKind: 'long' }, ctx())).toBe(
+      'skipped',
+    );
+  });
+
+  it('completes the end node with closing', () => {
+    expect(flowNodeState({ kind: 'end' }, ctx())).toBe('pending');
+    expect(flowNodeState({ kind: 'end' }, ctx({ stageStateOf: () => 'done' }))).toBe('done');
   });
 });

@@ -75,8 +75,52 @@ export function isStageDone(stage, facts) {
   return !!facts.flowSteps[stage];
 }
 
+/** 全生命周期页面的阶段顺序（含结项）。 */
+export const LIFECYCLE_STAGES = [...STAGE_ORDER, 'closing'];
+
 /** 阶段前置条件：第一个阶段直接满足，其余阶段要求上一阶段已完成。 */
 export function isStagePrereqMet(stage, isDone) {
   const index = STAGE_ORDER.indexOf(stage);
   return index === 0 || isDone(STAGE_ORDER[index - 1]);
+}
+
+/** 是否已流转到该阶段：第一个阶段始终到达，其余阶段要求上一阶段已完成（结项要求发布已完成）。 */
+export function isStageReached(stage, isDone) {
+  const index = LIFECYCLE_STAGES.indexOf(stage);
+  if (index < 0) return false;
+  return index === 0 || isDone(LIFECYCLE_STAGES[index - 1]);
+}
+
+/**
+ * 阶段状态：done 已完成，current 已到达但未完成，pending 未到达。
+ * 流程图节点、阶段 Tab 和页面是否可操作都使用这一结果。
+ */
+export function stageState(stage, isDone) {
+  if (isDone(stage)) return 'done';
+  return isStageReached(stage, isDone) ? 'current' : 'pending';
+}
+
+/** 未到达的阶段可以查看，但不能操作。 */
+export function isStageEditable(stage, isDone) {
+  return stageState(stage, isDone) !== 'pending';
+}
+
+/**
+ * 流程图节点状态：done / current / pending，项目不涉及的分支或测试项为 skipped。
+ *
+ * @param {object} node 节点：stage 所属阶段；kind 为 content（交付物）/ approval（审核）/ end（完成）；
+ *   可选 designTypes（所属设计分支，如 ['I', 'II']）、testKind（single / long）
+ * @param {object} ctx stageStateOf(stage)、designType、isTestEnabled(kind)、approvalStatus(stage)
+ */
+export function flowNodeState(node, ctx) {
+  if (node.designTypes && !node.designTypes.includes(ctx.designType || 'II')) return 'skipped';
+  if (node.testKind && !ctx.isTestEnabled(node.testKind)) return 'skipped';
+  if (node.kind === 'end') return ctx.stageStateOf('closing') === 'done' ? 'done' : 'pending';
+  const state = ctx.stageStateOf(node.stage);
+  if (node.kind === 'approval') {
+    if (state === 'done') return 'done';
+    const status = ctx.approvalStatus ? ctx.approvalStatus(node.stage) : '';
+    return state === 'current' && status === '待审核' ? 'current' : 'pending';
+  }
+  return state;
 }

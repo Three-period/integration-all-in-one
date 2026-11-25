@@ -1291,6 +1291,7 @@ function approve(d, m) {
   m.process.approval = record;
   d.approval = { commit: d.commit, at: at, reviewer: ACTOR, processId: record.processId };
   d.handoff = true;
+  syncHandoff();
   logDevEvent('检视过程 ' + m.process.id + ' 已准出，正式移交 ' + d.commit + ' 至测试');
   m.tasks.forEach(function (t) {
     t.status = '已完成';
