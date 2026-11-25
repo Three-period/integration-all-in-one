@@ -1,4 +1,8 @@
 /** 个人菜单：个人信息、修改密码与退出登录。 */
+import { logout } from '../core/auth.js';
+import { esc } from '../core/dom.js';
+import { ROLE_LABELS } from '../domain/permissions.js';
+import { state } from '../store/state.js';
 import { closeDrawer, openDrawer, openModal } from './overlays.js';
 import { showToast } from './toast.js';
 
@@ -21,9 +25,18 @@ export function bindProfileMenu() {
     }
     menu.classList.remove('show');
     if (action === 'personal') {
+      var user = state.user;
       openDrawer(
         '个人信息',
-        '<div class="form-card" style="padding:0;border:0;box-shadow:none"><div class="kv-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));padding:0"><div class="kv"><label>姓名</label><div>何盈</div></div><div class="kv"><label>账号</label><div>heying</div></div><div class="kv"><label>所属部门</label><div>软件一科</div></div><div class="kv"><label>当前角色</label><div>产品经理</div></div><div class="kv"><label>账号状态</label><div><span class="tag green">正常</span></div></div><div class="kv"><label>最近登录</label><div>2026-08-16 09:24</div></div></div></div>',
+        '<div class="form-card" style="padding:0;border:0;box-shadow:none"><div class="kv-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));padding:0"><div class="kv"><label>姓名</label><div>' +
+          esc(user.name) +
+          '</div></div><div class="kv"><label>账号</label><div>' +
+          esc(user.username) +
+          '</div></div><div class="kv"><label>所属部门</label><div>' +
+          esc(user.department) +
+          '</div></div><div class="kv"><label>当前角色</label><div>' +
+          esc(ROLE_LABELS[user.role]) +
+          '</div></div><div class="kv"><label>账号状态</label><div><span class="tag green">正常</span></div></div></div></div>',
         '<button class="btn" data-action="close-drawer">关闭</button>',
       );
       return;
@@ -59,8 +72,8 @@ export function bindProfileMenu() {
       return;
     }
     if (action === 'logout-confirm') {
-      document.querySelector('#modalRoot').classList.remove('show');
-      showToast('已退出登录');
+      logout();
+      window.location.reload();
       return;
     }
   });

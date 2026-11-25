@@ -1,4 +1,5 @@
 /** 个人工作台：仪表盘、任务、流程、日历、联系人与文档。 */
+import { can } from '../../domain/permissions.js';
 import { App } from '../../core/app.js';
 import { commonHead } from '../../components/shell.js';
 import { person, tag } from '../../core/dom.js';
@@ -24,7 +25,7 @@ export function renderWorkbench() {
     risks: `<div class="mini-list"><div class="mini-list-row"><i class="mini-avatar" style="background:#fff0ef;color:#d92d20">!</i><div class="grow"><strong>整机联调环境交付延期</strong><small>智能温控 · 责任人：王凯 · 预计影响发布</small></div>${tag('极高', 'red')}</div><div class="mini-list-row"><i class="mini-avatar" style="background:#fff4e5;color:#b54708">!</i><div class="grow"><strong>测试资源与其他重点项目冲突</strong><small>智能温控 · 责任人：赵敏</small></div>${tag('高', 'orange')}</div></div>`,
     team: `<div class="people-bars" style="padding:17px"><div class="people-bar"><span>开发团队</span><div class="bar"><i style="width:84%;background:#6f9fff"></i></div><b>84%</b></div><div class="people-bar"><span>测试团队</span><div class="bar"><i style="width:112%;background:#f79009"></i></div><b class="down">112%</b></div><div class="people-bar"><span>产品团队</span><div class="bar"><i style="width:68%;background:#6fd6a1"></i></div><b>68%</b></div></div>`,
   };
-  if (state.role === 'reviewer') {
+  if (can(state.role, 'review.perform')) {
     widgets.todo = App.renderReviewerTodoWidget();
     widgets.summary = App.renderReviewerSummaryWidget();
   }
@@ -44,11 +45,7 @@ export function renderWorkbench() {
     '个人工作台',
     '我的研发工作台',
     '聚合个人待办、项目进展、审批流程与研发质量数据。',
-    `<div class="role-control">当前角色<select id="roleSelect">${Object.entries(roles)
-      .map(([k, v]) => `<option value="${k}" ${state.role === k ? 'selected' : ''}>${v}</option>`)
-      .join(
-        '',
-      )}</select></div><button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
+    `<button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
   )}${tabs}<div class="notice"><i>◈</i><span><b>${roles[state.role]}工作台</b> · 角色权限决定可见数据范围，个人布局只能在已授权卡片中调整。当前可见 ${allowed.length} 类卡片。</span></div><div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${layout
     .filter((id) => allowed.includes(id))
     .map(
@@ -59,7 +56,7 @@ export function renderWorkbench() {
 }
 
 export function renderTasks() {
-  if (state.role === 'reviewer') return App.renderReviewerTasksPage();
+  if (can(state.role, 'review.perform')) return App.renderReviewerTasksPage();
   return `<section class="page">${commonHead('个人工作台', '我的任务', '仅展示与当前用户有关的任务，支持在列表中快速更新进度。', '<button class="btn">导出任务</button>')}<div class="tabs"><button class="tab active">待开始 <span class="tag gray">3</span></button><button class="tab">进行中 <span class="tag blue">4</span></button><button class="tab">即将逾期 <span class="tag orange">2</span></button><button class="tab">已完成 <span class="tag green">18</span></button></div><div class="toolbar"><input class="input search-input" placeholder="搜索任务名称 / 项目"><select class="input"><option>全部优先级</option><option>高</option><option>中</option><option>低</option></select><button class="btn">重置</button></div><div class="card table-wrap"><table class="table"><thead><tr><th>任务名称</th><th>关联项目</th><th>截止时间</th><th>优先级</th><th>进度</th><th>状态</th><th>操作</th></tr></thead><tbody><tr><td class="link">补充能耗数据边界说明</td><td>智能温控平台 V2.6</td><td class="down">2026-08-12 18:00</td><td>${tag('高', 'red')}</td><td><div class="table-progress"><input type="range" value="40" min="0" max="100" style="width:80px"><span>40%</span></div></td><td>${tag('进行中', 'blue')}</td><td><button class="op" data-action="open-task">查看</button><button class="op" data-action="update-task">更新进度</button></td></tr><tr><td class="link">确认需求变更影响范围</td><td>设备云平台 3.0</td><td>2026-08-14 12:00</td><td>${tag('中', 'orange')}</td><td><div class="table-progress"><input type="range" value="65" min="0" max="100" style="width:80px"><span>65%</span></div></td><td>${tag('进行中', 'blue')}</td><td><button class="op" data-action="open-task">查看</button><button class="op" data-action="update-task">更新进度</button></td></tr><tr><td class="link">整理项目发布复盘模板</td><td>智能温控平台 V2.6</td><td>2026-08-18</td><td>${tag('低', 'gray')}</td><td><div class="table-progress"><input type="range" value="0" min="0" max="100" style="width:80px"><span>0%</span></div></td><td>${tag('待开始', 'gray')}</td><td><button class="op" data-action="open-task">查看</button></td></tr></tbody></table><div class="pagination"><span>共 25 条</span><button class="page-btn" disabled>‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">›</button></div></div></section>`;
 }
 

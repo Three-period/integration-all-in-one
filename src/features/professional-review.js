@@ -1,4 +1,5 @@
 /** 专业检视（V55）：30/70 卡片布局与 R3 出口流转到测试。 */
+import { can } from '../domain/permissions.js';
 import { getDevReview } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
@@ -66,10 +67,10 @@ export function initProfessionalReview() {
 
   // V55.3: use the platform-wide role as the single source of truth; d.role is only a render mirror.
   function canRecord(d) {
-    return !!(d && state.role === 'reviewer');
+    return !!(d && can(state.role, 'review.perform'));
   }
   function valid(d) {
-    return !!(d && state.role === 'reviewer' && all(d));
+    return !!(d && can(state.role, 'review.perform') && all(d));
   }
   function initDraft(d) {
     if (d.v55DraftCommit !== d.commit) {
@@ -213,7 +214,7 @@ export function initProfessionalReview() {
       '">' +
       (formal
         ? 'Mock 专业检视已开放，当前演示 Commit：' + esc55(d.commit)
-        : '请切换至检视工程师角色') +
+        : '专业检视由检视工程师填写') +
       '</div>' +
       '<div class="v55-review-grid"><div>' +
       left +
@@ -307,7 +308,7 @@ export function initProfessionalReview() {
       }
       if (act === 'save') {
         if (!canRecord(d)) {
-          showToast('请切换至检视工程师角色后再填写检视结论', 'warn');
+          showToast('仅检视工程师可填写检视结论', 'warn');
           return;
         }
         ensureMockCommit(d);

@@ -5,26 +5,16 @@ import { showToast } from '../components/toast.js';
 import { $, $$, person, tag } from '../core/dom.js';
 import { projectView, setView } from '../core/navigation.js';
 import { projects } from '../data/projects.js';
-import { defaultLayouts, roles } from '../data/roles.js';
+import { defaultLayouts } from '../data/roles.js';
 import {
   closeCustomizer,
   openCustomizer,
   renderCustomizer,
 } from '../pages/workbench/customizer.js';
-import { currentLayout, saveCurrentLayout } from '../store/layout.js';
+import { saveCurrentLayout } from '../store/layout.js';
 import { project, state } from '../store/state.js';
 
 export function bindPageEvents() {
-  $$('#roleSelect').forEach(
-    (el) =>
-      (el.onchange = () => {
-        state.role = el.value;
-        state.layout[state.role] = state.layout[state.role] || defaultLayouts[state.role].slice();
-        state.draftVisible = currentLayout();
-        App.render();
-        showToast(`已切换为${roles[state.role]}工作台`);
-      }),
-  );
   $$('#globalSearch').forEach(
     (el) =>
       (el.onkeydown = (e) => {

@@ -15,7 +15,7 @@ import {
 } from '../domain/dev-review.js';
 import { isRecheckRun as isRecheckRunRule } from '../domain/review-gates.js';
 import { syncHandoff } from './version-anchor.js';
-import { project, state } from '../store/state.js';
+import { state } from '../store/state.js';
 
 /* V35: Same-task, same-developer, same-commit mock lifecycle for development & review. */
 
@@ -104,29 +104,6 @@ export function devButton(label, act, attrs, cl) {
     '</button>'
   );
 }
-
-function renderDevHeader(d) {
-  return (
-    '<div class="v35-head"><div><h2>开发阶段 · ' +
-    (d.role === 'developer' ? '开发工程师' : '检视工程师') +
-    '工作台</h2><div class="v35-sub">项目：' +
-    escText(project().name) +
-    ' · 任务：' +
-    escText(d.task) +
-    ' · 演示数据（不连接真实 GitLab、AI 或测试系统）</div></div><div class="v35-tools"><label>演示角色 <select class="input" data-v35-change="role"><option value="developer" ' +
-    (d.role === 'developer' ? 'selected' : '') +
-    '>开发工程师</option><option value="reviewer" ' +
-    (d.role === 'reviewer' ? 'selected' : '') +
-    '>检视工程师</option></select></label><label>责任开发人 <select class="input" data-v35-change="developer">' +
-    ['孙宁', '李明', '何盈']
-      .map(function (n) {
-        return '<option ' + (n === d.developer ? 'selected' : '') + '>' + n + '</option>';
-      })
-      .join('') +
-    '</select></label></div></div>'
-  );
-}
-App.renderDevHeader = renderDevHeader;
 
 function renderDevSummaryCard(title, status, note, type, badge) {
   return (
@@ -1006,14 +983,6 @@ export function initDevReview() {
       return;
     }
   });
-  document.addEventListener('change', function (e) {
-    var el = e.target.closest('[data-v35-change]');
-    if (!el || state.lifecycleStage !== 'development') return;
-    var d = getDevReview();
-    d[el.dataset.v35Change] = el.value;
-    d.reviewMode = 'todos';
-    refreshDevView();
-  });
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-v35]');
     if (!b || state.lifecycleStage !== 'development') return;
@@ -1026,22 +995,6 @@ export function initDevReview() {
     if (b.disabled) return;
     if (act === 'close') {
       closeDrawer();
-      return;
-    }
-    if (act === 'switch-role') {
-      d.role = b.dataset.role;
-      d.reviewMode = 'todos';
-      refreshDevView();
-      return;
-    }
-    if (act === 'view-dev') {
-      d.role = 'developer';
-      refreshDevView();
-      return;
-    }
-    if (act === 'view-review') {
-      d.role = 'reviewer';
-      refreshDevView();
       return;
     }
     if (act === 'open') {

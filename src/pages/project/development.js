@@ -200,13 +200,7 @@ function renderDevelopment() {
   var d = getDevReview(),
     ready = getDevReadiness(),
     r = latestAiRun();
-  var nav =
-    '<div class="v35-tabs">' +
-    (d.role === 'developer'
-      ? '<button class="active" data-v35="view-dev">开发工作台</button><button data-v35="switch-role" data-role="reviewer">检视工作台（角色切换）</button>'
-      : '<button data-v35="switch-role" data-role="developer">开发工作台</button><button class="active" data-v35="view-review">检视工作台</button>') +
-    '</div>';
-  var root = '<div class="development-reference-page v35-root">' + App.renderDevHeader(d) + nav;
+  var root = '<div class="development-reference-page v35-root">';
   if (d.role === 'reviewer') return root + App.renderReviewerWorkspace(d) + '</div>';
   return (
     root +

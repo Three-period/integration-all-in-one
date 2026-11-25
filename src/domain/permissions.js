@@ -31,3 +31,15 @@ export function can(role, permission) {
   if (!roles) throw new Error(`未定义的权限：${permission}`);
   return roles.includes(role);
 }
+
+/** 各角色登录后进入的界面；未列出的角色进入个人工作台。 */
+const LANDING = {
+  developer: { view: 'project-lifecycle', stage: 'development' },
+  reviewer: { view: 'project-lifecycle', stage: 'development' },
+  tester: { view: 'project-lifecycle', stage: 'testing' },
+  supervisor: { view: 'ops-projects' },
+};
+
+export function landingFor(role) {
+  return LANDING[role] || { view: 'dashboard' };
+}

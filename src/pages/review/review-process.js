@@ -1,4 +1,5 @@
 /** 检视流程 V5（V56）：开发与 AI 检视的作用域 Mock 工作流。 */
+import { can } from '../../domain/permissions.js';
 import { devReviewStore, getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer } from '../../components/overlays.js';
@@ -156,7 +157,7 @@ function createReview(d) {
     showToast(can.reason, 'warn');
     return false;
   }
-  if (state.role !== 'developer') {
+  if (!can(state.role, 'dev.submit')) {
     showToast('仅开发工程师可以提交人工检视申请', 'warn');
     return false;
   }
@@ -353,7 +354,7 @@ function issueCard(d, m, t) {
   var eligible = pending.filter(function (i) {
     return issueEligible(d, m, i);
   });
-  var canEdit = t.status !== '已完成' && state.role === 'reviewer';
+  var canEdit = t.status !== '已完成' && can(state.role, 'review.perform');
   var rows = pending
     .map(function (i) {
       var editable = canEdit && issueEligible(d, m, i);
@@ -446,7 +447,7 @@ function manualCard(d, m, t) {
       ) +
       '</span>' +
       '<button class="btn primary" data-v5="manual-open" ' +
-      (state.role !== 'reviewer' || t.status === '已完成' ? 'disabled' : '') +
+      (!can(state.role, 'review.perform') || t.status === '已完成' ? 'disabled' : '') +
       '>开展人工专业检视</button></div>' +
       '<div class="v35-notice">三项独立保存，允许发现问题。发现的问题进入结构化整改清单；完成 3/3 不代表阻断问题已经闭环。追加轮次复用已完成记录。</div>',
   );
@@ -458,7 +459,7 @@ function feedbackCard(d, m, t) {
     '<div class="v5-row"><span>候选记录 ' +
       m.feedback.length +
       ' 条（不参与准出门禁）</span><button class="btn" data-v5="feedback-open" ' +
-      (state.role === 'reviewer' && t.status !== '已完成' ? '' : 'disabled') +
+      (can(state.role, 'review.perform') && t.status !== '已完成' ? '' : 'disabled') +
       '>新增规则反馈</button></div>' +
       (m.feedback.length
         ? '<div class="v35-list">' +
@@ -512,7 +513,7 @@ function exitPanel(d, m) {
       h(x.missing.join('、') || '全部完成') +
       '</div></div></div>' +
       '<div class="v5-row"><button class="btn primary" data-v5="approve" ' +
-      (!done || already || state.role !== 'reviewer' ? 'disabled' : '') +
+      (!done || already || !can(state.role, 'review.perform') ? 'disabled' : '') +
       '>确认检视通过并进入测试节点</button>' +
       (already
         ? '<span class="tag green">已准出 · ' + h(m.process.approval.commit) + '</span>'
@@ -1316,7 +1317,7 @@ function approve(d, m) {
 }
 
 function updateDevDrawer() {
-  if (state.role !== 'developer') return;
+  if (!can(state.role, 'dev.submit')) return;
   var root = document.getElementById('drawerBody');
   if (!root) return;
   root.querySelectorAll('[data-v35="request-formal"]').forEach(function (btn) {
@@ -1511,7 +1512,6 @@ export function initReviewProcess() {
   App.openReviewerTask = function (pid) {
     if (!projects[pid]) return;
     state.projectId = pid;
-    state.role = 'reviewer';
     var d = data(),
       m = model(d);
     m.selectedTaskId = (m.tasks[m.tasks.length - 1] || {}).taskId || '';
@@ -1633,7 +1633,6 @@ export function initReviewProcess() {
         var pid = b.dataset.pid;
         if (!projects[pid]) return;
         state.projectId = pid;
-        state.role = 'reviewer';
         d = data();
         m = model(d);
         m.selectedTaskId = b.dataset.task;
@@ -1650,8 +1649,8 @@ export function initReviewProcess() {
         }
         return;
       }
-      if (state.role !== 'reviewer' && action !== 'editor-format') {
-        showToast('请切换至检视工程师角色', 'warn');
+      if (!can(state.role, 'review.perform') && action !== 'editor-format') {
+        showToast('仅检视工程师可编辑检视内容', 'warn');
         return;
       }
       if (action === 'ai-details') {

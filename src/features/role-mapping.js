@@ -9,25 +9,17 @@ import { state } from '../store/state.js';
 /** V55.5 角色映射与测试阶段渲染 */
 export function initRoleMapping() {
   /* V55.5: canonical role mapping and canonical testing-stage renderer.
-   * state.role is the only role source. v35Data().role is a render mirror only.
+   * state.role (from the signed-in account) is the only role source; d.role is a render mirror.
    * Testing uses the latest V54 report-list/editor workflow and V52 version lineage. */
 
   var baseRenderDevelopment = App.renderDevelopment;
 
-  // Remove the entire redundant workbench header from both role views.
-  App.renderDevHeader = function () {
-    return '';
-  };
-
-  // Legacy header renderer intentionally disabled; role and owner data remain intact.
-
   // Synchronize the render mirror BEFORE the workbench reads it.
-  // The old local role tabs are removed; all role changes come from #roleSelect.
+  // The role comes from the signed-in account (see app/session.js).
   App.renderDevelopment = function () {
     var d = getDevReview();
     d.role = state.role;
-    var html = baseRenderDevelopment();
-    return html.replace(/<div class="v35-tabs">[\s\S]*?<\/div>/, '');
+    return baseRenderDevelopment();
   };
 
   // V53 introduced the smoke-report entry. Keep it explicit and guarantee

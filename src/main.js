@@ -19,6 +19,11 @@ import './styles/document-approval.css';
 import './styles/professional-review.css';
 import './styles/role-mapping.css';
 import './styles/review-process.css';
+import './styles/login.css';
+
+import { currentUser } from './core/auth.js';
+import { applySession } from './app/session.js';
+import { renderLogin } from './pages/login.js';
 
 // Modules that only register extension points on App.
 import './app/render.js';
@@ -111,4 +116,10 @@ const bootSequence = [
   initReviewProcess, // V56 检视流程 V5
 ];
 
-bootSequence.forEach((step) => step());
+const user = currentUser();
+if (user) {
+  applySession(user);
+  bootSequence.forEach((step) => step());
+} else {
+  renderLogin();
+}

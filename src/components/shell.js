@@ -1,4 +1,5 @@
 /** 应用外壳：侧边栏导航、面包屑、页头与工作台子导航。 */
+import { can } from '../domain/permissions.js';
 import { App } from '../core/app.js';
 import { $ } from '../core/dom.js';
 import { project, state } from '../store/state.js';
@@ -122,7 +123,7 @@ function renderSidebar() {
     '" data-action="ops-tab" data-tab="people">人员运营看板</button><button class="' +
     (v === 'ops-resources' ? 'active' : '') +
     '" data-action="ops-tab" data-tab="resources">资源分配看板</button>' +
-    (state.role === 'supervisor'
+    (can(state.role, 'operations.view')
       ? '<button class="' +
         (v === 'ops-review' ? 'active' : '') +
         '" data-nav="ops-review">AI 检视看板</button>'

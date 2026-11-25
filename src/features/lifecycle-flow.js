@@ -1,4 +1,5 @@
 /** 统一 Mock 生命周期（V47）：阶段流转、角色门禁、项目创建与运营数据。 */
+import { can } from '../domain/permissions.js';
 import { devReviewStore, flowStore, getDevReview, getFlow, stageDocs } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
@@ -571,7 +572,7 @@ export function initLifecycleFlow() {
   App.renderSidebar = function () {
     baseRenderSidebar();
     var sb = document.querySelector('#sidebar');
-    if (sb && state.role !== 'supervisor')
+    if (sb && !can(state.role, 'operations.view'))
       sb.querySelectorAll('[data-action="ops-tab"],[data-nav="ops-review"]').forEach(function (el) {
         el.remove();
       });
@@ -586,21 +587,16 @@ export function initLifecycleFlow() {
   };
   baseRenderDevelopment = App.renderDevelopment;
   App.renderDevelopment = function () {
-    if (state.role !== 'reviewer' && state.role !== 'developer')
-      return '<div class="notice warn">开发阶段仅研发人员或检视工程师可以查看。请前往个人工作台切换角色。</div>';
+    if (!can(state.role, 'dev.workspace'))
+      return '<div class="notice warn">开发阶段工作台仅开发工程师和检视工程师可用。</div>';
     var d = getDevReview();
     d.role = state.role === 'reviewer' ? 'reviewer' : 'developer';
-    var html = baseRenderDevelopment();
-    html = html.replace(
-      /<div class="v35-head">[\s\S]*?<\/div><\/div><div class="v35-tabs">[\s\S]*?<\/div>/,
-      '',
-    );
-    return html;
+    return baseRenderDevelopment();
   };
 
   App.openAiResultsEvidence = function () {
-    if (state.role !== 'reviewer') {
-      showToast('请切换至检视工程师角色后查看 AI 检视资料', 'warn');
+    if (!can(state.role, 'review.perform')) {
+      showToast('仅检视工程师可查看 AI 检视资料', 'warn');
       return;
     }
     var d = getDevReview(),
@@ -846,8 +842,8 @@ export function initLifecycleFlow() {
   };
   baseRenderOps = App.renderOps2;
   App.renderOps2 = function () {
-    if (state.role !== 'supervisor') {
-      return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。请返回个人工作台切换角色为「部门主管」。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
+    if (!can(state.role, 'operations.view')) {
+      return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
     }
     return baseRenderOps();
   };
@@ -856,7 +852,7 @@ export function initLifecycleFlow() {
   };
   baseOpsTabs = App.ops2Tabs;
   App.ops2Tabs = function () {
-    return state.role === 'supervisor' ? baseOpsTabs() : '';
+    return can(state.role, 'operations.view') ? baseOpsTabs() : '';
   };
   document.addEventListener(
     'click',
@@ -979,14 +975,6 @@ export function initLifecycleFlow() {
     'change',
     function (e) {
       if (e.target.id === 'v47DesignType') getFlow().designType = e.target.value;
-      if (e.target.id === 'roleSelect') {
-        setTimeout(function () {
-          if (state.view.startsWith('ops-') && state.role !== 'supervisor') {
-            state.view = 'dashboard';
-            App.render();
-          }
-        }, 0);
-      }
     },
     true,
   );

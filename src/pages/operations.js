@@ -1,4 +1,5 @@
 /** 运营看板：项目、人员、资源与 AI 检视运营。 */
+import { can } from '../domain/permissions.js';
 import { App } from '../core/app.js';
 import { modalForm, openDrawer, openModal } from '../components/overlays.js';
 import { commonHead } from '../components/shell.js';
@@ -104,7 +105,7 @@ function ops2Tabs() {
     '" data-ops2-action="tab" data-ops2-tab="people">人员运营看板</button><button class="ops2-tab ' +
     (ops2Tab() === 'resources' ? 'active' : '') +
     '" data-ops2-action="tab" data-ops2-tab="resources">资源分配看板</button>' +
-    (state.role === 'supervisor'
+    (can(state.role, 'operations.view')
       ? '<button class="ops2-tab ' +
         (ops2Tab() === 'review' ? 'active' : '') +
         '" data-ops2-action="tab" data-ops2-tab="review">AI 检视看板</button>'
@@ -200,7 +201,7 @@ function ops3ProjectAnalytics() {
 
 function renderOps2() {
   var tab = ops2Tab();
-  if (tab === 'review' && state.role !== 'supervisor') {
+  if (tab === 'review' && !can(state.role, 'operations.view')) {
     state.view = 'ops-projects';
     tab = 'projects';
   }

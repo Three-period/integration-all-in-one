@@ -1,12 +1,8 @@
 /** 角色、工作台组件元数据、角色可见组件与默认布局。 */
-export const roles = {
-  product: '产品经理',
-  project: '项目经理',
-  developer: '研发人员',
-  tester: '测试人员',
-  supervisor: '部门主管',
-  reviewer: '检视工程师',
-};
+import { ROLE_LABELS } from '../domain/permissions.js';
+
+/** 角色名称，统一取自 domain/permissions.js。 */
+export const roles = ROLE_LABELS;
 
 export const widgetMeta = {
   summary: ['数据摘要', '本人参与项目与关键指标'],
@@ -53,6 +49,12 @@ export const rolePolicy = {
 
 rolePolicy.reviewer = ['summary', 'todo', 'activity', 'projects'];
 
+/** 审核角色（研发总监、研发主管、测试主管、质量主管）的工作台卡片。 */
+const APPROVER_WIDGETS = ['summary', 'approvals', 'todo', 'activity', 'projects', 'risks'];
+['rdDirector', 'rdManager', 'testManager', 'qualityManager'].forEach((role) => {
+  rolePolicy[role] = APPROVER_WIDGETS.slice();
+});
+
 export const defaultLayouts = {
   product: ['summary', 'todo', 'activity', 'projects', 'requirements', 'approvals', 'risks'],
   project: ['summary', 'todo', 'activity', 'projects', 'development', 'testing', 'risks', 'team'],
@@ -71,3 +73,6 @@ export const defaultLayouts = {
 };
 
 defaultLayouts.reviewer = ['summary', 'todo', 'activity', 'projects'];
+['rdDirector', 'rdManager', 'testManager', 'qualityManager'].forEach((role) => {
+  defaultLayouts[role] = APPROVER_WIDGETS.slice();
+});
