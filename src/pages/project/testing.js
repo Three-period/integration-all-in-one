@@ -766,7 +766,7 @@ App.renderTesting = renderTesting;
 
 function renderTestingReport(section) {
   var info = App.testingReportInfo(section),
-    r = App.v37Record(section);
+    r = App.getTestReport(section);
   return (
     '<div class="testing-report-panel"><div class="testing-report-head"><div><h3>' +
     info[0] +
@@ -777,7 +777,7 @@ function renderTestingReport(section) {
     ' · 演示数据</p></div><div class="testing-report-actions"><button class="btn primary" data-v37-report-action="new" data-section="' +
     section +
     '">＋ 新建报告</button><button class="btn" data-v37-report-action="save">保存草稿</button><button class="btn" data-v37-report-action="submit">提交评审</button></div></div>' +
-    App.v37ReportBody(section) +
+    App.renderTestReportBody(section) +
     '</div>'
   );
 }
@@ -788,7 +788,7 @@ export function openTestingReportDrawer(section) {
   state.v37ReportTab = 'detail';
   openDrawer(
     App.testingReportInfo(section)[0] + ' · 报告编辑',
-    App.v37ReportBody(section, 'detail'),
+    App.renderTestReportBody(section, 'detail'),
     '<button class="btn" data-v37-report-action="close">关闭</button><button class="btn" data-v37-report-action="save">保存草稿</button><button class="btn primary" data-v37-report-action="submit">提交评审</button>',
   );
 }

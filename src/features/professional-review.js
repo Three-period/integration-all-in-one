@@ -2,17 +2,17 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import {
-  v35Badge,
-  v35Btn,
-  v35Data,
-  v35E,
-  v35Log,
-  v35Panel,
-  v35Refresh,
-  v35Stamp,
+  devBadge,
+  devButton,
+  getDevReview,
+  escText,
+  logDevEvent,
+  devPanel,
+  refreshDevView,
+  nowStamp,
 } from './dev-review.js';
-import { v47Note } from './lifecycle-flow.js';
-import { v52CurrentCommit, v52SyncHandoff } from './version-anchor.js';
+import { logFlowNote } from './lifecycle-flow.js';
+import { getHandoffCommit, syncHandoff } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
 /** V55 专业检视 */
@@ -47,10 +47,10 @@ export function initProfessionalReview() {
         d.commits.push({
           commit: d.commit,
           owner: d.developer || 'Mock 检视',
-          at: v35Stamp(),
+          at: nowStamp(),
           mock: true,
         });
-      v35Log('生成演示用 Mock Commit：' + d.commit);
+      logDevEvent('生成演示用 Mock Commit：' + d.commit);
     }
     return d.commit;
   }
@@ -92,15 +92,15 @@ export function initProfessionalReview() {
     if (input) draft.result = input.value;
   }
   function esc55(v) {
-    return v35E(v == null ? '' : v);
+    return escText(v == null ? '' : v);
   }
-  App.v35Formal = function (d) {
+  App.renderFormalReview = function (d) {
     ensureMockCommit(d);
     var formal = canRecord(d),
       draft = initDraft(d),
       kind = d.v55Tab,
       r = latest(d, kind);
-    var left = v35Panel(
+    var left = devPanel(
       '检视资料',
       '<div class="v55-evidence"><b>Git 仓库 / Commit</b><p><button class="v43-evidence-link" data-v43="commit" ' +
         (d.commit ? '' : 'disabled') +
@@ -113,7 +113,7 @@ export function initProfessionalReview() {
         '</small></div>' +
         '<div class="v55-evidence"><b>设计与需求依据</b><p>软件规格书、架构 / 概要 / 详细设计与关联需求</p><button class="v43-evidence-link" data-v43="design">查看设计依据 ›</button></div>' +
         '<div class="v55-evidence"><b>AI 检视资料</b><p>文件一致性、文件正确性、方案与代码一致性、点检项检查</p>' +
-        v35Btn('查看四项 AI 检视详情', 'show-ai-manual', '') +
+        devButton('查看四项 AI 检视详情', 'show-ai-manual', '') +
         '</div>' +
         '<div class="v55-evidence"><b>当前检视进度</b><p>已通过 ' +
         kinds.filter(function (k) {
@@ -176,7 +176,7 @@ export function initProfessionalReview() {
         );
       })
       .join('');
-    var right = v35Panel(
+    var right = devPanel(
       '人工检视',
       '<div class="v55-tabs">' +
         tabs +
@@ -184,8 +184,8 @@ export function initProfessionalReview() {
         esc55(kind) +
         '</b> ' +
         (r
-          ? v35Badge('已记录 · ' + r.result, r.result === '发现问题' ? 'warn' : 'ok')
-          : v35Badge('待检视', 'warn')) +
+          ? devBadge('已记录 · ' + r.result, r.result === '发现问题' ? 'warn' : 'ok')
+          : devBadge('待检视', 'warn')) +
         '</div>' +
         radios +
         '<div class="v55-detail ' +
@@ -222,7 +222,7 @@ export function initProfessionalReview() {
       '</div></div>'
     );
   };
-  App.v35Exit = function (d) {
+  App.renderExitGate = function (d) {
     var gates = [
       [
         '高风险检视：无问题 / 规则反馈',
@@ -234,14 +234,14 @@ export function initProfessionalReview() {
       ],
       ['独立抽检：无问题 / 规则反馈', !!latest(d, '独立抽检') && complete(latest(d, '独立抽检'))],
     ];
-    return v35Panel(
+    return devPanel(
       'R4 准出确认 · 检视工程师',
       '<div class="v35-list">' +
         gates
           .map(function (g) {
             return (
               '<div class="v35-check">' +
-              v35Badge(g[1] ? '通过' : '阻断', g[1] ? 'ok' : 'bad') +
+              devBadge(g[1] ? '通过' : '阻断', g[1] ? 'ok' : 'bad') +
               ' <span>' +
               esc55(g[0]) +
               '</span></div>'
@@ -262,8 +262,8 @@ export function initProfessionalReview() {
           : ''),
     );
   };
-  var beforeReviewer = App.v35Reviewer;
-  App.v35Reviewer = function (d) {
+  var beforeReviewer = App.renderReviewerWorkspace;
+  App.renderReviewerWorkspace = function (d) {
     if (d.reviewMode === 'exit' && !all(d)) d.reviewMode = 'formal';
     return beforeReviewer(d);
   };
@@ -271,7 +271,7 @@ export function initProfessionalReview() {
     'click',
     function (e) {
       var go = e.target.closest('[data-v35="rev-mode"][data-mode="exit"]');
-      if (!go || state.lifecycleStage !== 'development' || all(v35Data())) return;
+      if (!go || state.lifecycleStage !== 'development' || all(getDevReview())) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       showToast('请先完成高风险、AI 未覆盖、独立抽检三项结论', 'warn');
@@ -285,12 +285,12 @@ export function initProfessionalReview() {
       if (!b || state.lifecycleStage !== 'development') return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      var d = v35Data(),
+      var d = getDevReview(),
         act = b.dataset.v55;
       if (act === 'tab') {
         capture(d);
         d.v55Tab = b.dataset.kind;
-        v35Refresh();
+        refreshDevView();
         return;
       }
       if (act === 'format') {
@@ -344,15 +344,15 @@ export function initProfessionalReview() {
           text: ['发现问题', '规则反馈'].includes(result) ? text : '',
           richHtml: ['发现问题', '规则反馈'].includes(result) ? draft.html : '',
           issueId: '',
-          at: v35Stamp(),
+          at: nowStamp(),
           feedbackType: result === '规则反馈' ? '规则反馈' : undefined,
         });
         d.v55Drafts[k] = {
           result: result,
           html: ['发现问题', '规则反馈'].includes(result) ? draft.html : '',
         };
-        v35Log('人工检视记录：' + k + ' · ' + result);
-        v35Refresh();
+        logDevEvent('人工检视记录：' + k + ' · ' + result);
+        refreshDevView();
         showToast(
           '已保存' +
             k +
@@ -372,13 +372,13 @@ export function initProfessionalReview() {
         }
         ensureMockCommit(d);
         if (!d.approval || d.approval.commit !== d.commit || !d.handoff) {
-          d.approval = { commit: d.commit, at: v35Stamp(), reviewer: '检视工程师' };
+          d.approval = { commit: d.commit, at: nowStamp(), reviewer: '检视工程师' };
           d.handoff = true;
-          v35Log('R3 检视准出通过，正式移交 Commit ' + d.commit + ' 至测试');
-          v47Note('专业检视准出通过，自动移交 Commit ' + d.commit + ' 至测试');
+          logDevEvent('R3 检视准出通过，正式移交 Commit ' + d.commit + ' 至测试');
+          logFlowNote('专业检视准出通过，自动移交 Commit ' + d.commit + ' 至测试');
         }
-        v52SyncHandoff();
-        if (v52CurrentCommit() !== d.commit) {
+        syncHandoff();
+        if (getHandoffCommit() !== d.commit) {
           showToast('移交版本校验失败，请核对当前 Commit', 'warn');
           return;
         }
@@ -401,12 +401,12 @@ export function initProfessionalReview() {
     function (e) {
       if (!e.target.matches('input[name="v55Result"]') || state.lifecycleStage !== 'development')
         return;
-      var d = v35Data(),
+      var d = getDevReview(),
         draft = initDraft(d);
       var editor = document.getElementById('v55Editor');
       if (editor) draft.html = editor.innerHTML;
       draft.result = e.target.value;
-      v35Refresh();
+      refreshDevView();
     },
     true,
   );

@@ -3,15 +3,15 @@ import { App } from '../../core/app.js';
 import { closeDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
-import { v35Store } from '../../features/dev-review.js';
+import { devReviewStore } from '../../features/dev-review.js';
 import { openTestingReportDrawer } from './testing.js';
 import { project, state } from '../../store/state.js';
 
-let v37OldEmergency;
-let v37OldClosingSubnav;
-let v37OldClosingRender;
+let baseClosingEmergencyForm;
+let baseClosingSubnav;
+let baseRenderClosing;
 
-function v37Reports() {
+function getTestReports() {
   App.testingInit();
   if (!state.v37Reports) state.v37Reports = {};
   var pid = state.projectId;
@@ -19,8 +19,8 @@ function v37Reports() {
   return state.v37Reports[pid];
 }
 
-function v37Record(section) {
-  var data = v37Reports();
+function getTestReport(section) {
+  var data = getTestReports();
   if (!data[section])
     data[section] = {
       name: App.testingReportInfo(section)[0],
@@ -32,10 +32,10 @@ function v37Record(section) {
     };
   return data[section];
 }
-App.v37Record = v37Record;
+App.getTestReport = getTestReport;
 
-function v37ReportBody(section, active) {
-  var r = App.v37Record(section),
+function renderTestReportBody(section, active) {
+  var r = App.getTestReport(section),
     info = App.testingReportInfo(section),
     tab = active || state.v37ReportTab || 'detail';
   return (
@@ -109,25 +109,25 @@ function v37ReportBody(section, active) {
           '</div>')
   );
 }
-App.v37ReportBody = v37ReportBody;
+App.renderTestReportBody = renderTestReportBody;
 
-function v37CollectReport() {
-  var r = App.v37Record(state.testingSection);
+function collectTestReport() {
+  var r = App.getTestReport(state.testingSection);
   document.querySelectorAll('[data-v37-report-input]').forEach(function (e) {
     r[e.dataset.v37ReportInput] = e.value;
   });
   return r;
 }
-App.v37CollectReport = v37CollectReport;
+App.collectTestReport = collectTestReport;
 
-function v37SaveReport(submit) {
+function saveTestReport(submit) {
   if ((state.v37ReportTab || 'detail') !== 'detail') {
     state.v37ReportTab = 'detail';
     App.render();
     showToast('请在详细信息中保存报告');
     return;
   }
-  var r = App.v37CollectReport();
+  var r = App.collectTestReport();
   if (submit && !r.conclusion.trim()) {
     showToast('请先填写测试结论再提交评审', 'warn');
     return;
@@ -144,9 +144,9 @@ function v37SaveReport(submit) {
   App.render();
   showToast(submit ? '报告已提交评审（Mock），历史记录已更新' : '报告草稿已保存（Mock）');
 }
-App.v37SaveReport = v37SaveReport;
+App.saveTestReport = saveTestReport;
 
-function v37EmergencyReview() {
+function renderEmergencyReview() {
   return (
     '<div class="closing-form-section"><h4>模拟审批操作（演示）</h4><p class="mini-note">模拟审批记录，不引入真实权限模型。仅审批中可处理。</p><div class="v35-row"><button class="btn primary" data-v37-emergency="approve" ' +
     (state.closingEmergencyStatus === '审批中' ? '' : 'disabled') +
@@ -156,10 +156,10 @@ function v37EmergencyReview() {
   );
 }
 
-function v37ReleaseVersions() {
+function renderReleaseVersions() {
   App.closingInit();
   var r = state.v37Published && state.v37Published[state.projectId],
-    d = typeof v35Store !== 'undefined' && v35Store[state.projectId];
+    d = typeof devReviewStore !== 'undefined' && devReviewStore[state.projectId];
   return (
     '<section class="closing-panel"><div class="closing-panel-head"><div><h3>版本发布</h3><p>发布评审 / 文档归档 / 版本发布 · Mock 演示</p></div></div><div class="closing-form"><div class="notice">当前项目：' +
     esc(project().name) +
@@ -182,7 +182,7 @@ function v37ReleaseVersions() {
     '</p></div></section>'
   );
 }
-App.v37ReleaseVersions = v37ReleaseVersions;
+App.renderReleaseVersions = renderReleaseVersions;
 
 /** V37 测试报告 / 紧急下发评审 / 发布版本 */
 export function initReportVersioning() {
@@ -191,11 +191,13 @@ export function initReportVersioning() {
     if (tab) {
       e.preventDefault();
       e.stopPropagation();
-      if (state.v37ReportTab === 'detail') App.v37CollectReport();
+      if (state.v37ReportTab === 'detail') App.collectTestReport();
       state.v37ReportTab = tab.dataset.v37ReportTab;
       var inDrawer = !!tab.closest('#drawer');
       if (inDrawer)
-        document.querySelector('#drawerBody').innerHTML = App.v37ReportBody(state.testingSection);
+        document.querySelector('#drawerBody').innerHTML = App.renderTestReportBody(
+          state.testingSection,
+        );
       else App.render();
       return;
     }
@@ -205,7 +207,7 @@ export function initReportVersioning() {
     e.stopPropagation();
     var action = b.dataset.v37ReportAction;
     if (action === 'new') {
-      var r = App.v37Record(b.dataset.section);
+      var r = App.getTestReport(b.dataset.section);
       r.name = App.testingReportInfo(b.dataset.section)[0];
       r.conclusion = '';
       r.status = '草稿';
@@ -217,16 +219,16 @@ export function initReportVersioning() {
       return;
     }
     if (action === 'save' || action === 'submit') {
-      App.v37SaveReport(action === 'submit');
+      App.saveTestReport(action === 'submit');
       closeDrawer();
       return;
     }
   });
-  v37OldEmergency = App.closingEmergencyForm;
+  baseClosingEmergencyForm = App.closingEmergencyForm;
   App.closingEmergencyForm = function () {
-    return v37OldEmergency().replace(
+    return baseClosingEmergencyForm().replace(
       '<div class="closing-form-actions">',
-      v37EmergencyReview() + '<div class="closing-form-actions">',
+      renderEmergencyReview() + '<div class="closing-form-actions">',
     );
   };
   document.addEventListener('click', function (e) {
@@ -242,26 +244,26 @@ export function initReportVersioning() {
     App.render();
     showToast('模拟审批结果：' + state.closingEmergencyStatus);
   });
-  v37OldClosingSubnav = App.closingSubnav;
+  baseClosingSubnav = App.closingSubnav;
   App.closingSubnav = function () {
-    return v37OldClosingSubnav().replace(
+    return baseClosingSubnav().replace(
       '</aside>',
       '<button class="' +
         (state.closingSection === 'versions' ? 'active' : '') +
         '" data-closing-page-action="section" data-closing-section="versions">版本发布</button></aside>',
     );
   };
-  v37OldClosingRender = App.renderClosing;
+  baseRenderClosing = App.renderClosing;
   App.renderClosing = function () {
     if (state.closingSection === 'versions')
       return (
         '<div class="closing-reference-page"><div class="closing-stage-layout">' +
         App.closingSubnav() +
         '<main class="closing-main">' +
-        App.v37ReleaseVersions() +
+        App.renderReleaseVersions() +
         '</main></div></div>'
       );
-    return v37OldClosingRender();
+    return baseRenderClosing();
   };
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-v37-publish]');

@@ -3,14 +3,14 @@ import { App } from '../core/app.js';
 import { closeDrawer, openDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
-import { v35Stamp } from './dev-review.js';
-import { v47DesignKeys, v47Flow, v47Note, v47Prereq } from './lifecycle-flow.js';
+import { nowStamp } from './dev-review.js';
+import { designKeysForProject, getFlow, logFlowNote, isStagePrereqMet } from './lifecycle-flow.js';
 import {
-  v52BaseTestingRender,
-  v52CurrentCommit,
-  v52Data,
-  v52Status,
-  v52VersionBanner,
+  originalRenderTesting,
+  getHandoffCommit,
+  getVersionAnchor,
+  getReleaseGate,
+  renderVersionBanner,
 } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
@@ -19,34 +19,34 @@ export function initDocumentApproval() {
   /* V54.0: unify document-driven stage approval and report-list workflow.
    * No changes to V52 Commit lineage, R3 approval or I–IV branch mapping. */
 
-  var v54Kinds = ['smoke', 'single', 'long', 'system'];
-  var v54Names = {
+  var REPORT_KINDS = ['smoke', 'single', 'long', 'system'];
+  var REPORT_NAMES = {
     smoke: '冒烟测试报告',
     single: '单板测试报告',
     long: '长运测试报告',
     system: '整机测试报告',
   };
-  function v54Enabled(kind) {
+  function isReportKindEnabled(kind) {
     return kind === 'single'
       ? project().needsSingleTest !== '否'
       : kind === 'long'
         ? project().needsLongTest !== '否'
         : true;
   }
-  function v54Now() {
+  function reportStamp() {
     return new Date().toLocaleString('zh-CN', { hour12: false });
   }
-  function v54Esc(str) {
+  function escReportText(str) {
     return esc(String(str == null ? '' : str));
   }
-  function v54DesignTypes() {
+  function requiredDesignTypes() {
     var names = {
       architecture: '软件架构设计',
       summarydesign: '概要设计',
       detaildesign: '详细设计',
     };
     return ['软件规格书'].concat(
-      v47DesignKeys()
+      designKeysForProject()
         .map(function (k) {
           return names[k];
         })
@@ -55,7 +55,7 @@ export function initDocumentApproval() {
   }
   // A new draft supersedes an earlier approved version; preloaded legacy versions use
   // their version numbers to decide which is current.
-  function v54CurrentDesign(type) {
+  function currentDesignRecord(type) {
     App.designInit();
     var rows = state.designRecords.filter(function (x) {
       return x.docType === type;
@@ -73,28 +73,28 @@ export function initDocumentApproval() {
     });
     return rows[0] || null;
   }
-  function v54MissingDesign() {
-    return v54DesignTypes().filter(function (type) {
-      var r = v54CurrentDesign(type);
+  function missingDesignReviews() {
+    return requiredDesignTypes().filter(function (type) {
+      var r = currentDesignRecord(type);
       return !r || ['评审通过', '已结束'].indexOf(r.status) < 0;
     });
   }
-  var oldDesignApprove = App.v47ApproveStage;
-  App.v47ApproveStage = function (stage) {
+  var oldDesignApprove = App.approveStage;
+  App.approveStage = function (stage) {
     if (stage !== 'design') return oldDesignApprove(stage);
-    if (!v47Prereq('design')) {
+    if (!isStagePrereqMet('design')) {
       showToast('请先完成需求阶段准出', 'warn');
       return;
     }
-    var missing = v54MissingDesign();
+    var missing = missingDesignReviews();
     if (missing.length) {
       showToast('无法通过设计阶段审核：请先完成 ' + missing.join('、') + ' 的文档评审', 'warn');
       return;
     }
-    var f = v47Flow(),
+    var f = getFlow(),
       p = project();
     f.steps.design = true;
-    v47Note('设计阶段统一审核通过（Mock），依据当前项目各必做设计文档的最新审核状态');
+    logFlowNote('设计阶段统一审核通过（Mock），依据当前项目各必做设计文档的最新审核状态');
     p.status = '进行中';
     p.flowStatus = '开发阶段';
     p.progress = Math.max(Number(p.progress) || 0, 40);
@@ -105,8 +105,8 @@ export function initDocumentApproval() {
 
   // Report list storage is project/type scoped; migrate meaningful V53.1 single-record
   // data without overwriting existing histories, rich content or frozen comments.
-  var oldRecord = App.v37Record;
-  function v54Bucket(kind) {
+  var oldRecord = App.getTestReport;
+  function reportBucket(kind) {
     if (!state.v54Reports) state.v54Reports = Object.create(null);
     var pid = state.projectId;
     if (!state.v54Reports[pid]) state.v54Reports[pid] = Object.create(null);
@@ -117,7 +117,7 @@ export function initDocumentApproval() {
       var old = state.v37Reports && state.v37Reports[pid] && state.v37Reports[pid][kind];
       if (old && (old.status !== '草稿' || old.conclusion || (old.history && old.history.length))) {
         var copy = Object.assign(
-          { id: 'LEGACY-' + pid + '-' + kind, createdAt: old.at || v54Now() },
+          { id: 'LEGACY-' + pid + '-' + kind, createdAt: old.at || reportStamp() },
           old,
         );
         if (!Array.isArray(copy.history)) copy.history = [];
@@ -127,9 +127,9 @@ export function initDocumentApproval() {
     }
     return bucket;
   }
-  App.v37Record = function (kind) {
-    if (v54Kinds.indexOf(kind) < 0) return oldRecord(kind);
-    var b = v54Bucket(kind);
+  App.getTestReport = function (kind) {
+    if (REPORT_KINDS.indexOf(kind) < 0) return oldRecord(kind);
+    var b = reportBucket(kind);
     if (state.v54Draft && state.v54Draft.kind === kind) return state.v54Draft.row;
     return (
       b.rows.find(function (r) {
@@ -139,12 +139,12 @@ export function initDocumentApproval() {
       oldRecord(kind)
     );
   };
-  function v54Rows(kind) {
-    return v54Bucket(kind).rows;
+  function reportRows(kind) {
+    return reportBucket(kind).rows;
   }
-  function v54ReadyReport(kind, commit) {
-    if (!v54Enabled(kind)) return { ready: true, skipped: true };
-    var rows = v54Rows(kind),
+  function reportReadiness(kind, commit) {
+    if (!isReportKindEnabled(kind)) return { ready: true, skipped: true };
+    var rows = reportRows(kind),
       matching = rows.find(function (r) {
         return (
           ['待评审', '审核通过', '已提交'].includes(r.status) &&
@@ -154,29 +154,29 @@ export function initDocumentApproval() {
       });
     return { ready: !!matching, row: matching || null };
   }
-  function v54ReportRequirements() {
-    var z = v52Status(),
+  function reportRequirements() {
+    var z = getReleaseGate(),
       result = { commit: z.commit, items: [], missing: [] };
-    v54Kinds.forEach(function (kind) {
-      var r = v54ReadyReport(kind, z.commit);
+    REPORT_KINDS.forEach(function (kind) {
+      var r = reportReadiness(kind, z.commit);
       result.items.push({
         kind: kind,
-        name: v54Names[kind],
+        name: REPORT_NAMES[kind],
         status: r.skipped ? '不适用' : r.ready ? '已提交' : '未完成',
         row: r.row,
         ready: r.ready,
         skipped: r.skipped,
       });
-      if (!r.ready) result.missing.push(v54Names[kind]);
+      if (!r.ready) result.missing.push(REPORT_NAMES[kind]);
     });
     return result;
   }
 
   // The testing section is now a read-only report index. The existing V491 rich
   // editor (H1/H2/H3, comments, freeze) lives in the right-hand drawer only.
-  function v54RenderReportList(kind) {
-    var b = v54Bucket(kind),
-      enabled = v54Enabled(kind),
+  function renderReportList(kind) {
+    var b = reportBucket(kind),
+      enabled = isReportKindEnabled(kind),
       q = (state.v54ReportQuery || '').trim().toLowerCase(),
       filter = state.v54ReportFilter || '全部';
     var rows = b.rows.filter(function (r) {
@@ -195,24 +195,24 @@ export function initDocumentApproval() {
           '<tr><td><button class="testing-link" data-v54-report="open" data-kind="' +
           kind +
           '" data-id="' +
-          v54Esc(r.id) +
+          escReportText(r.id) +
           '">' +
-          v54Esc(r.name || v54Names[kind]) +
+          escReportText(r.name || REPORT_NAMES[kind]) +
           '</button></td>' +
           '<td>' +
-          v54Esc(r.version || '—') +
+          escReportText(r.version || '—') +
           '</td><td>' +
-          v54Esc(r.status || '草稿') +
+          escReportText(r.status || '草稿') +
           '</td>' +
           '<td>' +
-          v54Esc(r.owner || '—') +
+          escReportText(r.owner || '—') +
           '</td><td>' +
-          v54Esc(r.updatedAt || r.createdAt || '—') +
+          escReportText(r.updatedAt || r.createdAt || '—') +
           '</td>' +
           '<td><button class="op" data-v54-report="open" data-kind="' +
           kind +
           '" data-id="' +
-          v54Esc(r.id) +
+          escReportText(r.id) +
           '">' +
           (view ? '查看' : '编辑') +
           '</button></td></tr>'
@@ -223,21 +223,21 @@ export function initDocumentApproval() {
       '<div class="testing-report-panel v54-report-list">' +
       (!enabled
         ? '<div class="v53-readonly-hint">项目基本信息设置为不需要' +
-          v54Names[kind] +
+          REPORT_NAMES[kind] +
           '，页面仅供查看。</div>'
         : '') +
       '<div class="testing-report-head"><div><h3>' +
-      v54Names[kind] +
+      REPORT_NAMES[kind] +
       '</h3><p>当前项目测试报告列表 · 报告提交后统一在流程视图审核</p></div>' +
       '<div class="testing-report-actions">' +
-      (enabled && !v52Status().testPass
+      (enabled && !getReleaseGate().testPass
         ? '<button class="btn primary" data-v54-report="new" data-kind="' +
           kind +
           '">＋ 新建测试报告</button>'
         : '') +
       '</div></div>' +
       '<div class="v54-report-tools"><input class="input search" data-v54-report-query placeholder="搜索报告名称 / 负责人 / 版本" value="' +
-      v54Esc(state.v54ReportQuery || '') +
+      escReportText(state.v54ReportQuery || '') +
       '">' +
       '<select class="input" data-v54-report-filter><option value="全部">全部状态</option>' +
       ['草稿', '待评审', '审核通过', '已退回']
@@ -256,36 +256,36 @@ export function initDocumentApproval() {
       '</div>'
     );
   }
-  App.renderTestingReport = v54RenderReportList;
+  App.renderTestingReport = renderReportList;
   // Remove V52.1's phase-approval card from the testing page. The flow view
   // becomes the only place for simulated test-phase approval.
   App.renderTesting = function () {
-    return v52VersionBanner() + v52BaseTestingRender();
+    return renderVersionBanner() + originalRenderTesting();
   };
-  function v54ReportDrawer(kind, row, mode) {
-    var enabled = v54Enabled(kind);
+  function renderReportDrawer(kind, row, mode) {
+    var enabled = isReportKindEnabled(kind);
     state.testingSection = kind;
     state.v37ReportTab = 'detail';
-    var readOnly = !enabled || mode === 'view' || v52Status().testPass;
+    var readOnly = !enabled || mode === 'view' || getReleaseGate().testPass;
     var detail =
       '<div class="v54-report-drawer"><div class="v54-drawer-meta">' +
       '<label>报告名称<input class="input" data-v54-field="name" value="' +
-      v54Esc(row.name || v54Names[kind]) +
+      escReportText(row.name || REPORT_NAMES[kind]) +
       '"' +
       (readOnly ? ' disabled' : '') +
       '></label>' +
       '<label>负责人<input class="input" data-v54-field="owner" value="' +
-      v54Esc(row.owner || '赵敏') +
+      escReportText(row.owner || '赵敏') +
       '"' +
       (readOnly ? ' disabled' : '') +
       '></label>' +
       '<label>关联版本<input class="input" readonly value="' +
-      v54Esc(row.version || project().version || 'V1.0') +
+      escReportText(row.version || project().version || 'V1.0') +
       '"></label>' +
       '<label>报告状态<input class="input" readonly value="' +
-      v54Esc(row.status || '草稿') +
+      escReportText(row.status || '草稿') +
       '"></label></div>' +
-      App.v37ReportBody(kind, 'detail') +
+      App.renderTestReportBody(kind, 'detail') +
       '</div>';
     if (readOnly) {
       detail = detail
@@ -299,40 +299,44 @@ export function initDocumentApproval() {
         '<button class="btn" data-v54-report="save">保存草稿</button>' +
         '<button class="btn primary" data-v54-report="submit">提交报告</button>';
     openDrawer(
-      (mode === 'new' ? '新建' : '') + v54Names[kind] + ' · ' + (readOnly ? '查看' : '编辑'),
+      (mode === 'new' ? '新建' : '') + REPORT_NAMES[kind] + ' · ' + (readOnly ? '查看' : '编辑'),
       detail,
       foot,
     );
     $('#drawer').classList.add('req-drawer-large');
   }
-  function v54OpenReport(kind, id) {
-    var b = v54Bucket(kind),
+  function openReport(kind, id) {
+    var b = reportBucket(kind),
       row = b.rows.find(function (r) {
         return r.id === id;
       });
     if (!row) return;
     state.v54Draft = null;
     b.selectedId = id;
-    v54ReportDrawer(kind, row, v54Enabled(kind) && row.status === '草稿' ? 'edit' : 'view');
+    renderReportDrawer(
+      kind,
+      row,
+      isReportKindEnabled(kind) && row.status === '草稿' ? 'edit' : 'view',
+    );
   }
-  function v54NewReport(kind) {
-    if (!v54Enabled(kind)) {
+  function newReport(kind) {
+    if (!isReportKindEnabled(kind)) {
       showToast('当前项目未启用本项测试', 'warn');
       return;
     }
-    if (!v52CurrentCommit()) {
+    if (!getHandoffCommit()) {
       showToast('请先完成 R3 人工检视，正式移交 Commit 后才能编写测试报告', 'warn');
       return;
     }
-    if (v52Status().testPass) {
+    if (getReleaseGate().testPass) {
       showToast('测试阶段已审核通过，无法直接新增报告', 'warn');
       return;
     }
     var id = 'RPT-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-    var x = v52Status();
+    var x = getReleaseGate();
     var row = {
       id: id,
-      name: v54Names[kind],
+      name: REPORT_NAMES[kind],
       owner: '赵敏',
       status: '草稿',
       version: x.version || project().version || 'V1.0',
@@ -341,30 +345,30 @@ export function initDocumentApproval() {
       richHtml: '',
       richComments: [],
       history: [],
-      createdAt: v54Now(),
-      updatedAt: v54Now(),
+      createdAt: reportStamp(),
+      updatedAt: reportStamp(),
     };
     state.v54Draft = { kind: kind, row: row };
-    v54ReportDrawer(kind, row, 'new');
+    renderReportDrawer(kind, row, 'new');
   }
-  function v54SaveReport(submit) {
+  function saveReport(submit) {
     var kind = state.testingSection,
-      enabled = v54Enabled(kind);
-    if (!enabled || v52Status().testPass) {
+      enabled = isReportKindEnabled(kind);
+    if (!enabled || getReleaseGate().testPass) {
       showToast('当前报告不可编辑', 'warn');
       return;
     }
-    var z = v52Status();
+    var z = getReleaseGate();
     if (!z.commit) {
       showToast('无正式移交 Commit，无法保存测试报告', 'warn');
       return;
     }
-    var row = App.v37Record(kind);
+    var row = App.getTestReport(kind);
     var root = document.querySelector('#drawer [data-v491-doc="' + kind + '"]');
     if (root) {
       // V491 comments/formatting use v37Record(kind), which now resolves the
       // exact selected report or the uncommitted draft.
-      App.v37CollectReport();
+      App.collectTestReport();
     }
     document.querySelectorAll('#drawer [data-v54-field]').forEach(function (input) {
       if (input.dataset.v54Field === 'name' || input.dataset.v54Field === 'owner')
@@ -381,7 +385,7 @@ export function initDocumentApproval() {
     row.commit = z.commit;
     row.version = z.version || project().version || row.version;
     row.status = submit ? '待评审' : '草稿';
-    row.updatedAt = v54Now();
+    row.updatedAt = reportStamp();
     row.history.push({
       name: row.name,
       owner: row.owner,
@@ -392,7 +396,7 @@ export function initDocumentApproval() {
       richHtml: row.richHtml,
       at: row.updatedAt,
     });
-    var bucket = v54Bucket(kind);
+    var bucket = reportBucket(kind);
     if (state.v54Draft && state.v54Draft.kind === kind) {
       bucket.rows.unshift(row);
       bucket.selectedId = row.id;
@@ -411,9 +415,9 @@ export function initDocumentApproval() {
       e.stopImmediatePropagation();
       var a = b.dataset.v54Report,
         kind = b.dataset.kind || state.testingSection;
-      if (a === 'new') return v54NewReport(kind);
-      if (a === 'open') return v54OpenReport(kind, b.dataset.id);
-      if (a === 'save' || a === 'submit') return v54SaveReport(a === 'submit');
+      if (a === 'new') return newReport(kind);
+      if (a === 'open') return openReport(kind, b.dataset.id);
+      if (a === 'save' || a === 'submit') return saveReport(a === 'submit');
       if (a === 'close') {
         state.v54Draft = null;
         closeDrawer();
@@ -437,7 +441,7 @@ export function initDocumentApproval() {
       var panel = e.target.closest('.v54-report-list');
       if (panel) {
         var oldSelection = e.target.selectionStart;
-        panel.outerHTML = v54RenderReportList(state.testingSection);
+        panel.outerHTML = renderReportList(state.testingSection);
         var next = document.querySelector('[data-v54-report-query]');
         if (next) {
           next.focus();
@@ -463,14 +467,14 @@ export function initDocumentApproval() {
 
   // Centralized approval card in flow view; replaces the older V48 mock action,
   // not the original flow diagram or its navigation.
-  function v54FlowPanel() {
+  function renderFlowApprovalPanel() {
     var active =
       ['planning', 'requirements', 'design', 'development', 'testing', 'release'].find(
         function (k) {
-          return !App.v47StageDone(k);
+          return !App.isStageDone(k);
         },
       ) || 'complete';
-    if (active === 'design' && !v47Prereq('design')) active = 'requirements';
+    if (active === 'design' && !isStagePrereqMet('design')) active = 'requirements';
     var title = {
       planning: '立项审核',
       requirements: '需求规格书审核',
@@ -489,7 +493,7 @@ export function initDocumentApproval() {
         '<button class="v47-btn" data-v47="doc-open" data-doc="requirement">编写需求规格书</button>' +
         '<button class="v47-cta" data-v47="approve-stage" data-stage="requirements">模拟需求审核通过</button>';
     if (active === 'design') {
-      var missing = v54MissingDesign();
+      var missing = missingDesignReviews();
       buttons =
         '<label class="mini-note">设计类别</label><select id="v47DesignType" class="input" style="max-width:115px">' +
         ['I', 'II', 'III', 'IV']
@@ -498,7 +502,7 @@ export function initDocumentApproval() {
               '<option value="' +
               v +
               '"' +
-              (v47Flow().designType === v ? ' selected' : '') +
+              (getFlow().designType === v ? ' selected' : '') +
               '>' +
               v +
               ' 类</option>'
@@ -507,16 +511,16 @@ export function initDocumentApproval() {
           .join('') +
         '</select>' +
         '<div class="v54-checks">' +
-        v54DesignTypes()
+        requiredDesignTypes()
           .map(function (t) {
-            var r = v54CurrentDesign(t),
+            var r = currentDesignRecord(t),
               good = r && ['评审通过', '已结束'].includes(r.status);
             return (
               '<span class="' +
               (good ? 'v54-ok' : 'v54-pending') +
               '">' +
               (good ? '✓ ' : '○ ') +
-              v54Esc(t) +
+              escReportText(t) +
               '</span>'
             );
           })
@@ -524,15 +528,17 @@ export function initDocumentApproval() {
         '</div>' +
         '<button class="v47-cta" data-v54-stage="design">模拟设计阶段审核通过</button>' +
         (missing.length
-          ? '<small class="v54-flow-note">尚需完成：' + v54Esc(missing.join('、')) + '</small>'
+          ? '<small class="v54-flow-note">尚需完成：' +
+            escReportText(missing.join('、')) +
+            '</small>'
           : '');
     }
     if (active === 'development')
       buttons =
         '<div class="mini-note">请在检视工程师工作台完成 R3 人工检视，自动解锁测试阶段。</div>';
     if (active === 'testing') {
-      var review = v54ReportRequirements(),
-        z = v52Status();
+      var review = reportRequirements(),
+        z = getReleaseGate();
       buttons =
         '<div class="v54-checks">' +
         review.items
@@ -542,7 +548,7 @@ export function initDocumentApproval() {
               (r.ready ? 'v54-ok' : 'v54-pending') +
               '">' +
               (r.skipped ? '— ' : r.ready ? '✓ ' : '○ ') +
-              v54Esc(r.name) +
+              escReportText(r.name) +
               ' · ' +
               r.status +
               '</span>'
@@ -555,7 +561,7 @@ export function initDocumentApproval() {
           ? '<small class="v54-flow-note">请先完成 R3 检视并正式移交 Commit。</small>'
           : review.missing.length
             ? '<small class="v54-flow-note">未完成：' +
-              v54Esc(review.missing.join('、')) +
+              escReportText(review.missing.join('、')) +
               '</small>'
             : '');
     }
@@ -568,28 +574,28 @@ export function initDocumentApproval() {
       title +
       '</b>' +
       '<small>当前项目：' +
-      v54Esc(project().name) +
+      escReportText(project().name) +
       '</small><div class="v48-approval-buttons v54-flow-buttons">' +
       buttons +
       '</div></div></div>'
     );
   }
-  var v54PlanningBase = App.renderPlanning;
+  var baseRenderPlanning = App.renderPlanning;
   App.renderPlanning = function () {
-    var html = v54PlanningBase(),
+    var html = baseRenderPlanning(),
       start = html.indexOf('<div class="flow-view-approval-list v48-approval-list">');
     if (start < 0) return html;
     var end = html.indexOf('</aside>', start);
     if (end < 0) return html;
-    return html.slice(0, start) + v54FlowPanel() + html.slice(end);
+    return html.slice(0, start) + renderFlowApprovalPanel() + html.slice(end);
   };
-  function v54ApproveTesting() {
-    if (!v47Prereq('testing')) {
+  function approveTestingStage() {
+    if (!isStagePrereqMet('testing')) {
       showToast('请先完成 R3 人工检视准出与 Commit 移交', 'warn');
       return;
     }
-    var check = v54ReportRequirements(),
-      z = v52Status();
+    var check = reportRequirements(),
+      z = getReleaseGate();
     if (!z.commit) {
       showToast('缺少正式移交 Commit，无法审核测试阶段', 'warn');
       return;
@@ -598,12 +604,12 @@ export function initDocumentApproval() {
       showToast('测试阶段审核受阻：请提交 ' + check.missing.join('、'), 'warn');
       return;
     }
-    var x = v52Data();
+    var x = getVersionAnchor();
     x.testReview = {
       status: '审核通过',
       commit: z.commit,
       reviewer: '测试主管（Mock）',
-      at: v35Stamp(),
+      at: nowStamp(),
       reportIds: check.items
         .filter(function (i) {
           return i.row;
@@ -612,10 +618,10 @@ export function initDocumentApproval() {
           return i.row.id;
         }),
     };
-    v47Flow().steps.testing = true;
+    getFlow().steps.testing = true;
     project().progress = Math.max(Number(project().progress) || 0, 82);
     project().flowStatus = '发布阶段';
-    v47Note('测试阶段统一审核通过，关联正式移交 Commit ' + z.commit + '；适用报告均已提交');
+    logFlowNote('测试阶段统一审核通过，关联正式移交 Commit ' + z.commit + '；适用报告均已提交');
     state.lifecycleStage = 'release';
     state.projectSection = 'lifecycle';
     state.view = 'project-lifecycle';
@@ -629,8 +635,8 @@ export function initDocumentApproval() {
       if (!b) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (b.dataset.v54Stage === 'design') return App.v47ApproveStage('design');
-      if (b.dataset.v54Stage === 'testing') return v54ApproveTesting();
+      if (b.dataset.v54Stage === 'design') return App.approveStage('design');
+      if (b.dataset.v54Stage === 'testing') return approveTestingStage();
     },
     true,
   );
@@ -648,9 +654,9 @@ export function initDocumentApproval() {
     },
     true,
   );
-  var v54Reset = App.v47Reset;
-  App.v47Reset = function () {
-    v54Reset();
+  var baseResetDemoData = App.resetDemoData;
+  App.resetDemoData = function () {
+    baseResetDemoData();
     state.v54Reports = null;
     state.v54Draft = null;
     state.v54ReportQuery = '';

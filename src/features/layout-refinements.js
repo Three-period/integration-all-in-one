@@ -1,7 +1,7 @@
 /** 布局整理、阶段目录与流程图导航（V49）。 */
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
-import { v47Prereq } from './lifecycle-flow.js';
+import { isStagePrereqMet } from './lifecycle-flow.js';
 import { state } from '../store/state.js';
 
 /** V49 布局整理与阶段目录 */
@@ -44,8 +44,8 @@ export function initLayoutRefinements() {
   ];
   function started(stage) {
     if (stage === 'planning') return true;
-    if (stage === 'closing') return !!App.v47StageDone('release');
-    return !!(v47Prereq(stage) || App.v47StageDone(stage));
+    if (stage === 'closing') return !!App.isStageDone('release');
+    return !!(isStagePrereqMet(stage) || App.isStageDone(stage));
   }
   function phaseName(stage) {
     var p = stageLabels.find(function (a) {

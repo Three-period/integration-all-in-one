@@ -2,27 +2,27 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v35Store } from './dev-review.js';
+import { devReviewStore } from './dev-review.js';
 import { project, state } from '../store/state.js';
 
-let v38OldClosingInit;
-let v38OldTestInit;
-export let v38OldReportSave;
-export let v38OldRenderTesting;
-let v38OldRenderClosing;
-let v38OldRenderRelease;
-let v38OldReport;
-let v38OldPublishVersions;
-let v38OldDefects;
+let baseClosingInit;
+let baseTestingInit;
+export let baseSaveTestReport;
+export let baseRenderTesting;
+let baseRenderClosing;
+let baseRenderRelease;
+let baseRenderTestingReport;
+let baseReleaseVersions;
+let baseTestingDefectRows;
 
 /* V38 跨阶段 Mock 共享状态：不增加角色权限、不对接真实服务 */
-export function v38Dev() {
-  return (typeof v35Store === 'object' && v35Store[state.projectId]) || null;
+export function getDevRecord() {
+  return (typeof devReviewStore === 'object' && devReviewStore[state.projectId]) || null;
 }
 
-function v38Status() {
-  var dev = v38Dev(),
-    report = App.v37Record('system');
+function getStageStatus() {
+  var dev = getDevRecord(),
+    report = App.getTestReport('system');
   return {
     dev: dev,
     commit: dev && dev.handoff ? dev.commit : null,
@@ -37,17 +37,17 @@ function v38Status() {
     review: state.v37PublishReview && state.v37PublishReview[state.projectId],
   };
 }
-App.v38Status = v38Status;
+App.getStageStatus = getStageStatus;
 
-function v38StepBanner() {
+function renderStepBanner() {
   return '';
 }
-App.v38StepBanner = v38StepBanner;
+App.renderStepBanner = renderStepBanner;
 
 /** V38 跨阶段共享状态 */
 export function initStageProgress() {
   /* V38: 每个项目独立的业务底稿，防止项目间交叉显示 */
-  v38OldClosingInit = App.closingInit;
+  baseClosingInit = App.closingInit;
   App.closingInit = function () {
     if (state.v38ClosingProject !== state.projectId) {
       state.v38ClosingProject = state.projectId;
@@ -56,9 +56,9 @@ export function initStageProgress() {
       state.closingEmergencyStatus = '待审批';
       state.closingSection = 'emergency';
     }
-    v38OldClosingInit();
+    baseClosingInit();
   };
-  v38OldTestInit = App.testingInit;
+  baseTestingInit = App.testingInit;
   App.testingInit = function () {
     if (state.v38TestProject !== state.projectId) {
       state.v38TestProject = state.projectId;
@@ -68,40 +68,40 @@ export function initStageProgress() {
       state.testingDefectQuery = '';
       state.testingSection = 'cases';
     }
-    v38OldTestInit();
+    baseTestingInit();
     state.testingDefects.forEach(function (d) {
       d.project = project().name;
     });
   };
-  v38OldReportSave = App.v37SaveReport;
-  App.v37SaveReport = function (submit) {
+  baseSaveTestReport = App.saveTestReport;
+  App.saveTestReport = function (submit) {
     if (submit) {
-      var dev = v38Dev();
+      var dev = getDevRecord();
       if (!dev || !dev.handoff) {
         showToast('请先由开发工程师完成检视准出并移交当前 Commit', 'warn');
         return;
       }
-      var r = App.v37Record(state.testingSection);
+      var r = App.getTestReport(state.testingSection);
       r.commit = dev.commit;
     }
-    return v38OldReportSave(submit);
+    return baseSaveTestReport(submit);
   };
-  v38OldRenderTesting = App.renderTesting;
+  baseRenderTesting = App.renderTesting;
   App.renderTesting = function () {
-    return App.v38StepBanner() + v38OldRenderTesting();
+    return App.renderStepBanner() + baseRenderTesting();
   };
-  v38OldRenderClosing = App.renderClosing;
+  baseRenderClosing = App.renderClosing;
   App.renderClosing = function () {
-    return App.v38StepBanner() + v38OldRenderClosing();
+    return App.renderStepBanner() + baseRenderClosing();
   };
-  v38OldRenderRelease = App.renderRelease;
+  baseRenderRelease = App.renderRelease;
   App.renderRelease = function () {
-    return App.v38StepBanner() + v38OldRenderRelease();
+    return App.renderStepBanner() + baseRenderRelease();
   };
-  v38OldReport = App.renderTestingReport;
+  baseRenderTestingReport = App.renderTestingReport;
   App.renderTestingReport = function (section) {
-    var html = v38OldReport(section),
-      r = App.v37Record(section);
+    var html = baseRenderTestingReport(section),
+      r = App.getTestReport(section);
     if (r.status === '待评审')
       html = html.replace(
         'data-v37-report-action="submit">提交评审</button>',
@@ -118,13 +118,13 @@ export function initStageProgress() {
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
-    var r = App.v37Record(b.dataset.section),
+    var r = App.getTestReport(b.dataset.section),
       next = b.dataset.v38Report === 'approve' ? '审核通过' : '已退回';
     if (r.status !== '待评审') {
       showToast('请先提交测试报告评审', 'warn');
       return;
     }
-    var dev = v38Dev();
+    var dev = getDevRecord();
     if (!dev || !dev.handoff || r.commit !== dev.commit) {
       showToast('测试报告对应 Commit 与已移交的开发版本不一致', 'warn');
       return;
@@ -141,10 +141,10 @@ export function initStageProgress() {
     App.render();
     showToast('测试报告模拟审核：' + next);
   });
-  v38OldPublishVersions = App.v37ReleaseVersions;
-  App.v37ReleaseVersions = function () {
-    var html = v38OldPublishVersions(),
-      z = App.v38Status();
+  baseReleaseVersions = App.renderReleaseVersions;
+  App.renderReleaseVersions = function () {
+    var html = baseReleaseVersions(),
+      z = App.getStageStatus();
     var prerequisite =
       '<div class="notice ' +
       (z.commit && z.testPass ? 'success' : 'warn') +
@@ -166,7 +166,7 @@ export function initStageProgress() {
     function (e) {
       var b = e.target.closest('[data-v37-publish="publish"]');
       if (!b) return;
-      var z = App.v38Status();
+      var z = App.getStageStatus();
       if (!z.commit || !z.testPass) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -180,7 +180,7 @@ export function initStageProgress() {
     function (e) {
       var b = e.target.closest('[data-release-drawer-action="submit"]');
       if (!b || state.lifecycleStage !== 'closing') return;
-      var z = App.v38Status();
+      var z = App.getStageStatus();
       if (!z.published) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -189,9 +189,9 @@ export function initStageProgress() {
     },
     true,
   );
-  v38OldDefects = App.testingDefectRows;
+  baseTestingDefectRows = App.testingDefectRows;
   App.testingDefectRows = function () {
-    return v38OldDefects().filter(function (x) {
+    return baseTestingDefectRows().filter(function (x) {
       return x.project === project().name;
     });
   };

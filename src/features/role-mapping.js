@@ -1,7 +1,7 @@
 /** 规范角色映射与测试阶段渲染（V55.5）。 */
 import { App } from '../core/app.js';
-import { v35Data } from './dev-review.js';
-import { v52VersionBanner } from './version-anchor.js';
+import { getDevReview } from './dev-review.js';
+import { renderVersionBanner } from './version-anchor.js';
 import { renderTestingDefects } from '../pages/project/testing.js';
 import { state } from '../store/state.js';
 
@@ -11,10 +11,10 @@ export function initRoleMapping() {
    * state.role is the only role source. v35Data().role is a render mirror only.
    * Testing uses the latest V54 report-list/editor workflow and V52 version lineage. */
 
-  var v55BaseRenderDevelopment = App.renderDevelopment;
+  var baseRenderDevelopment = App.renderDevelopment;
 
   // Remove the entire redundant workbench header from both role views.
-  App.v35ShellTitle = function () {
+  App.renderDevHeader = function () {
     return '';
   };
 
@@ -23,17 +23,17 @@ export function initRoleMapping() {
   // Synchronize the render mirror BEFORE the workbench reads it.
   // The old local role tabs are removed; all role changes come from #roleSelect.
   App.renderDevelopment = function () {
-    var d = v35Data();
+    var d = getDevReview();
     d.role = state.role;
-    var html = v55BaseRenderDevelopment();
+    var html = baseRenderDevelopment();
     return html.replace(/<div class="v35-tabs">[\s\S]*?<\/div>/, '');
   };
 
   // V53 introduced the smoke-report entry. Keep it explicit and guarantee
   // the six required destinations even if an earlier section list is changed.
-  var v55BaseTestingSections = App.testingSections;
+  var baseTestingSections = App.testingSections;
   App.testingSections = function () {
-    var items = v55BaseTestingSections().filter(function (item) {
+    var items = baseTestingSections().filter(function (item) {
       return item[0] !== 'smoke';
     });
     items.splice(1, 0, ['smoke', '冒烟测试报告']);
@@ -59,7 +59,7 @@ export function initRoleMapping() {
           ? renderTestingDefects()
           : App.renderTestingReport(section);
     return (
-      v52VersionBanner() +
+      renderVersionBanner() +
       '<div class="testing-reference-page"><div class="testing-stage-layout">' +
       App.testingSubnav() +
       '<main class="testing-main">' +

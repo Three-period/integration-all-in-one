@@ -6,12 +6,12 @@ import { esc } from '../core/dom.js';
 import { project, state } from '../store/state.js';
 
 /* V35: Same-task, same-developer, same-commit mock lifecycle for development & review. */
-export const v35Store = Object.create(null);
+export const devReviewStore = Object.create(null);
 
-export function v35Data() {
+export function getDevReview() {
   var id = state.projectId || 'thermal';
-  if (!v35Store[id])
-    v35Store[id] = {
+  if (!devReviewStore[id])
+    devReviewStore[id] = {
       task: 'TASK-142',
       developer: '孙宁',
       role: 'developer',
@@ -43,11 +43,11 @@ export function v35Data() {
       selfFrozen: false,
       aiMode: 'issues',
     };
-  return v35Store[id];
+  return devReviewStore[id];
 }
 
-export function v35Log(t) {
-  var d = v35Data();
+export function logDevEvent(t) {
+  var d = getDevReview();
   d.log.unshift({
     text: t,
     at: new Date().toLocaleString('zh-CN', { hour12: false }),
@@ -55,16 +55,16 @@ export function v35Log(t) {
   });
 }
 
-export function v35E(s) {
+export function escText(s) {
   return esc(s == null ? '' : s);
 }
 
-export function v35Stamp() {
+export function nowStamp() {
   return new Date().toLocaleString('zh-CN', { hour12: false });
 }
 
-function v35Find(list) {
-  var d = v35Data();
+function findCurrentRecord(list) {
+  var d = getDevReview();
   return list
     .slice()
     .reverse()
@@ -73,21 +73,21 @@ function v35Find(list) {
     });
 }
 
-function v44Prep() {
-  var d = v35Data();
+function getDevPrep() {
+  var d = getDevReview();
   if (!d.prep || d.prep.owner !== d.developer)
     d.prep = { owner: d.developer, smoke: null, self: null };
   return d.prep;
 }
 
-function v35Ready() {
-  var d = v35Data(),
-    p = v44Prep();
+function getDevReadiness() {
+  var d = getDevReview(),
+    p = getDevPrep();
   var owner = d.commits.find(function (c) {
     return c.commit === d.commit && c.owner === d.developer;
   });
-  var smoke = !!(owner && v35Find(d.smokes)),
-    self = !!(owner && v35Find(d.selfTests));
+  var smoke = !!(owner && findCurrentRecord(d.smokes)),
+    self = !!(owner && findCurrentRecord(d.selfTests));
   return {
     smoke: smoke,
     self: self,
@@ -96,15 +96,15 @@ function v35Ready() {
     stageSelf: !!p.self,
   };
 }
-App.v35Ready = v35Ready;
+App.getDevReadiness = getDevReadiness;
 
-function v44StageReady() {
-  var p = v44Prep();
+function getPrepReadiness() {
+  var p = getDevPrep();
   return { smoke: !!p.smoke, self: !!p.self };
 }
 
-export function v35Latest() {
-  var d = v35Data();
+export function latestAiRun() {
+  var d = getDevReview();
   return d.runs
     .slice()
     .reverse()
@@ -113,16 +113,16 @@ export function v35Latest() {
     });
 }
 
-export function v35Pending() {
-  var d = v35Data();
+export function pendingIssues() {
+  var d = getDevReview();
   return d.issues.filter(function (i) {
     return !['已关闭', '授权例外'].includes(i.status);
   });
 }
 
 /* V46: a new Commit with acknowledged fixes is a reinspection, not another first inspection. */
-function v46IsRecheck() {
-  var d = v35Data();
+function isRecheckRun() {
+  var d = getDevReview();
   return !!(
     d.commit &&
     d.issues.some(function (i) {
@@ -130,10 +130,10 @@ function v46IsRecheck() {
     })
   );
 }
-App.v46IsRecheck = v46IsRecheck;
+App.isRecheckRun = isRecheckRun;
 
-function v46AiModePicker() {
-  var repeat = App.v46IsRecheck();
+function renderAiModePicker() {
+  var repeat = App.isRecheckRun();
   return (
     '<div class="v35-field"><label>模拟 AI 执行结果（仅演示）</label><select id="v35AiMode">' +
     (repeat
@@ -147,28 +147,28 @@ function v46AiModePicker() {
   );
 }
 
-function v45AiClear() {
-  var r = v35Latest();
+function isAiReviewClear() {
+  var r = latestAiRun();
   return !!(
     r &&
     r.result === '完成' &&
     r.checks.every(function (c) {
       return c.result === '通过';
     }) &&
-    v35Pending().length === 0
+    pendingIssues().length === 0
   );
 }
 
-export function v35FormalReady() {
-  var d = v35Data();
-  return !!(v45AiClear() && d.formalRequest && d.formalRequest.commit === d.commit);
+export function isFormalReviewReady() {
+  var d = getDevReview();
+  return !!(isAiReviewClear() && d.formalRequest && d.formalRequest.commit === d.commit);
 }
 
-export function v35Badge(label, cl) {
-  return '<span class="v35-badge ' + (cl || '') + '">' + v35E(label) + '</span>';
+export function devBadge(label, cl) {
+  return '<span class="v35-badge ' + (cl || '') + '">' + escText(label) + '</span>';
 }
 
-export function v35Btn(label, act, attrs, cl) {
+export function devButton(label, act, attrs, cl) {
   return (
     '<button class="btn ' +
     (cl || '') +
@@ -182,14 +182,14 @@ export function v35Btn(label, act, attrs, cl) {
   );
 }
 
-function v35ShellTitle(d) {
+function renderDevHeader(d) {
   return (
     '<div class="v35-head"><div><h2>开发阶段 · ' +
     (d.role === 'developer' ? '开发工程师' : '检视工程师') +
     '工作台</h2><div class="v35-sub">项目：' +
-    v35E(project().name) +
+    escText(project().name) +
     ' · 任务：' +
-    v35E(d.task) +
+    escText(d.task) +
     ' · 演示数据（不连接真实 GitLab、AI 或测试系统）</div></div><div class="v35-tools"><label>演示角色 <select class="input" data-v35-change="role"><option value="developer" ' +
     (d.role === 'developer' ? 'selected' : '') +
     '>开发工程师</option><option value="reviewer" ' +
@@ -203,9 +203,9 @@ function v35ShellTitle(d) {
     '</select></label></div></div>'
   );
 }
-App.v35ShellTitle = v35ShellTitle;
+App.renderDevHeader = renderDevHeader;
 
-function v35SummaryCard(title, status, note, type, badge) {
+function renderDevSummaryCard(title, status, note, type, badge) {
   return (
     '<section class="v35-card" data-v35="open" data-kind="' +
     type +
@@ -214,19 +214,19 @@ function v35SummaryCard(title, status, note, type, badge) {
     '详情"><div class="v35-card-head"><strong>' +
     title +
     '</strong>' +
-    v35Badge(badge === 'ok' ? '已就绪' : '待处理', badge) +
+    devBadge(badge === 'ok' ? '已就绪' : '待处理', badge) +
     '</div><div style="font-size:11px;font-weight:650">' +
-    v35E(status) +
+    escText(status) +
     '</div><div class="v35-card-note">' +
-    v35E(note) +
+    escText(note) +
     '</div><div class="v35-card-foot"><span class="v35-mini">点击查看 / 操作</span>' +
-    v35Btn('打开详情', 'open', 'data-kind="' + type + '"', 'primary') +
+    devButton('打开详情', 'open', 'data-kind="' + type + '"', 'primary') +
     '</div></section>'
   );
 }
-App.v35SummaryCard = v35SummaryCard;
+App.renderDevSummaryCard = renderDevSummaryCard;
 
-export function v35Panel(title, body, actions) {
+export function devPanel(title, body, actions) {
   return (
     '<section class="v35-panel"><div class="v35-panel-head"><h3>' +
     title +
@@ -238,42 +238,42 @@ export function v35Panel(title, body, actions) {
   );
 }
 
-function v35Drawer(title, body, foot) {
+function openDevDrawer(title, body, foot) {
   openDrawer(
     title,
     '<div class="v35-root">' + body + '</div>',
-    '<div class="v35-drawer-foot">' + (foot || v35Btn('关闭', 'close')) + '</div>',
+    '<div class="v35-drawer-foot">' + (foot || devButton('关闭', 'close')) + '</div>',
   );
 }
 
-function v35Repo() {
-  var d = v35Data();
-  v35Drawer(
+function openRepoDrawer() {
+  var d = getDevReview();
+  openDevDrawer(
     '代码仓库关联 · 当前版本',
-    v35Panel(
+    devPanel(
       'GitLab / 分支 / Commit',
       '<div class="v35-notice">GitLab 提交为 Mock 数据。必须先获取冒烟方案、填写冒烟结果并提交自测报告，再提交新 Commit；提交时统一绑定这两项记录。旧版本记录保留历史，不替代新版本。</div><div class="v35-field"><label>代码仓库 URL</label><input id="v35Repo" value="' +
-        v35E(d.repo) +
+        escText(d.repo) +
         '"></div><div class="v35-field"><label>当前分支</label><input id="v35Branch" value="' +
-        v35E(d.branch) +
+        escText(d.branch) +
         '"></div><div class="v35-field"><label>当前 Commit（输入新的提交 SHA / 版本号）</label><input id="v35Commit" placeholder="例如 a7d42f1" value="' +
-        v35E(d.commit) +
+        escText(d.commit) +
         '"></div><div class="v35-row">' +
-        v35Btn(
+        devButton(
           '模拟新 Commit',
           'generate-commit',
-          v44StageReady().self ? '' : 'disabled title="须先完成冒烟、自测"',
+          getPrepReadiness().self ? '' : 'disabled title="须先完成冒烟、自测"',
           'primary',
         ) +
-        v35Btn(
+        devButton(
           '提交 Commit / 保存关联',
           'save-repo',
-          v44StageReady().self ? '' : 'disabled title="须先完成冒烟、自测"',
+          getPrepReadiness().self ? '' : 'disabled title="须先完成冒烟、自测"',
         ) +
-        v35Btn('打开仓库（Mock）', 'repo-link') +
+        devButton('打开仓库（Mock）', 'repo-link') +
         '</div>',
     ) +
-      v35Panel(
+      devPanel(
         'Commit 历史',
         '<div class="v35-list">' +
           (d.commits.length
@@ -281,16 +281,16 @@ function v35Repo() {
                 .map(function (x) {
                   return (
                     '<div class="v35-list-item">' +
-                    v35Badge(
+                    devBadge(
                       x.commit === d.commit ? '当前' : '历史',
                       x.commit === d.commit ? 'ok' : '',
                     ) +
                     ' <b>' +
-                    v35E(x.commit) +
+                    escText(x.commit) +
                     '</b> · ' +
-                    v35E(x.owner) +
+                    escText(x.owner) +
                     ' <span class="v35-mini">' +
-                    v35E(x.at) +
+                    escText(x.at) +
                     '</span></div>'
                   );
                 })
@@ -301,51 +301,51 @@ function v35Repo() {
   );
 }
 
-function v35Self() {
-  var d = v35Data(),
-    record = v44Prep().self || v35Find(d.selfTests);
-  v35Drawer(
+function openSelfTestDrawer() {
+  var d = getDevReview(),
+    record = getDevPrep().self || findCurrentRecord(d.selfTests);
+  openDevDrawer(
     '自测报告 · 在线编写',
-    v35Panel(
+    devPanel(
       '自测报告正文',
       '<div class="v35-notice">当前责任人 ' +
-        v35E(d.developer) +
+        escText(d.developer) +
         ' · 自测报告在提交 Commit 前完成，提交后再关联当前版本。</div><div class="v35-field"><label>自测结论（支持在线编辑）</label><div id="v35SelfEditor" contenteditable="true" style="border:1px solid #d6deeb;min-height:130px;padding:12px;line-height:1.7;border-radius:5px" aria-label="自测报告在线编辑">' +
-        v35E(record ? record.text : d.selfText) +
+        escText(record ? record.text : d.selfText) +
         '</div><div class="v35-row">' +
-        v35Btn('引用选中文字', 'self-quote') +
-        v35Btn(d.selfFrozen ? '解冻评论' : '冻结评论', 'self-freeze') +
+        devButton('引用选中文字', 'self-quote') +
+        devButton(d.selfFrozen ? '解冻评论' : '冻结评论', 'self-freeze') +
         '</div><div class="v35-field" style="margin-top:10px"><label>在线评论（Mock）</label><textarea id="v35SelfComment" placeholder="选中文字后引用，再填写评论" ' +
         (d.selfFrozen ? 'disabled' : '') +
         '></textarea></div>' +
-        v35Btn('添加评论', 'self-comment', d.selfFrozen ? 'disabled' : '') +
+        devButton('添加评论', 'self-comment', d.selfFrozen ? 'disabled' : '') +
         '<div class="v35-list" style="margin-top:9px">' +
         d.selfComments
           .map(function (c) {
             return (
               '<div class="v35-list-item"><b>' +
-              v35E(c.owner) +
+              escText(c.owner) +
               ' · ' +
-              v35E(c.at) +
+              escText(c.at) +
               '</b><p>引用：' +
-              v35E(c.quote || '全文') +
+              escText(c.quote || '全文') +
               '</p><p>' +
-              v35E(c.text) +
+              escText(c.text) +
               '</p></div>'
             );
           })
           .join('') +
         '</div></div><div class="v35-row">' +
-        v35Btn('保存草稿', 'save-self') +
-        v35Btn(
+        devButton('保存草稿', 'save-self') +
+        devButton(
           '提交自测报告',
           'submit-self',
-          v44Prep().smoke ? '' : 'disabled title="须先完成冒烟测试"',
+          getDevPrep().smoke ? '' : 'disabled title="须先完成冒烟测试"',
           'primary',
         ) +
         '</div>',
     ) +
-      v35Panel(
+      devPanel(
         '自测报告版本历史',
         d.selfTests.length
           ? d.selfTests
@@ -354,18 +354,18 @@ function v35Self() {
               .map(function (x) {
                 return (
                   '<div class="v35-list-item"><b>' +
-                  v35E(x.commit) +
+                  escText(x.commit) +
                   '</b> ' +
-                  v35Badge(
+                  devBadge(
                     x.commit === d.commit ? '当前版本' : '历史版本',
                     x.commit === d.commit ? 'ok' : '',
                   ) +
                   ' · ' +
-                  v35E(x.owner) +
+                  escText(x.owner) +
                   ' · ' +
-                  v35E(x.at) +
+                  escText(x.at) +
                   '<p>' +
-                  v35E(x.text) +
+                  escText(x.text) +
                   '</p></div>'
                 );
               })
@@ -375,12 +375,12 @@ function v35Self() {
   );
 }
 
-function v35Smoke() {
-  var d = v35Data(),
-    record = v44Prep().smoke || v35Find(d.smokes);
-  v35Drawer(
+function openSmokeDrawer() {
+  var d = getDevReview(),
+    record = getDevPrep().smoke || findCurrentRecord(d.smokes);
+  openDevDrawer(
     '冒烟测试 · 执行记录',
-    v35Panel(
+    devPanel(
       '平台测试方案（Mock）',
       '<div class="v35-notice">依据规格书，测试组提前确定测试路径。此处记录第 1 步冒烟测试，完成后才允许填写自测报告；提交 Commit 时关联同一责任人与当前版本。</div><div class="v35-list"><div class="v35-list-item"><strong>SMK-01 基础启动与服务可用性</strong><p>预期：应用正常启动，核心服务可用。</p></div><div class="v35-list-item"><strong>SMK-02 核心功能链路</strong><p>预期：设备连接、数据上报与断线恢复基本可用。</p></div></div><div class="v35-field"><label>执行结果</label><select id="v35SmokeResult"><option ' +
         ((record ? record.result : d.smokeResult) === '通过' ? 'selected' : '') +
@@ -389,12 +389,12 @@ function v35Smoke() {
         '>失败</option><option ' +
         ((record ? record.result : d.smokeResult) === '待确认' ? 'selected' : '') +
         '>待确认</option></select></div><div class="v35-field"><label>执行记录 / 测试结论</label><textarea id="v35SmokeText">' +
-        v35E(record ? record.text : d.smokeText) +
+        escText(record ? record.text : d.smokeText) +
         '</textarea></div><div class="v35-row">' +
-        v35Btn('提交冒烟测试记录', 'submit-smoke', '', 'primary') +
+        devButton('提交冒烟测试记录', 'submit-smoke', '', 'primary') +
         '</div><div class="v35-notice warn">冒烟结果失败是否阻断 AI 申请，业务规则尚未确认。本原型仅校验该 Commit 已完成记录，不擅自将“通过”设为强制条件。</div>',
     ) +
-      v35Panel(
+      devPanel(
         '历史冒烟记录',
         d.smokes.length
           ? d.smokes
@@ -403,13 +403,13 @@ function v35Smoke() {
               .map(function (x) {
                 return (
                   '<div class="v35-list-item"><b>' +
-                  v35E(x.commit) +
+                  escText(x.commit) +
                   '</b> · ' +
-                  v35E(x.owner) +
+                  escText(x.owner) +
                   ' · ' +
-                  v35Badge(x.result, x.result === '通过' ? 'ok' : 'bad') +
+                  devBadge(x.result, x.result === '通过' ? 'ok' : 'bad') +
                   '<p>' +
-                  v35E(x.text) +
+                  escText(x.text) +
                   '</p></div>'
                 );
               })
@@ -419,22 +419,22 @@ function v35Smoke() {
   );
 }
 
-function v35CheckCard(c) {
+function renderCheckCard(c) {
   return (
     '<div class="v35-list-item"><strong>' +
-    v35E(c.name) +
+    escText(c.name) +
     ' ' +
-    v35Badge(c.result, c.result === '通过' ? 'ok' : c.result === '失败' ? 'bad' : 'warn') +
+    devBadge(c.result, c.result === '通过' ? 'ok' : c.result === '失败' ? 'bad' : 'warn') +
     '</strong><p>' +
-    v35E(c.detail) +
+    escText(c.detail) +
     '</p></div>'
   );
 }
 
-function v35AI() {
-  var d = v35Data(),
-    r = v35Latest(),
-    ready = App.v35Ready(),
+function openAiReviewDrawer() {
+  var d = getDevReview(),
+    r = latestAiRun(),
+    ready = App.getDevReadiness(),
     can = ready.smoke && ready.self && ready.commit;
   var tabs =
     '<div class="v35-section-tabs">' +
@@ -466,13 +466,13 @@ function v35AI() {
         ['③ Commit', ready.commit],
       ]
         .map(function (x) {
-          return v35Badge(x[0] + (x[1] ? ' ✓' : ' ✕'), x[1] ? 'ok' : 'warn');
+          return devBadge(x[0] + (x[1] ? ' ✓' : ' ✕'), x[1] ? 'ok' : 'warn');
         })
         .join(' ') +
       '</div>' +
-      v46AiModePicker() +
+      renderAiModePicker() +
       '<div class="v35-row">' +
-      v35Btn(
+      devButton(
         '提交 AI 检视申请',
         'request-ai',
         can ? '' : 'disabled title="须同一人员依次完成冒烟、自测、Commit 并绑定同一版本"',
@@ -480,26 +480,26 @@ function v35AI() {
       ) +
       '</div>' +
       (r
-        ? v35Panel(
-            '当前检视批次 ' + v35E(r.id) + ' · ' + v35E(r.commit),
+        ? devPanel(
+            '当前检视批次 ' + escText(r.id) + ' · ' + escText(r.commit),
             '<div class="v35-list">' +
-              r.checks.map(v35CheckCard).join('') +
+              r.checks.map(renderCheckCard).join('') +
               '</div><div class="v35-notice">AI 执行完成不等于问题已闭环，正式人工检视必须等待所有问题处理完毕。</div>',
           )
         : '<div class="v35-empty">尚无 AI 检视批次。完成三个准入步骤后可模拟申请。</div>') +
       (d.approval
-        ? v35Panel(
+        ? devPanel(
             '开发提交拟提测版本',
             '<div class="v35-notice">检视工程师已确认通过：' +
-              v35E(d.approval.commit) +
+              escText(d.approval.commit) +
               '。开发工程师提交拟提测版本，必须与通过版本一致。</div><div class="v35-field"><label>拟提测 Commit</label><input id="v35HandoffCommit" value="' +
-              v35E(d.commit) +
+              escText(d.commit) +
               '"></div>' +
-              v35Btn('校验版本并移交测试', 'handoff', '', 'primary'),
+              devButton('校验版本并移交测试', 'handoff', '', 'primary'),
           )
         : '');
   if (d.section === 'issues') {
-    var pending = v35Pending().slice().reverse(),
+    var pending = pendingIssues().slice().reverse(),
       history = d.issues
         .filter(function (i) {
           return ['已关闭', '授权例外'].includes(i.status);
@@ -520,8 +520,8 @@ function v35AI() {
         ? '<div class="v35-row" style="margin:10px 0"><label><input type="checkbox" data-v45-all ' +
           (allSelection ? 'checked' : '') +
           '> 全选可处理问题</label><span class="v35-mini">勾选需统一处理的问题</span>' +
-          v35Btn('批量认可整改', 'batch-fix') +
-          v35Btn('批量提交异议', 'batch-dispute', '', 'primary') +
+          devButton('批量认可整改', 'batch-fix') +
+          devButton('批量提交异议', 'batch-dispute', '', 'primary') +
           '</div>'
         : '') +
       '<div class="v35-list">' +
@@ -535,37 +535,37 @@ function v35AI() {
                 '"><div class="v35-row" style="align-items:center">' +
                 (editable
                   ? '<input type="checkbox" data-v45-issue="' +
-                    v35E(i.id) +
+                    escText(i.id) +
                     '" ' +
                     (d.v45Selection && d.v45Selection.includes(i.id) ? 'checked' : '') +
                     '>'
                   : '<span style="width:18px"></span>') +
                 '<strong>' +
-                v35E(i.title) +
+                escText(i.title) +
                 '</strong>' +
-                v35Badge(i.status, i.status === '待复检' ? '' : 'warn') +
+                devBadge(i.status, i.status === '待复检' ? '' : 'warn') +
                 '</div><div class="v35-mini">' +
-                v35E(i.id) +
+                escText(i.id) +
                 ' · ' +
-                v35E(i.source) +
+                escText(i.source) +
                 ' · ' +
-                v35E(i.commit) +
+                escText(i.commit) +
                 ' · ' +
-                v35E(i.run) +
+                escText(i.run) +
                 '</div><p>依据：' +
-                v35E(i.evidence) +
+                escText(i.evidence) +
                 '</p>' +
-                (i.dispute ? '<p><b>开发异议：</b>' + v35E(i.dispute) + '</p>' : '') +
-                (i.reply ? '<p><b>检视反馈：</b>' + v35E(i.reply) + '</p>' : '') +
+                (i.dispute ? '<p><b>开发异议：</b>' + escText(i.dispute) + '</p>' : '') +
+                (i.reply ? '<p><b>检视反馈：</b>' + escText(i.reply) + '</p>' : '') +
                 '</div>'
               );
             })
             .join('')
         : '<div class="v35-empty">当前没有待处理问题。</div>') +
       '</div>' +
-      (!pending.length && v45AiClear()
+      (!pending.length && isAiReviewClear()
         ? '<div class="v35-notice">最新 AI 检视有效完成，且问题处理页已清空。请由开发人员主动提交人工检视申请。</div><div class="v35-row">' +
-          v35Btn(
+          devButton(
             d.formalRequest && d.formalRequest.commit === d.commit
               ? '已提交人工检视'
               : '提交人工检视',
@@ -578,20 +578,20 @@ function v35AI() {
           ? '<div class="v35-notice warn">暂无待处理问题，但最新 AI 检视尚未有效完成，不能提交人工检视。</div>'
           : '') +
       (history.length
-        ? v35Panel(
+        ? devPanel(
             '已闭环问题历史（不占用处理列表）',
             '<div class="v35-list">' +
               history
                 .map(function (i) {
                   return (
                     '<div class="v35-list-item"><b>' +
-                    v35E(i.id) +
+                    escText(i.id) +
                     ' · ' +
-                    v35E(i.title) +
+                    escText(i.title) +
                     '</b> ' +
-                    v35Badge(i.status, 'ok') +
+                    devBadge(i.status, 'ok') +
                     '<p>' +
-                    v35E(i.reply || '已闭环') +
+                    escText(i.reply || '已闭环') +
                     '</p></div>'
                   );
                 })
@@ -611,22 +611,22 @@ function v35AI() {
             .map(function (run) {
               return (
                 '<div class="v35-list-item"><strong>' +
-                v35E(run.id) +
+                escText(run.id) +
                 ' · ' +
-                v35E(run.commit) +
+                escText(run.commit) +
                 ' ' +
-                v35Badge(run.result, run.result === '完成' ? 'ok' : 'bad') +
+                devBadge(run.result, run.result === '完成' ? 'ok' : 'bad') +
                 '</strong><p>' +
-                v35E(run.at) +
+                escText(run.at) +
                 ' · 规则版本 ' +
-                v35E(run.ruleVersion) +
+                escText(run.ruleVersion) +
                 '</p></div>'
               );
             })
             .join('')
         : '<div class="v35-empty">暂无检视记录</div>') +
       '</div>' +
-      v35Panel(
+      devPanel(
         '操作记录',
         '<div class="v35-timeline">' +
           (d.log.length
@@ -635,11 +635,11 @@ function v35AI() {
                 .map(function (l) {
                   return (
                     '<div>' +
-                    v35E(l.text) +
+                    escText(l.text) +
                     '<small>' +
-                    v35E(l.at) +
+                    escText(l.at) +
                     ' · ' +
-                    v35E(l.commit) +
+                    escText(l.commit) +
                     '</small></div>'
                   );
                 })
@@ -647,15 +647,15 @@ function v35AI() {
             : '暂无记录') +
           '</div>',
       );
-  v35Drawer('AI 检视报告 · ' + v35E(d.task), tabs + content);
+  openDevDrawer('AI 检视报告 · ' + escText(d.task), tabs + content);
 }
-App.v35AI = v35AI;
+App.openAiReviewDrawer = openAiReviewDrawer;
 
-function v35Reviewer(d) {
+function renderReviewerWorkspace(d) {
   var disputes = d.issues.filter(function (i) {
       return i.status === '异议待裁定' || i.status === '待线下评审';
     }),
-    formal = v35FormalReady(),
+    formal = isFormalReviewReady(),
     rechecks = d.issues.filter(function (i) {
       return i.source === '人工检视' && i.status === '待人工复核';
     });
@@ -668,26 +668,36 @@ function v35Reviewer(d) {
     rechecks.length;
   var nav =
     '<div class="v35-row" style="margin-bottom:12px">' +
-    v35Btn('检视待办', 'rev-mode', 'data-mode="todos"', d.reviewMode === 'todos' ? 'primary' : '') +
-    v35Btn(
+    devButton(
+      '检视待办',
+      'rev-mode',
+      'data-mode="todos"',
+      d.reviewMode === 'todos' ? 'primary' : '',
+    ) +
+    devButton(
       '异议处理',
       'rev-mode',
       'data-mode="disputes"',
       d.reviewMode === 'disputes' ? 'primary' : '',
     ) +
-    v35Btn(
+    devButton(
       '专业检视',
       'rev-mode',
       'data-mode="formal"',
       d.reviewMode === 'formal' ? 'primary' : '',
     ) +
-    v35Btn('准出确认', 'rev-mode', 'data-mode="exit"', d.reviewMode === 'exit' ? 'primary' : '') +
+    devButton(
+      '准出确认',
+      'rev-mode',
+      'data-mode="exit"',
+      d.reviewMode === 'exit' ? 'primary' : '',
+    ) +
     '<span class="v35-spacer v35-mini">' +
     counts +
     '</span></div>';
   var content = '';
   if (d.reviewMode === 'todos')
-    content = v35Panel(
+    content = devPanel(
       '检视任务列表（共享开发侧问题与状态）',
       '<div class="v35-list">' +
         disputes
@@ -696,33 +706,33 @@ function v35Reviewer(d) {
               '<button class="v35-todo" data-v35="open-dispute" data-id="' +
               i.id +
               '"><span><b>开发异议 · ' +
-              v35E(i.title) +
+              escText(i.title) +
               '</b><small style="display:block">' +
-              v35E(i.id) +
+              escText(i.id) +
               ' · ' +
-              v35E(i.commit) +
+              escText(i.commit) +
               '</small></span>' +
-              v35Badge(i.status, 'warn') +
+              devBadge(i.status, 'warn') +
               '</button>'
             );
           })
           .join('') +
         (formal
           ? '<button class="v35-todo" data-v35="rev-mode" data-mode="formal"><span><b>正式专业检视 · ' +
-            v35E(d.task) +
+            escText(d.task) +
             '</b><small style="display:block">当前 Commit：' +
-            v35E(d.commit) +
+            escText(d.commit) +
             '</small></span>' +
-            v35Badge('待检视', 'ok') +
+            devBadge('待检视', 'ok') +
             '</button>'
           : '<div class="v35-notice warn">R3 待办尚未生成：须最新 AI 检视有效完成、问题处理页清空，且开发主动提交人工检视。R2 异议可提前处理。</div>') +
         rechecks
           .map(function (i) {
             return (
               '<button class="v35-todo" data-v35="rev-mode" data-mode="formal"><span><b>人工复核 · ' +
-              v35E(i.title) +
+              escText(i.title) +
               '</b></span>' +
-              v35Badge(i.status, 'warn') +
+              devBadge(i.status, 'warn') +
               '</button>'
             );
           })
@@ -730,32 +740,32 @@ function v35Reviewer(d) {
         '</div>',
     );
   if (d.reviewMode === 'disputes')
-    content = v35Panel(
+    content = devPanel(
       'R2 开发异议与裁定',
       disputes.length
         ? disputes
             .map(function (i) {
               return (
                 '<div class="v35-issue"><h4>' +
-                v35E(i.title) +
+                escText(i.title) +
                 ' ' +
-                v35Badge(i.status, 'warn') +
+                devBadge(i.status, 'warn') +
                 '</h4><p><b>AI 原问题：</b>' +
-                v35E(i.evidence) +
+                escText(i.evidence) +
                 '</p><p><b>开发异议：</b>' +
-                v35E(i.dispute || '待补充') +
+                escText(i.dispute || '待补充') +
                 '</p><div class="v35-field"><label>裁定意见 / 执行要求</label><textarea id="v35Verdict-' +
                 i.id +
                 '" placeholder="说明处理依据与明确的下一步行动">' +
-                v35E(i.verdict || '') +
+                escText(i.verdict || '') +
                 '</textarea></div><div class="v35-row">' +
-                v35Btn('应整改', 'verdict', 'data-id="' + i.id + '" data-result="fix"') +
-                v35Btn(
+                devButton('应整改', 'verdict', 'data-id="' + i.id + '" data-result="fix"') +
+                devButton(
                   'AI误报 / 合理例外',
                   'verdict',
                   'data-id="' + i.id + '" data-result="exception"',
                 ) +
-                v35Btn('转线下评审', 'offline', 'data-id="' + i.id + '"') +
+                devButton('转线下评审', 'offline', 'data-id="' + i.id + '"') +
                 '</div>' +
                 (i.status === '待线下评审'
                   ? '<div class="v35-field" style="margin-top:10px"><label>线下会议纪要（Mock 上传说明）</label><textarea id="v35Minutes-' +
@@ -763,7 +773,12 @@ function v35Reviewer(d) {
                     '" placeholder="会议时间、参会人、结论摘要"></textarea><label>最终可执行裁定</label><select id="v35OfflineDecision-' +
                     i.id +
                     '"><option value="">请选择裁定结果</option><option value="fix">应整改</option><option value="exception">AI误报 / 授权例外</option></select>' +
-                    v35Btn('保存纪要并裁定', 'offline-save', 'data-id="' + i.id + '"', 'primary') +
+                    devButton(
+                      '保存纪要并裁定',
+                      'offline-save',
+                      'data-id="' + i.id + '"',
+                      'primary',
+                    ) +
                     '</div>'
                   : '') +
                 '</div>'
@@ -772,14 +787,14 @@ function v35Reviewer(d) {
             .join('')
         : '<div class="v35-empty">当前没有开发异议待办</div>',
     );
-  if (d.reviewMode === 'formal') content = App.v35Formal(d);
-  if (d.reviewMode === 'exit') content = App.v35Exit(d);
+  if (d.reviewMode === 'formal') content = App.renderFormalReview(d);
+  if (d.reviewMode === 'exit') content = App.renderExitGate(d);
   return nav + content;
 }
-App.v35Reviewer = v35Reviewer;
+App.renderReviewerWorkspace = renderReviewerWorkspace;
 
-function v35Formal(d) {
-  var formal = v35FormalReady(),
+function renderFormalReview(d) {
+  var formal = isFormalReviewReady(),
     checks = [
       ['高风险必查', '关键调用 / 异常处理'],
       ['AI 未有效覆盖', '范围遗漏与不确定项'],
@@ -793,7 +808,7 @@ function v35Formal(d) {
       ? '开发已提交正式人工检视申请，可进行专业检视。'
       : '尚未收到开发提交的 R3 正式人工检视申请；可查看检查框架，但不可提交人工结论。') +
     '</div><div class="v35-review-3">' +
-    v35Panel(
+    devPanel(
       '① 检查范围',
       checks
         .map(function (c) {
@@ -803,7 +818,7 @@ function v35Formal(d) {
             '</b><p>' +
             c[1] +
             '</p>' +
-            v35Badge(
+            devBadge(
               d.manual.some(function (x) {
                 return x.kind === c[0] && x.commit === d.commit;
               })
@@ -820,16 +835,16 @@ function v35Formal(d) {
         })
         .join(''),
     ) +
-    v35Panel(
+    devPanel(
       '② 方案 / 代码证据',
       '<div class="v35-list-item"><b>当前 Commit</b><p><button class="v43-evidence-link" data-v43="commit" ' +
         (d.commit ? '' : 'disabled') +
         '>' +
-        v35E(d.commit || '尚未提交') +
+        escText(d.commit || '尚未提交') +
         ' ↗</button></p><small class="v43-evidence-note">' +
-        v35E(d.repo || '模拟 GitLab 仓库') +
+        escText(d.repo || '模拟 GitLab 仓库') +
         ' · 点击访问仓库（Mock）</small></div><div class="v35-list-item"><b>设计依据</b><p>软件规格书 V1.3 / 关联方案文档（Mock）</p><button class="v43-evidence-link" data-v43="design">查看设计依据与文档目录 ›</button></div><div class="v35-list-item"><b>AI 对照结果</b><p>先保存当前 Commit 的独立抽检结论，再查看 AI 对照结果。</p>' +
-        v35Btn(
+        devButton(
           '查看 AI 四类检查',
           'show-ai-manual',
           d.commit &&
@@ -841,7 +856,7 @@ function v35Formal(d) {
         ) +
         '</div>',
     ) +
-    v35Panel(
+    devPanel(
       '③ 人工判断与新增问题',
       '<div class="v35-field"><label>检查类型</label><select id="v35ManualKind">' +
         checks
@@ -850,16 +865,16 @@ function v35Formal(d) {
           })
           .join('') +
         '</select></div><div class="v35-field"><label>独立检查结论</label><select id="v35ManualResult"><option>无新增问题</option><option>发现问题</option></select></div><div class="v35-field"><label>结论依据 / 新增问题描述</label><textarea id="v35ManualText" placeholder="写明证据或人工发现的问题"></textarea></div>' +
-        v35Btn('保存人工检视记录', 'save-manual', formal ? '' : 'disabled', 'primary') +
+        devButton('保存人工检视记录', 'save-manual', formal ? '' : 'disabled', 'primary') +
         '<div class="v35-notice">人工新增问题会直接同步回开发侧 AI 报告的问题处理列表。整改后需新 Commit、重测与复检。</div>',
     ) +
     '</div>'
   );
 }
-App.v35Formal = v35Formal;
+App.renderFormalReview = renderFormalReview;
 
-function v35Exit(d) {
-  var r = v35Latest(),
+function renderExitGate(d) {
+  var r = latestAiRun(),
     checks = [
       [
         '当前 Commit 有完整 AI 四类结果',
@@ -869,7 +884,7 @@ function v35Exit(d) {
             return c.result === '通过';
           }),
       ],
-      ['所有 AI / 人工问题闭环', v35Pending().length === 0],
+      ['所有 AI / 人工问题闭环', pendingIssues().length === 0],
       [
         '三类人工检查已完成',
         ['高风险必查', 'AI 未有效覆盖', '独立抽检'].every(function (k) {
@@ -883,14 +898,14 @@ function v35Exit(d) {
   var ok = checks.every(function (x) {
     return x[1];
   });
-  return v35Panel(
+  return devPanel(
     'R4 最终准出 · 检视工程师确认',
     '<div class="v35-list">' +
       checks
         .map(function (c) {
           return (
             '<div class="v35-check">' +
-            v35Badge(c[1] ? '通过' : '阻断', c[1] ? 'ok' : 'bad') +
+            devBadge(c[1] ? '通过' : '阻断', c[1] ? 'ok' : 'bad') +
             ' <span>' +
             c[0] +
             '</span></div>'
@@ -898,44 +913,44 @@ function v35Exit(d) {
         })
         .join('') +
       '</div><div class="v35-notice">检视通过不等于测试已开始。通过后还需由开发提交拟提测 Commit，并校验与检视通过版本一致。</div><div class="v35-row">' +
-      v35Btn('确认检视通过', 'approve', ok ? '' : 'disabled', 'primary') +
+      devButton('确认检视通过', 'approve', ok ? '' : 'disabled', 'primary') +
       '</div>' +
       (d.approval
         ? '<div class="v35-notice">已确认：' +
-          v35E(d.approval.commit) +
+          escText(d.approval.commit) +
           ' · ' +
-          v35E(d.approval.at) +
+          escText(d.approval.at) +
           '。请开发工程师从 AI 报告卡片提交拟提测 Commit。</div>'
         : ''),
   );
 }
-App.v35Exit = v35Exit;
+App.renderExitGate = renderExitGate;
 
-export function v35Refresh() {
+export function refreshDevView() {
   App.render();
 }
 
-function v35Issue(id) {
-  return v35Data().issues.find(function (x) {
+function findIssue(id) {
+  return getDevReview().issues.find(function (x) {
     return x.id === id;
   });
 }
 
-function v35ApplyVerdict(i, result, comment) {
+function applyReviewVerdict(i, result, comment) {
   i.verdict = comment;
   i.reply = (result === 'fix' ? '裁定应整改：' : '裁定为误报 / 授权例外：') + comment;
   i.status = result === 'fix' ? '待整改' : '授权例外';
-  v35Log('检视工程师已裁定 ' + i.id + '：' + i.status);
+  logDevEvent('检视工程师已裁定 ' + i.id + '：' + i.status);
 }
 
-function v35PerformAi(mode) {
-  var d = v35Data(),
-    ready = App.v35Ready();
+function performAiReview(mode) {
+  var d = getDevReview(),
+    ready = App.getDevReadiness();
   if (!(ready.commit && ready.smoke && ready.self)) {
     showToast('准入失败：须依次完成冒烟、自测和 Commit', 'warn');
     return;
   }
-  var recheck = App.v46IsRecheck(),
+  var recheck = App.isRecheckRun(),
     recheckIssues = d.issues.filter(function (i) {
       return i.source === 'AI 检视' && i.status === '待复检' && i.commit !== d.commit;
     });
@@ -954,7 +969,7 @@ function v35PerformAi(mode) {
   var run = {
     id: id,
     commit: d.commit,
-    at: v35Stamp(),
+    at: nowStamp(),
     ruleVersion: 'RULE-1.0',
     result: mode === 'fail' ? '执行失败' : '完成',
     checks: checks,
@@ -987,7 +1002,7 @@ function v35PerformAi(mode) {
   if (recheck && mode === 'pass') {
     recheckIssues.forEach(function (i) {
       i.status = '已关闭';
-      i.recheckedAt = v35Stamp();
+      i.recheckedAt = nowStamp();
       i.recheckedCommit = d.commit;
       i.reply =
         (i.reply || '') + '；经 ' + id + '（' + d.commit + '）AI 复检通过，确认该问题整改闭环。';
@@ -1007,10 +1022,12 @@ function v35PerformAi(mode) {
   d.approval = null;
   d.handoff = false;
   d.v45Selection = [];
-  v35Log((recheck ? '整改复检' : '首次检视') + ' AI 申请，产生 ' + id + '（' + run.result + '）');
+  logDevEvent(
+    (recheck ? '整改复检' : '首次检视') + ' AI 申请，产生 ' + id + '（' + run.result + '）',
+  );
   d.section = 'issues';
-  v35Refresh();
-  App.v35AI();
+  refreshDevView();
+  App.openAiReviewDrawer();
   showToast(
     recheck && mode === 'pass'
       ? 'AI 复检通过，旧问题已关闭；可提交人工检视'
@@ -1019,7 +1036,7 @@ function v35PerformAi(mode) {
         : '已生成 ' + id + '，可在问题处理页查看',
   );
 }
-App.v35PerformAi = v35PerformAi;
+App.performAiReview = performAiReview;
 
 /** V35/V45/V46 开发与 AI 检视 */
 export function initDevReview() {
@@ -1038,7 +1055,7 @@ export function initDevReview() {
   /* V45: batch problem selection in the AI report drawer. */
   document.addEventListener('change', function (e) {
     if (state.lifecycleStage !== 'development') return;
-    var d = v35Data(),
+    var d = getDevReview(),
       t = e.target;
     if (t.matches('[data-v45-issue]')) {
       var id = t.dataset.v45Issue;
@@ -1052,7 +1069,7 @@ export function initDevReview() {
     }
     if (t.matches('[data-v45-all]')) {
       d.v45Selection = t.checked
-        ? v35Pending()
+        ? pendingIssues()
             .filter(function (i) {
               return ['待整改', '待处理'].includes(i.status);
             })
@@ -1060,27 +1077,27 @@ export function initDevReview() {
               return i.id;
             })
         : [];
-      App.v35AI();
+      App.openAiReviewDrawer();
       return;
     }
   });
   document.addEventListener('change', function (e) {
     var el = e.target.closest('[data-v35-change]');
     if (!el || state.lifecycleStage !== 'development') return;
-    var d = v35Data();
+    var d = getDevReview();
     d[el.dataset.v35Change] = el.value;
     d.reviewMode = 'todos';
-    v35Refresh();
+    refreshDevView();
   });
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-v35]');
     if (!b || state.lifecycleStage !== 'development') return;
     e.preventDefault();
     e.stopPropagation();
-    var d = v35Data(),
+    var d = getDevReview(),
       act = b.dataset.v35,
       id = b.dataset.id,
-      issue = v35Issue(id);
+      issue = findIssue(id);
     if (b.disabled) return;
     if (act === 'close') {
       closeDrawer();
@@ -1089,21 +1106,26 @@ export function initDevReview() {
     if (act === 'switch-role') {
       d.role = b.dataset.role;
       d.reviewMode = 'todos';
-      v35Refresh();
+      refreshDevView();
       return;
     }
     if (act === 'view-dev') {
       d.role = 'developer';
-      v35Refresh();
+      refreshDevView();
       return;
     }
     if (act === 'view-review') {
       d.role = 'reviewer';
-      v35Refresh();
+      refreshDevView();
       return;
     }
     if (act === 'open') {
-      ({ repo: v35Repo, self: v35Self, smoke: v35Smoke, ai: App.v35AI })[b.dataset.kind]();
+      ({
+        repo: openRepoDrawer,
+        self: openSelfTestDrawer,
+        smoke: openSmokeDrawer,
+        ai: App.openAiReviewDrawer,
+      })[b.dataset.kind]();
       return;
     }
     if (act === 'repo-link') {
@@ -1119,7 +1141,7 @@ export function initDevReview() {
     if (act === 'save-repo') {
       let commit = document.querySelector('#v35Commit').value.trim(),
         owner = d.developer,
-        p = v44Prep();
+        p = getDevPrep();
       if (!commit) {
         showToast('请先填写当前 Commit', 'warn');
         return;
@@ -1143,7 +1165,7 @@ export function initDevReview() {
       d.repo = document.querySelector('#v35Repo').value.trim();
       d.branch = document.querySelector('#v35Branch').value.trim();
       d.commit = commit;
-      d.commits.push({ commit: commit, owner: owner, at: v35Stamp() });
+      d.commits.push({ commit: commit, owner: owner, at: nowStamp() });
       d.smokes.push(Object.assign({}, p.smoke, { commit: commit, owner: owner }));
       d.selfTests.push(Object.assign({}, p.self, { commit: commit, owner: owner }));
       d.prep = { owner: owner, smoke: null, self: null };
@@ -1152,9 +1174,9 @@ export function initDevReview() {
       d.approval = null;
       d.handoff = false;
       d.section = 'overview';
-      v35Log('完成冒烟、自测并提交 Commit：' + commit);
+      logDevEvent('完成冒烟、自测并提交 Commit：' + commit);
       closeDrawer();
-      v35Refresh();
+      refreshDevView();
       showToast('Commit 已提交，冒烟与自测两项记录已绑定');
       return;
     }
@@ -1169,7 +1191,7 @@ export function initDevReview() {
     }
     if (act === 'self-freeze') {
       d.selfFrozen = !d.selfFrozen;
-      v35Self();
+      openSelfTestDrawer();
       showToast(d.selfFrozen ? '评论已冻结' : '评论已解冻');
       return;
     }
@@ -1184,10 +1206,10 @@ export function initDevReview() {
         owner: d.developer,
         text: value,
         quote: d.selfQuote || '',
-        at: v35Stamp(),
+        at: nowStamp(),
       });
       d.selfQuote = '';
-      v35Self();
+      openSelfTestDrawer();
       showToast('在线评论已添加');
       return;
     }
@@ -1202,50 +1224,50 @@ export function initDevReview() {
         showToast('自测草稿已保存（Mock）');
         return;
       }
-      let p = v44Prep();
+      let p = getDevPrep();
       if (!p.smoke) {
         showToast('请先完成冒烟测试', 'warn');
         return;
       }
-      p.self = { text: text, at: v35Stamp(), result: '已提交' };
-      v35Log('完成自测报告（等待提交 Commit）');
+      p.self = { text: text, at: nowStamp(), result: '已提交' };
+      logDevEvent('完成自测报告（等待提交 Commit）');
       closeDrawer();
-      v35Refresh();
+      refreshDevView();
       showToast('自测报告已提交，下一步请提交 Commit');
       return;
     }
     if (act === 'submit-smoke') {
-      let p = v44Prep(),
+      let p = getDevPrep(),
         res = document.querySelector('#v35SmokeResult').value,
         txt = document.querySelector('#v35SmokeText').value.trim();
-      p.smoke = { result: res, text: txt, at: v35Stamp() };
+      p.smoke = { result: res, text: txt, at: nowStamp() };
       p.self = null;
-      v35Log('提交冒烟测试记录：' + res + '（等待自测）');
+      logDevEvent('提交冒烟测试记录：' + res + '（等待自测）');
       closeDrawer();
-      v35Refresh();
+      refreshDevView();
       showToast('冒烟记录已提交，下一步请填写自测报告');
       return;
     }
 
     if (act === 'ai-section') {
       d.section = b.dataset.section;
-      App.v35AI();
+      App.openAiReviewDrawer();
       return;
     }
     if (act === 'request-ai') {
-      App.v35PerformAi(document.querySelector('#v35AiMode').value);
+      App.performAiReview(document.querySelector('#v35AiMode').value);
       return;
     }
     if (act === 'request-formal') {
-      if (!v45AiClear()) {
+      if (!isAiReviewClear()) {
         showToast('须先完成有效 AI 检视并清空所有未闭环问题', 'warn');
         return;
       }
-      d.formalRequest = { commit: d.commit, at: v35Stamp(), owner: d.developer };
+      d.formalRequest = { commit: d.commit, at: nowStamp(), owner: d.developer };
       d.reviewMode = 'todos';
-      v35Log('开发人员主动提交 R3 正式人工检视申请：' + d.commit);
+      logDevEvent('开发人员主动提交 R3 正式人工检视申请：' + d.commit);
       d.section = 'issues';
-      App.v35AI();
+      App.openAiReviewDrawer();
       showToast('已提交人工检视，检视工程师已收到 R3 正式待办');
       return;
     }
@@ -1261,14 +1283,14 @@ export function initDevReview() {
       items.forEach(function (i) {
         i.status = '待复检';
         i.acknowledged = true;
-        i.acknowledgedAt = v35Stamp();
-        i.fixedAt = v35Stamp();
+        i.acknowledgedAt = nowStamp();
+        i.fixedAt = nowStamp();
       });
       d.v47NeedsNewCommit = true;
       d.prep = { owner: d.developer, smoke: null, self: null };
       d.v45Selection = [];
-      v35Log('批量认可整改 ' + items.length + ' 项，待新 Commit AI 复检');
-      App.v35AI();
+      logDevEvent('批量认可整改 ' + items.length + ' 项，待新 Commit AI 复检');
+      App.openAiReviewDrawer();
       showToast(
         '已将 ' +
           items.length +
@@ -1280,11 +1302,11 @@ export function initDevReview() {
       if (!issue) return;
       issue.status = '待复检';
       issue.acknowledged = true;
-      issue.fixedAt = v35Stamp();
+      issue.fixedAt = nowStamp();
       d.v47NeedsNewCommit = true;
       d.prep = { owner: d.developer, smoke: null, self: null };
-      v35Log('开发确认整改 ' + id + '，待新 Commit AI 复检');
-      App.v35AI();
+      logDevEvent('开发确认整改 ' + id + '，待新 Commit AI 复检');
+      App.openAiReviewDrawer();
       showToast('该问题已变灰待复检；请重新冒烟、自测、提交新 Commit 并申请 AI 复检');
       return;
     }
@@ -1310,11 +1332,11 @@ export function initDevReview() {
             .map(function (i) {
               return (
                 '<div class="v35-list-item"><b>' +
-                v35E(i.id) +
+                escText(i.id) +
                 ' · ' +
-                v35E(i.title) +
+                escText(i.title) +
                 '</b><p>' +
-                v35E(i.evidence) +
+                escText(i.evidence) +
                 '</p></div>'
               );
             })
@@ -1340,7 +1362,7 @@ export function initDevReview() {
         if (ids.includes(i.id) && ['待整改', '待处理'].includes(i.status)) {
           i.dispute = content;
           i.status = '异议待裁定';
-          i.disputeAt = v35Stamp();
+          i.disputeAt = nowStamp();
           i.disputeOwner = d.developer;
           i.disputeBatch = batch;
           count++;
@@ -1348,26 +1370,26 @@ export function initDevReview() {
       });
       d.v45Selection = [];
       d.v45DisputeIds = [];
-      v35Log('开发批量提交异议 ' + batch + '：' + count + ' 项，已生成 R2 异议待办');
+      logDevEvent('开发批量提交异议 ' + batch + '：' + count + ' 项，已生成 R2 异议待办');
       var modal = document.getElementById('modalRoot');
       if (modal) {
         modal.classList.remove('show');
         modal.innerHTML = '';
       }
       d.section = 'issues';
-      App.v35AI();
+      App.openAiReviewDrawer();
       showToast('异议已提交，检视工程师收到 ' + count + ' 条 R2 待办，未进入正式检视');
       return;
     }
 
     if (act === 'rev-mode') {
       d.reviewMode = b.dataset.mode;
-      v35Refresh();
+      refreshDevView();
       return;
     }
     if (act === 'open-dispute') {
       d.reviewMode = 'disputes';
-      v35Refresh();
+      refreshDevView();
       return;
     }
     if (act === 'verdict') {
@@ -1376,14 +1398,14 @@ export function initDevReview() {
         showToast('请先填写可执行裁定意见', 'warn');
         return;
       }
-      v35ApplyVerdict(issue, b.dataset.result, opinion.trim());
-      v35Refresh();
+      applyReviewVerdict(issue, b.dataset.result, opinion.trim());
+      refreshDevView();
       return;
     }
     if (act === 'offline') {
       issue.status = '待线下评审';
-      v35Log('异议 ' + id + ' 转线下评审');
-      v35Refresh();
+      logDevEvent('异议 ' + id + ' 转线下评审');
+      refreshDevView();
       return;
     }
     if (act === 'offline-save') {
@@ -1393,13 +1415,13 @@ export function initDevReview() {
         showToast('纪要与最终裁定均不能为空', 'warn');
         return;
       }
-      d.disputes.push({ issue: id, minutes: note, decision: decision, at: v35Stamp() });
-      v35ApplyVerdict(issue, decision, note);
-      v35Refresh();
+      d.disputes.push({ issue: id, minutes: note, decision: decision, at: nowStamp() });
+      applyReviewVerdict(issue, decision, note);
+      refreshDevView();
       return;
     }
     if (act === 'save-manual') {
-      if (!v35FormalReady()) {
+      if (!isFormalReviewReady()) {
         showToast('AI 检视尚未正式通过，不能开展专业检视', 'warn');
         return;
       }
@@ -1413,7 +1435,7 @@ export function initDevReview() {
       d.manual = d.manual.filter(function (m) {
         return !(m.kind === kind && m.commit === d.commit);
       });
-      d.manual.push({ kind: kind, commit: d.commit, result: result, text: txt, at: v35Stamp() });
+      d.manual.push({ kind: kind, commit: d.commit, result: result, text: txt, at: nowStamp() });
       if (result === '发现问题') {
         d.issues.push({
           id: 'ISS-' + String(d.issues.length + 1).padStart(3, '0'),
@@ -1421,23 +1443,23 @@ export function initDevReview() {
           title: txt.slice(0, 60),
           evidence: '检视工程师独立检查：' + kind,
           commit: d.commit,
-          run: v35Latest().id,
+          run: latestAiRun().id,
           status: '待整改',
           reply: '',
         });
       }
-      v35Log('人工检视：' + kind + ' · ' + result);
-      v35Refresh();
+      logDevEvent('人工检视：' + kind + ' · ' + result);
+      refreshDevView();
       showToast('人工结论已保存' + (result === '发现问题' ? '，问题已回传开发侧' : ''));
       return;
     }
     if (act === 'show-ai-manual') {
-      App.v43OpenAiResults();
+      App.openAiResultsEvidence();
       return;
     }
     if (act === 'approve') {
       if (
-        !v35FormalReady() ||
+        !isFormalReviewReady() ||
         !['高风险必查', 'AI 未有效覆盖', '独立抽检'].every(function (k) {
           return d.manual.some(function (x) {
             return x.kind === k && x.commit === d.commit && x.result === '无新增问题';
@@ -1447,9 +1469,9 @@ export function initDevReview() {
         showToast('准出门禁尚未满足', 'warn');
         return;
       }
-      d.approval = { commit: d.commit, at: v35Stamp(), reviewer: '检视工程师' };
-      v35Log('检视工程师确认准出');
-      v35Refresh();
+      d.approval = { commit: d.commit, at: nowStamp(), reviewer: '检视工程师' };
+      logDevEvent('检视工程师确认准出');
+      refreshDevView();
       return;
     }
     if (act === 'handoff') {
@@ -1463,7 +1485,7 @@ export function initDevReview() {
         return;
       }
       d.handoff = true;
-      v35Log('拟提测 Commit 一致，已模拟移交测试阶段');
+      logDevEvent('拟提测 Commit 一致，已模拟移交测试阶段');
       state.lifecycleStage = 'testing';
       App.render();
       showToast('版本校验通过，已进入测试阶段（Mock）');

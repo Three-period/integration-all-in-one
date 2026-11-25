@@ -2,8 +2,14 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v35Data, v35FormalReady, v35Log, v35Pending, v35Stamp } from './dev-review.js';
-import { v47DesignKeys, v47Flow, v47Note } from './lifecycle-flow.js';
+import {
+  getDevReview,
+  isFormalReviewReady,
+  logDevEvent,
+  pendingIssues,
+  nowStamp,
+} from './dev-review.js';
+import { designKeysForProject, getFlow, logFlowNote } from './lifecycle-flow.js';
 import { project, state } from '../store/state.js';
 
 /** V48 阶段门禁与集中审批 */
@@ -32,17 +38,17 @@ export function initStageGate() {
     return html;
   };
   // The top stage approval area is no longer rendered; original V47 handler remains the single source of approval rules.
-  App.v47StagePanel = function () {
+  App.renderStagePanel = function () {
     return '';
   };
-  function v48ApprovalPanel() {
-    var f = v47Flow(),
+  function renderApprovalPanel() {
+    var f = getFlow(),
       active =
         ['planning', 'requirements', 'design', 'testing', 'release'].find(function (x) {
-          return !App.v47StageDone(x);
+          return !App.isStageDone(x);
         }) || 'release';
     // For development phase, the reviewer's R3 action remains in the reviewer workspace.
-    if (App.v47StageDone('design') && !App.v47StageDone('development')) active = 'development';
+    if (App.isStageDone('design') && !App.isStageDone('development')) active = 'development';
     var btn = '';
     if (active === 'planning')
       btn =
@@ -61,7 +67,7 @@ export function initStageGate() {
         '>III 类</option><option value="IV" ' +
         (f.designType === 'IV' ? 'selected' : '') +
         '>IV 类</option></select>' +
-        v47DesignKeys()
+        designKeysForProject()
           .map(function (k) {
             var names = {
               architecture: '架构设计',
@@ -84,7 +90,7 @@ export function initStageGate() {
     if (active === 'testing')
       btn = '<button class="v47-cta" data-v47="demo-testing">模拟整机测试报告审核通过</button>';
     if (active === 'release')
-      btn = App.v47StageDone('release')
+      btn = App.isStageDone('release')
         ? '<span class="mini-note">所有流程审核已完成</span>'
         : '<button class="v47-cta" data-v47="demo-release">模拟发布评审、归档与正式发布</button>';
     var names = {
@@ -110,7 +116,7 @@ export function initStageGate() {
     var html = oldPlanning();
     return html.replace(
       /<div class="flow-view-approval-list">[\s\S]*?<\/div><\/aside>/,
-      v48ApprovalPanel() + '</aside>',
+      renderApprovalPanel() + '</aside>',
     );
   };
   // Keep approved Commit consistent, and move into testing without extra developer handoff click.
@@ -121,16 +127,16 @@ export function initStageGate() {
       if (!el) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      var d = v35Data();
+      var d = getDevReview();
       if (
         d.role !== 'reviewer' ||
-        !v35FormalReady() ||
+        !isFormalReviewReady() ||
         !['高风险必查', 'AI 未有效覆盖', '独立抽检'].every(function (k) {
           return d.manual.some(function (x) {
             return x.kind === k && x.commit === d.commit && x.result === '无新增问题';
           });
         }) ||
-        v35Pending().length
+        pendingIssues().length
       ) {
         showToast('请先完成三项必检、问题闭环和正式检视准入', 'warn');
         return;
@@ -139,14 +145,14 @@ export function initStageGate() {
         showToast('待移交 Commit 为空', 'warn');
         return;
       }
-      d.approval = { commit: d.commit, at: v35Stamp(), reviewer: '检视工程师' };
+      d.approval = { commit: d.commit, at: nowStamp(), reviewer: '检视工程师' };
       d.handoff = true;
-      v35Log('人工检视准出通过；已自动移交 Commit ' + d.commit + ' 至测试');
+      logDevEvent('人工检视准出通过；已自动移交 Commit ' + d.commit + ' 至测试');
       var p = project();
       p.flowStatus = '测试阶段';
       p.status = '进行中';
       p.progress = Math.max(Number(p.progress) || 0, 60);
-      v47Note('R3 人工检视通过，系统自动移交 Commit ' + d.commit + '，测试阶段解锁');
+      logFlowNote('R3 人工检视通过，系统自动移交 Commit ' + d.commit + '，测试阶段解锁');
       state.lifecycleStage = 'testing';
       App.render();
       showToast('人工检视通过！已自动移交 ' + d.commit + '，测试阶段已解锁');
@@ -154,10 +160,10 @@ export function initStageGate() {
     true,
   );
   // Test handoff must be same approved commit, never a stale/mock-only state.
-  var oldDevDone = App.v47StageDone;
-  App.v47StageDone = function (k) {
+  var oldDevDone = App.isStageDone;
+  App.isStageDone = function (k) {
     if (k === 'development') {
-      var d = v35Data();
+      var d = getDevReview();
       return !!(d.approval && d.handoff && d.commit && d.approval.commit === d.commit);
     }
     return oldDevDone(k);

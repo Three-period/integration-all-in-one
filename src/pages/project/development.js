@@ -3,7 +3,7 @@ import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc, tag } from '../../core/dom.js';
-import { v35Badge, v35Data, v35Latest, v35Pending } from '../../features/dev-review.js';
+import { devBadge, getDevReview, latestAiRun, pendingIssues } from '../../features/dev-review.js';
 import { project, state } from '../../store/state.js';
 
 function developmentInit() {
@@ -191,23 +191,23 @@ function saveDevelopmentReport(mode) {
 }
 
 function renderDevelopment() {
-  var d = v35Data(),
-    ready = App.v35Ready(),
-    r = v35Latest();
+  var d = getDevReview(),
+    ready = App.getDevReadiness(),
+    r = latestAiRun();
   var nav =
     '<div class="v35-tabs">' +
     (d.role === 'developer'
       ? '<button class="active" data-v35="view-dev">开发工作台</button><button data-v35="switch-role" data-role="reviewer">检视工作台（角色切换）</button>'
       : '<button data-v35="switch-role" data-role="developer">开发工作台</button><button class="active" data-v35="view-review">检视工作台</button>') +
     '</div>';
-  var root = '<div class="development-reference-page v35-root">' + App.v35ShellTitle(d) + nav;
-  if (d.role === 'reviewer') return root + App.v35Reviewer(d) + '</div>';
+  var root = '<div class="development-reference-page v35-root">' + App.renderDevHeader(d) + nav;
+  if (d.role === 'reviewer') return root + App.renderReviewerWorkspace(d) + '</div>';
   return (
     root +
     '<div class="v35-dev-layout"><section class="v35-ide"><div class="v35-ide-top"><strong>开发工作区 · 在线 IDE / AI 编程工具</strong>' +
-    v35Badge('开发空间预留') +
+    devBadge('开发空间预留') +
     '</div><div class="v35-ide-area"><div class="v35-ide-empty"><div style="font-size:30px;color:#688bc3">⌘</div><h3>在线 IDE / AI 编程工作区</h3><p>原型预留开发主空间。真实编程服务待后续接入；当前以右侧四张卡片完成代码检视业务演示。</p></div></div></section><aside class="v35-side">' +
-    App.v35SummaryCard(
+    App.renderDevSummaryCard(
       '冒烟测试',
       ready.stageSmoke
         ? '已记录 · 待提交 Commit'
@@ -218,21 +218,21 @@ function renderDevelopment() {
       'smoke',
       ready.stageSmoke || ready.smoke ? 'ok' : 'warn',
     ) +
-    App.v35SummaryCard(
+    App.renderDevSummaryCard(
       '自测报告',
       ready.stageSelf ? '已提交 · 待提交 Commit' : ready.self ? '已提交 · ' + d.commit : '待提交',
       '第 2 步 · 当前责任人：' + d.developer,
       'self',
       ready.stageSelf || ready.self ? 'ok' : 'warn',
     ) +
-    App.v35SummaryCard(
+    App.renderDevSummaryCard(
       '代码仓库关联',
       d.commit ? '当前 ' + d.commit : '未提交 Commit',
       '第 3 步 · ' + d.branch,
       'repo',
       d.commit ? 'ok' : 'warn',
     ) +
-    App.v35SummaryCard(
+    App.renderDevSummaryCard(
       'AI 检视报告',
       r ? '批次 ' + r.id + ' · ' + r.result : '尚未申请',
       r ? '四类检查 / 批量问题处理 / 历史' : '第 4 步 · 前置完成后主动申请',
@@ -240,7 +240,7 @@ function renderDevelopment() {
       r && r.result === '完成' ? 'ok' : 'warn',
     ) +
     '</aside></div><div class="v35-notice">执行顺序：获取冒烟方案并完成测试、填写冒烟结果 → 提交自测报告 → 提交 Commit → 申请 AI 检视。' +
-    (v35Pending().length ? '当前待闭环问题 ' + v35Pending().length + ' 项。' : '') +
+    (pendingIssues().length ? '当前待闭环问题 ' + pendingIssues().length + ' 项。' : '') +
     'R2 开发异议即时送检视工程师；R3 正式检视须待问题清空并由开发主动提交。</div></div>'
   );
 }

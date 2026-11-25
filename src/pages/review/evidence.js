@@ -3,11 +3,11 @@ import { App } from '../../core/app.js';
 import { openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
-import { v35Data, v35Latest } from '../../features/dev-review.js';
+import { getDevReview, latestAiRun } from '../../features/dev-review.js';
 import { project } from '../../store/state.js';
 
 /* V43: Reviewer evidence drawers + categorized asset lists, isolated incremental patch */
-function v43DesignDocs() {
+function designEvidenceDocs() {
   var p = project();
   return [
     {
@@ -46,8 +46,8 @@ function v43DesignDocs() {
   ];
 }
 
-function v43OpenDesignEvidence() {
-  var docs = v43DesignDocs();
+function openDesignEvidence() {
+  var docs = designEvidenceDocs();
   var html =
     '<div class="notice"><i>◈</i><span>关联设计依据为 Mock 文档，仅展示「文档目录 → 点击目录展开正文」两层内容。</span></div><div class="v43-doc-list">' +
     docs
@@ -83,8 +83,8 @@ function v43OpenDesignEvidence() {
   openDrawer('设计依据 · 文档目录', html);
 }
 
-function v43OpenAiResults() {
-  var d = v35Data(),
+function openAiResultsEvidence() {
+  var d = getDevReview(),
     record = d.manual.some(function (m) {
       return m.kind === '独立抽检' && m.commit === d.commit;
     });
@@ -92,7 +92,7 @@ function v43OpenAiResults() {
     showToast('请先保存当前 Commit 的独立抽检结论', 'warn');
     return;
   }
-  var r = v35Latest();
+  var r = latestAiRun();
   var html =
     '<div class="notice"><i>◈</i><span>AI 四类检查为 Mock 数据；独立抽检结论已记录后才允许查看。结果仅用于对照，不代替人工判断。</span></div>' +
     '<div class="kv-grid"><div class="kv"><label>当前 Commit</label><div>' +
@@ -126,7 +126,7 @@ function v43OpenAiResults() {
       : '<div class="notice warn">当前 Commit 尚无可对照的 AI 检视批次，请先返回开发工作台完成 AI 检视。</div>');
   openDrawer('AI 四类检查 · 对照结果', html);
 }
-App.v43OpenAiResults = v43OpenAiResults;
+App.openAiResultsEvidence = openAiResultsEvidence;
 
 /** V43 检视证据抽屉 */
 export function initReviewEvidence() {
@@ -137,7 +137,7 @@ export function initReviewEvidence() {
     event.stopPropagation();
     var action = el.dataset.v43;
     if (action === 'design') {
-      v43OpenDesignEvidence();
+      openDesignEvidence();
       return;
     }
     if (action === 'doc-toggle') {
@@ -151,7 +151,7 @@ export function initReviewEvidence() {
       return;
     }
     if (action === 'commit') {
-      var d = v35Data(),
+      var d = getDevReview(),
         repo = (d.repo || '').trim();
       if (!d.commit) {
         showToast('当前暂无 Commit', 'warn');

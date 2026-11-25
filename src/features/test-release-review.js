@@ -2,12 +2,12 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v35Stamp } from './dev-review.js';
+import { nowStamp } from './dev-review.js';
 import {
-  v52BaseTestingRender,
-  v52CurrentCommit,
-  v52Status,
-  v52VersionBanner,
+  originalRenderTesting,
+  getHandoffCommit,
+  getReleaseGate,
+  renderVersionBanner,
 } from './version-anchor.js';
 
 /** V52.1 测试审核与发布门禁 */
@@ -24,12 +24,12 @@ export function initTestReleaseReview() {
       e.preventDefault();
       e.stopImmediatePropagation();
       var section = b.dataset.section,
-        report = App.v37Record(section);
+        report = App.getTestReport(section);
       if (report.status !== '待评审') {
         showToast('请先提交该测试报告评审', 'warn');
         return;
       }
-      var commit = v52CurrentCommit();
+      var commit = getHandoffCommit();
       if (!commit) {
         showToast('开发检视尚未准出，无法审核测试报告', 'warn');
         return;
@@ -51,7 +51,7 @@ export function initTestReleaseReview() {
         richHtml: report.richHtml,
         status: result,
         commit: commit,
-        at: v35Stamp(),
+        at: nowStamp(),
       });
       App.render();
       showToast(
@@ -66,11 +66,11 @@ export function initTestReleaseReview() {
   // Place the phase-level review in a prominent location within testing.
   // This uses the exact same v52 testReview record as the process-view panel.
   App.renderTesting = function () {
-    return v52VersionBanner() + App.v52TestingReviewPanel() + v52BaseTestingRender();
+    return renderVersionBanner() + App.renderTestingReviewPanel() + originalRenderTesting();
   };
 
   function phaseReviewButtons() {
-    var z = v52Status(),
+    var z = getReleaseGate(),
       tr = z.testReview;
     if (!z.commit)
       return '<span class="mini-note">请先完成 R3 人工检视并移交 Commit，才可发起测试审核。</span>';
@@ -86,9 +86,9 @@ export function initTestReleaseReview() {
     return '<button class="v47-cta" data-v52-action="test-submit">重新提交测试审核</button>';
   }
 
-  var v521BasePlanning = App.renderPlanning;
+  var baseRenderPlanning = App.renderPlanning;
   App.renderPlanning = function () {
-    var html = v521BasePlanning();
+    var html = baseRenderPlanning();
     // Only replace the testing action in the existing right-side approval card.
     // Requirements, design, release and diagram nodes are intentionally unchanged.
     html = html.replace(

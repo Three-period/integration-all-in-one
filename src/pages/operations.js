@@ -5,7 +5,7 @@ import { commonHead } from '../components/shell.js';
 import { showToast } from '../components/toast.js';
 import { $, person, tag } from '../core/dom.js';
 import { setView } from '../core/navigation.js';
-import { v41ReviewOperations } from './review/reviewer-tasks.js';
+import { renderReviewOperations } from './review/reviewer-tasks.js';
 import { state } from '../store/state.js';
 
 let informationArchitectureApp;
@@ -212,7 +212,7 @@ function renderOps2() {
   }
   var body =
     tab === 'review'
-      ? v41ReviewOperations()
+      ? renderReviewOperations()
       : tab === 'people'
         ? ops2People()
         : tab === 'resources'

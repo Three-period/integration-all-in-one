@@ -6,8 +6,14 @@ import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { projects } from '../../data/projects.js';
-import { v35Data, v35Log, v35Panel, v35Stamp, v35Store } from '../../features/dev-review.js';
-import { v52CurrentCommit, v52SyncHandoff } from '../../features/version-anchor.js';
+import {
+  getDevReview,
+  logDevEvent,
+  devPanel,
+  nowStamp,
+  devReviewStore,
+} from '../../features/dev-review.js';
+import { getHandoffCommit, syncHandoff } from '../../features/version-anchor.js';
 import { project, state } from '../../store/state.js';
 
 let oldAI;
@@ -25,11 +31,11 @@ function h(v) {
 }
 
 function stamp() {
-  return v35Stamp();
+  return nowStamp();
 }
 
 function data() {
-  return v35Data();
+  return getDevReview();
 }
 
 function currentRun(d) {
@@ -208,7 +214,7 @@ function approvalState(d, m) {
 
 function canSubmit(d, m) {
   var run = currentRun(d),
-    ready = App.v35Ready(),
+    ready = App.getDevReadiness(),
     own = selfItems(d),
     human = humanItems(d),
     p = m.process;
@@ -310,7 +316,7 @@ function createReview(d) {
     processId: p.id,
     reviewTaskId: taskId,
   };
-  v35Log('提交 ' + task.taskId + ' · ' + task.type + '（过程 ' + p.id + '）');
+  logDevEvent('提交 ' + task.taskId + ' · ' + task.type + '（过程 ' + p.id + '）');
   return true;
 }
 
@@ -369,7 +375,7 @@ function selectedIssues(d, m) {
 
 function evidencePanel(d) {
   var run = currentRun(d);
-  return v35Panel(
+  return devPanel(
     '检视资料',
     '<div class="v5-evidence"><b>GitLab 仓库 / Commit</b><p><button class="v43-evidence-link" data-v43="commit">' +
       h(d.commit || '暂无') +
@@ -449,7 +455,7 @@ function todoPage(d, m) {
       );
     })
     .join('');
-  return v35Panel(
+  return devPanel(
     '检视待办 · 人工介入轮次',
     control +
       '<div class="table-wrap"><table class="v5-table"><thead><tr><th>待办</th><th>过程</th><th>轮次</th><th>Commit / AI</th><th>裁定数</th><th>状态</th><th>发起人 / 时间</th><th>操作</th></tr></thead><tbody>' +
@@ -500,7 +506,7 @@ function issueCard(d, m, t) {
       return t.issueIds.includes(id);
     });
   });
-  return v35Panel(
+  return devPanel(
     '① 开发待裁定问题',
     '<div class="v5-toolbar"><span>待裁定 ' +
       eligible.length +
@@ -547,7 +553,7 @@ function issueCard(d, m, t) {
 
 function manualCard(d, m, t) {
   var n = counts(d, m);
-  return v35Panel(
+  return devPanel(
     '② 人工专业检视',
     '<div class="v5-row"><strong>' +
       n +
@@ -566,7 +572,7 @@ function manualCard(d, m, t) {
 }
 
 function feedbackCard(d, m, t) {
-  return v35Panel(
+  return devPanel(
     '③ 规则反馈',
     '<div class="v5-row"><span>候选记录 ' +
       m.feedback.length +
@@ -609,7 +615,7 @@ function exitPanel(d, m) {
       return i.id + '(' + i.status + ')';
     })
     .join('、');
-  return v35Panel(
+  return devPanel(
     '准出确认 · 专业检视页面内嵌',
     '<div class="v5-gates"><div class="v5-gate"><b>G1：必须处理的问题全部闭环</b>' +
       '<div>' +
@@ -1065,7 +1071,7 @@ function saveBatch() {
   m.selected = [];
   d.v47NeedsNewCommit = true;
   d.prep = { owner: d.developer, smoke: null, self: null };
-  v35Log('人工裁定 ' + issues.length + ' 项返回开发整改（逐 issueId 独立反馈）');
+  logDevEvent('人工裁定 ' + issues.length + ' 项返回开发整改（逐 issueId 独立反馈）');
   closeDrawer();
   App.render();
   showToast('已分别保存 ' + issues.length + ' 条意见，返回开发整改');
@@ -1128,7 +1134,7 @@ function startMeeting() {
     i.status = '待线下评审';
   });
   m.selected = [];
-  v35Log(
+  logDevEvent(
     '线下会议 ' +
       id +
       ' 独占锁定 ' +
@@ -1336,7 +1342,7 @@ function manualSave() {
     d.v47NeedsNewCommit = true;
     d.prep = { owner: d.developer, smoke: null, self: null };
   } else markTask(d, m);
-  v35Log(
+  logDevEvent(
     '人工专业检视保存 ' +
       changes
         .map(function (c) {
@@ -1374,7 +1380,7 @@ function saveCandidate() {
     status: '候选',
   };
   m.feedback.push(item);
-  v35Log('新增候选规则反馈 ' + id);
+  logDevEvent('新增候选规则反馈 ' + id);
   closeDrawer();
   App.render();
   showToast('已保存候选规则反馈；不影响检视准出');
@@ -1404,12 +1410,12 @@ function approve(d, m) {
   m.process.approval = record;
   d.approval = { commit: d.commit, at: at, reviewer: ACTOR, processId: record.processId };
   d.handoff = true;
-  v35Log('检视过程 ' + m.process.id + ' 已准出，正式移交 ' + d.commit + ' 至测试');
+  logDevEvent('检视过程 ' + m.process.id + ' 已准出，正式移交 ' + d.commit + ' 至测试');
   m.tasks.forEach(function (t) {
     t.status = '已完成';
   });
-  v52SyncHandoff();
-  if (v52CurrentCommit() !== d.commit) {
+  syncHandoff();
+  if (getHandoffCommit() !== d.commit) {
     m.process.approval = null;
     d.approval = null;
     d.handoff = false;
@@ -1475,8 +1481,8 @@ function updateDevDrawer() {
 
 function entries() {
   var out = [];
-  Object.keys(v35Store).forEach(function (pid) {
-    var d = v35Store[pid],
+  Object.keys(devReviewStore).forEach(function (pid) {
+    var d = devReviewStore[pid],
       m = d && d.reviewV5;
     if (!m) return;
     m.tasks.forEach(function (t) {
@@ -1499,17 +1505,17 @@ function entries() {
 
 /** V56 检视流程 V5 */
 export function initReviewProcess() {
-  App.v35Reviewer = function (d) {
+  App.renderReviewerWorkspace = function (d) {
     return reviewerPage(d);
   };
-  oldAI = App.v35AI;
-  App.v35AI = function () {
+  oldAI = App.openAiReviewDrawer;
+  App.openAiReviewDrawer = function () {
     oldAI();
     updateDevDrawer();
   };
-  oldPerformAi = App.v35PerformAi;
-  oldRecheck = App.v46IsRecheck;
-  App.v46IsRecheck = function () {
+  oldPerformAi = App.performAiReview;
+  oldRecheck = App.isRecheckRun;
+  App.isRecheckRun = function () {
     var d = data();
     return (
       oldRecheck() ||
@@ -1522,11 +1528,11 @@ export function initReviewProcess() {
       })
     );
   };
-  App.v35PerformAi = function (mode) {
+  App.performAiReview = function (mode) {
     var d = data(),
       oldRun = (currentRun(d) || {}).id || '',
       oldCount = d.issues.length;
-    var wasRecheck = App.v46IsRecheck();
+    var wasRecheck = App.isRecheckRun();
     if (mode === 'pass' && wasRecheck) {
       // Recheck accepted issues; never close merely because Commit changed.
       d.issues.forEach(function (i) {
@@ -1630,11 +1636,11 @@ export function initReviewProcess() {
       var last = m.tasks[m.tasks.length - 1];
       if (last && last.status !== '已完成') markTask(d, m);
     }
-    App.v35AI();
+    App.openAiReviewDrawer();
   };
-  App.v41TaskEntries = entries;
-  App.v41ReviewerEntriesWithDemo = entries;
-  App.v41OpenReviewerTask = function (pid) {
+  App.reviewerTaskEntries = entries;
+  App.reviewerEntriesWithDemo = entries;
+  App.openReviewerTask = function (pid) {
     if (!projects[pid]) return;
     state.projectId = pid;
     state.role = 'reviewer';
@@ -1646,7 +1652,7 @@ export function initReviewProcess() {
     state.lifecycleStage = 'development';
     setView('project-lifecycle');
   };
-  App.v41TaskTable = function () {
+  App.renderReviewerTaskTable = function () {
     var list = entries();
     return (
       '<div class="card table-wrap"><table class="v5-table"><thead><tr><th>检视待办</th><th>项目</th><th>Commit</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
@@ -1674,7 +1680,7 @@ export function initReviewProcess() {
       '</tbody></table></div>'
     );
   };
-  App.v41ReviewerTasksPage = function () {
+  App.renderReviewerTasksPage = function () {
     return (
       '<section class="page">' +
       commonHead(
@@ -1682,11 +1688,11 @@ export function initReviewProcess() {
         '检视任务待办',
         '正式人工介入任务统一从 reviewTasks 读取，不按单个异议即时生成模拟待办。',
       ) +
-      App.v41TaskTable() +
+      App.renderReviewerTaskTable() +
       '</section>'
     );
   };
-  App.v41ReviewerTodoWidget = function () {
+  App.renderReviewerTodoWidget = function () {
     return (
       '<div class="mini-list">' +
       entries()
@@ -1712,7 +1718,7 @@ export function initReviewProcess() {
       '<div><button class="btn" data-v41-task="all">查看全部检视待办</button></div></div>'
     );
   };
-  App.v41ReviewerSummaryWidget = function () {
+  App.renderReviewerSummaryWidget = function () {
     return (
       '<div class="compact-metrics"><div class="compact-metric"><span>正式人工检视待办</span><b>' +
       entries().filter(function (t) {
@@ -1771,7 +1777,7 @@ export function initReviewProcess() {
       }
       if (action === 'dev-submit') {
         if (createReview(d)) {
-          App.v35AI();
+          App.openAiReviewDrawer();
           showToast('已生成一条新的正式人工检视待办');
         }
         return;
@@ -1781,7 +1787,7 @@ export function initReviewProcess() {
         return;
       }
       if (action === 'ai-details') {
-        App.v43OpenAiResults();
+        App.openAiResultsEvidence();
         return;
       }
       if (action === 'issue-detail') {
@@ -1929,7 +1935,7 @@ export function initReviewProcess() {
         modal.classList.remove('show');
         modal.innerHTML = '';
       }
-      v35Log(
+      logDevEvent(
         '开发异议暂存 ' +
           matched
             .map(function (i) {
@@ -1939,7 +1945,7 @@ export function initReviewProcess() {
           '，未创建检视待办',
       );
       d.section = 'issues';
-      App.v35AI();
+      App.openAiReviewDrawer();
       showToast('异议已暂存，请在允许时正式提交人工检视');
     },
     true,

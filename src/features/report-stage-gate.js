@@ -49,7 +49,7 @@ export function initReportStageGate() {
       if (!Array.isArray(d.v491Comments)) d.v491Comments = [];
       return { item: d, htmlKey: 'v491Rich', commentsKey: 'v491Comments' };
     }
-    const r = App.v37Record(kind);
+    const r = App.getTestReport(kind);
     if (!r.richHtml)
       r.richHtml =
         '<h1>1. 测试概况</h1><p>填写本次' +
@@ -117,8 +117,8 @@ export function initReportStageGate() {
     else d.item.conclusion = strip(edit.innerHTML);
   }
   // Reuse V37 report tabs and storage; only replace the editable report body.
-  App.v37ReportBody = function (section, active) {
-    const r = App.v37Record(section),
+  App.renderTestReportBody = function (section, active) {
+    const r = App.getTestReport(section),
       tab = active || state.v37ReportTab || 'detail';
     const tabs =
       '<div class="testing-report-tabs">' +
@@ -191,15 +191,15 @@ export function initReportStageGate() {
       '</div>'
     );
   };
-  App.v37CollectReport = function () {
-    const r = App.v37Record(state.testingSection);
+  App.collectTestReport = function () {
+    const r = App.getTestReport(state.testingSection);
     const root = document.querySelector('[data-v491-doc="' + state.testingSection + '"]');
     if (root) saveRich(root);
     return r;
   };
   // V37 handler saves and updates history; keep its original workflow intact.
-  const originalCollect = App.v37CollectReport;
-  App.v37SaveReport = function (submit) {
+  const originalCollect = App.collectTestReport;
+  App.saveTestReport = function (submit) {
     if ((state.v37ReportTab || 'detail') !== 'detail') {
       showToast('请返回详细信息编辑正文', 'warn');
       return;

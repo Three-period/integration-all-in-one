@@ -2,26 +2,26 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v35Data, v35Stamp, v35Store } from './dev-review.js';
-import { v47Flow, v47Note } from './lifecycle-flow.js';
-import { v38Dev, v38OldRenderTesting, v38OldReportSave } from './stage-progress.js';
+import { getDevReview, nowStamp, devReviewStore } from './dev-review.js';
+import { getFlow, logFlowNote } from './lifecycle-flow.js';
+import { getDevRecord, baseRenderTesting, baseSaveTestReport } from './stage-progress.js';
 import { releaseCurrent } from '../pages/project/release.js';
 import { project, state } from '../store/state.js';
 
-let v52OldStageDone;
-let v52BaseReportSave;
-export let v52BaseTestingRender;
-let v52BaseReleaseDetailBody;
-let v52BaseSeed;
-let v52BaseReset;
+let baseIsStageDone;
+let originalSaveTestReport;
+export let originalRenderTesting;
+let baseReleaseDetailBody;
+let baseSeedDemoScenario;
+let baseResetDemoData;
 
 /* V52: unified cross-stage commit anchor and test/release/closing gates */
-const v52Store = Object.create(null);
+const versionAnchorStore = Object.create(null);
 
-export function v52Data(pid) {
+export function getVersionAnchor(pid) {
   pid = pid || state.projectId;
-  if (!v52Store[pid])
-    v52Store[pid] = {
+  if (!versionAnchorStore[pid])
+    versionAnchorStore[pid] = {
       handoffCommit: '',
       handoffVersion: '',
       handoffAt: '',
@@ -31,12 +31,12 @@ export function v52Data(pid) {
       published: null,
       closingCommit: '',
     };
-  return v52Store[pid];
+  return versionAnchorStore[pid];
 }
 
-export function v52SyncHandoff() {
-  var d = v35Data(),
-    x = v52Data();
+export function syncHandoff() {
+  var d = getDevReview(),
+    x = getVersionAnchor();
   if (d.handoff && d.approval && d.commit && d.approval.commit === d.commit) {
     if (x.handoffCommit !== d.approval.commit) {
       if (x.handoffCommit)
@@ -48,14 +48,14 @@ export function v52SyncHandoff() {
         });
       x.handoffCommit = d.approval.commit;
       x.handoffVersion = project().version || 'V1.0';
-      x.handoffAt = d.approval.at || v35Stamp();
+      x.handoffAt = d.approval.at || nowStamp();
       x.testReview = null;
       x.releaseReview = null;
       x.published = null;
       x.closingCommit = '';
-      v47Flow().steps.testing = false;
-      v47Flow().steps.release = false;
-      v47Flow().steps.closing = false;
+      getFlow().steps.testing = false;
+      getFlow().steps.release = false;
+      getFlow().steps.closing = false;
       if (state.v37PublishReview) delete state.v37PublishReview[state.projectId];
       if (state.v37Published) delete state.v37Published[state.projectId];
     }
@@ -64,13 +64,13 @@ export function v52SyncHandoff() {
   return '';
 }
 
-export function v52CurrentCommit() {
-  return v52SyncHandoff();
+export function getHandoffCommit() {
+  return syncHandoff();
 }
 
-export function v52Status() {
-  var x = v52Data(),
-    commit = v52CurrentCommit(),
+export function getReleaseGate() {
+  var x = getVersionAnchor(),
+    commit = getHandoffCommit(),
     tr = x.testReview,
     rr = x.releaseReview,
     pub = x.published;
@@ -90,18 +90,18 @@ export function v52Status() {
   };
 }
 
-export function v52VersionBanner() {
+export function renderVersionBanner() {
   return '';
 }
 
-function v52TestingReviewPanel() {
-  var z = v52Status(),
+function renderTestingReviewPanel() {
+  var z = getReleaseGate(),
     tr = z.testReview,
     sections = ['single', 'long', 'system'],
     names = { single: '单板测试报告', long: '长运测试报告', system: '整机测试报告' };
   var rows = sections
     .map(function (k) {
-      var r = App.v37Record(k);
+      var r = App.getTestReport(k);
       return (
         '<div class="kv"><label>' +
         names[k] +
@@ -144,11 +144,11 @@ function v52TestingReviewPanel() {
     '</section>'
   );
 }
-App.v52TestingReviewPanel = v52TestingReviewPanel;
+App.renderTestingReviewPanel = renderTestingReviewPanel;
 
-function v52ReleaseVersions() {
+function renderAnchoredReleaseVersions() {
   App.closingInit();
-  var z = v52Status(),
+  var z = getReleaseGate(),
     rr = z.releaseReview,
     pub = z.published;
   var reviewButton = z.testPass
@@ -163,7 +163,7 @@ function v52ReleaseVersions() {
     : '<button class="btn primary" disabled>执行版本发布</button>';
   return (
     '<section class="closing-panel"><div class="closing-panel-head"><div><h3>版本发布</h3><p>发布评审 / 文档归档 / 版本发布 · Mock 演示</p></div></div><div class="closing-form">' +
-    v52VersionBanner() +
+    renderVersionBanner() +
     '<div class="kv-grid"><div class="kv"><label>发布版本</label><div>' +
     esc(z.version || '—') +
     '</div></div><div class="kv"><label>开发移交 Commit</label><div>' +
@@ -185,10 +185,10 @@ function v52ReleaseVersions() {
 
 /** V52 跨阶段 Commit 锚点与测试/发布/结项门禁 */
 export function initVersionAnchor() {
-  App.v38Status = function () {
-    var z = v52Status(),
-      dev = v38Dev(),
-      report = App.v37Record('system');
+  App.getStageStatus = function () {
+    var z = getReleaseGate(),
+      dev = getDevRecord(),
+      report = App.getTestReport('system');
     return {
       dev: dev,
       commit: z.commit || null,
@@ -198,44 +198,44 @@ export function initVersionAnchor() {
       review: z.releaseReview,
     };
   };
-  v52OldStageDone = App.v47StageDone;
-  App.v47StageDone = function (k) {
-    if (k === 'development') return !!v52CurrentCommit();
-    if (k === 'testing') return !!v52Status().testPass;
-    if (k === 'release') return !!v52Status().published;
+  baseIsStageDone = App.isStageDone;
+  App.isStageDone = function (k) {
+    if (k === 'development') return !!getHandoffCommit();
+    if (k === 'testing') return !!getReleaseGate().testPass;
+    if (k === 'release') return !!getReleaseGate().published;
     if (k === 'closing') {
-      var z = v52Status();
+      var z = getReleaseGate();
       return !!(z.published && z.closingCommit && z.closingCommit === z.commit);
     }
-    return v52OldStageDone(k);
+    return baseIsStageDone(k);
   };
   /* Reports are outputs. Bind every saved/submitted report to the immutable handoff Commit. */
-  v52BaseReportSave = v38OldReportSave;
-  App.v37SaveReport = function (submit) {
-    var commit = v52CurrentCommit();
+  originalSaveTestReport = baseSaveTestReport;
+  App.saveTestReport = function (submit) {
+    var commit = getHandoffCommit();
     if (!commit) {
       showToast('请先完成开发检视准出并移交正式 Commit', 'warn');
       return;
     }
-    var r = App.v37CollectReport();
+    var r = App.collectTestReport();
     r.commit = commit;
-    r.version = project().version || v52Data().handoffVersion || r.version;
-    return v52BaseReportSave(submit);
+    r.version = project().version || getVersionAnchor().handoffVersion || r.version;
+    return originalSaveTestReport(submit);
   };
-  v52BaseTestingRender = v38OldRenderTesting;
+  originalRenderTesting = baseRenderTesting;
   App.renderTesting = function () {
-    return v52VersionBanner() + v52BaseTestingRender() + App.v52TestingReviewPanel();
+    return renderVersionBanner() + originalRenderTesting() + App.renderTestingReviewPanel();
   };
-  App.v38StepBanner = function () {
-    return v52VersionBanner();
+  App.renderStepBanner = function () {
+    return renderVersionBanner();
   };
-  App.v37ReleaseVersions = v52ReleaseVersions;
+  App.renderReleaseVersions = renderAnchoredReleaseVersions;
   /* Expose the exact published version on the closing application. */
-  v52BaseReleaseDetailBody = App.releaseDetailBody;
+  baseReleaseDetailBody = App.releaseDetailBody;
   App.releaseDetailBody = function (item) {
-    var z = v52Status();
+    var z = getReleaseGate();
     return (
-      v52BaseReleaseDetailBody(item) +
+      baseReleaseDetailBody(item) +
       '<div class="detail-section"><h4>结项版本校验</h4><div class="kv-grid"><div class="kv"><label>正式发布版本</label><div>' +
       esc(z.published ? z.published.version : '—') +
       '</div></div><div class="kv"><label>正式发布 Commit</label><div>' +
@@ -252,9 +252,9 @@ export function initVersionAnchor() {
       e.preventDefault();
       e.stopImmediatePropagation();
       var action = b.dataset.v52Action || b.dataset.v52Release,
-        z = v52Status(),
-        x = v52Data(),
-        now = v35Stamp();
+        z = getReleaseGate(),
+        x = getVersionAnchor(),
+        now = nowStamp();
       if (action === 'test-submit') {
         if (!z.commit) {
           showToast('尚无有效开发移交版本，无法提交测试审核', 'warn');
@@ -279,16 +279,16 @@ export function initVersionAnchor() {
         x.testReview.reviewer = '赵敏';
         x.testReview.at = now;
         if (action === 'test-approve') {
-          v47Flow().steps.testing = true;
+          getFlow().steps.testing = true;
           project().progress = Math.max(Number(project().progress) || 0, 82);
           project().flowStatus = '发布阶段';
-          v47Note('测试审核通过，关联 Commit ' + z.commit);
+          logFlowNote('测试审核通过，关联 Commit ' + z.commit);
           state.lifecycleStage = 'release';
           state.projectSection = 'lifecycle';
           showToast('测试审核通过，已解锁发布阶段');
         } else {
-          v47Flow().steps.testing = false;
-          v47Note('测试审核退回，关联 Commit ' + z.commit);
+          getFlow().steps.testing = false;
+          logFlowNote('测试审核退回，关联 Commit ' + z.commit);
           showToast('测试审核已退回，请补充测试结果后重新提交');
         }
         App.render();
@@ -308,7 +308,7 @@ export function initVersionAnchor() {
         };
         if (!state.v37PublishReview) state.v37PublishReview = {};
         state.v37PublishReview[state.projectId] = x.releaseReview;
-        v47Note('发布评审通过，关联 Commit ' + z.commit);
+        logFlowNote('发布评审通过，关联 Commit ' + z.commit);
         showToast('发布评审模拟通过');
         App.render();
         return;
@@ -331,8 +331,8 @@ export function initVersionAnchor() {
         };
         if (!state.v37Published) state.v37Published = {};
         state.v37Published[state.projectId] = x.published;
-        v47Flow().steps.release = true;
-        v47Note('正式版本已发布，关联 Commit ' + z.commit);
+        getFlow().steps.release = true;
+        logFlowNote('正式版本已发布，关联 Commit ' + z.commit);
         project().status = '已发布';
         project().flowStatus = '已发布';
         project().progress = 100;
@@ -344,16 +344,16 @@ export function initVersionAnchor() {
     true,
   );
   /* One-click lifecycle demo uses the same gates and writes the same version records. */
-  App.v47Test = function () {
-    var commit = v52CurrentCommit(),
+  App.runTestingDemo = function () {
+    var commit = getHandoffCommit(),
       p = project();
     if (!commit) {
       showToast('开发尚未完成检视准出与 Commit 移交', 'warn');
       return;
     }
-    var r = App.v37Record('system'),
-      now = v35Stamp(),
-      x = v52Data();
+    var r = App.getTestReport('system'),
+      now = nowStamp(),
+      x = getVersionAnchor();
     r.name = '整机测试报告';
     r.version = p.version || x.handoffVersion || 'V1.0';
     r.owner = '赵敏';
@@ -370,19 +370,19 @@ export function initVersionAnchor() {
       commit: commit,
     });
     x.testReview = { status: '审核通过', commit: commit, reviewer: '赵敏', at: now };
-    v47Flow().steps.testing = true;
-    v47Note('测试审核通过，关联 ' + commit);
+    getFlow().steps.testing = true;
+    logFlowNote('测试审核通过，关联 ' + commit);
     p.progress = Math.max(Number(p.progress) || 0, 82);
     p.flowStatus = '发布阶段';
     state.lifecycleStage = 'release';
     App.render();
     showToast('模拟测试审核通过，已关联开发移交 Commit');
   };
-  App.v47Release = function () {
-    var z = v52Status(),
-      x = v52Data(),
+  App.runReleaseDemo = function () {
+    var z = getReleaseGate(),
+      x = getVersionAnchor(),
       p = project(),
-      now = v35Stamp();
+      now = nowStamp();
     if (!z.testPass) {
       showToast('测试审核未通过，无法发布', 'warn');
       return;
@@ -404,8 +404,8 @@ export function initVersionAnchor() {
     if (!state.v37Published) state.v37Published = {};
     state.v37PublishReview[state.projectId] = x.releaseReview;
     state.v37Published[state.projectId] = x.published;
-    v47Flow().steps.release = true;
-    v47Note('发布评审通过、正式发布完成，关联 Commit ' + z.commit);
+    getFlow().steps.release = true;
+    logFlowNote('发布评审通过、正式发布完成，关联 Commit ' + z.commit);
     p.status = '已发布';
     p.flowStatus = '已发布';
     p.progress = 100;
@@ -418,7 +418,7 @@ export function initVersionAnchor() {
     function (e) {
       var b = e.target.closest('[data-release-drawer-action="submit"]');
       if (!b) return;
-      var z = v52Status();
+      var z = getReleaseGate();
       if (!z.published || z.published.commit !== z.commit) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -429,24 +429,24 @@ export function initVersionAnchor() {
       item.version = z.published.version;
       item.commit = z.published.commit;
       item.publishedAt = z.published.at;
-      v52Data().closingCommit = z.commit;
-      v47Flow().steps.closing = true;
-      v47Note('项目结项申请已提交，关联发布 Commit ' + z.commit);
+      getVersionAnchor().closingCommit = z.commit;
+      getFlow().steps.closing = true;
+      logFlowNote('项目结项申请已提交，关联发布 Commit ' + z.commit);
     },
     true,
   );
   /* Scenario presets and reset also manage the unified version records. */
-  v52BaseSeed = App.v39Seed;
-  App.v39Seed = function (key) {
-    delete v52Store[state.projectId];
-    v52BaseSeed(key);
-    var d = v35Data(),
-      x = v52Data(),
+  baseSeedDemoScenario = App.seedDemoScenario;
+  App.seedDemoScenario = function (key) {
+    delete versionAnchorStore[state.projectId];
+    baseSeedDemoScenario(key);
+    var d = getDevReview(),
+      x = getVersionAnchor(),
       commit = d.approval && d.approval.commit;
     if (['handoff', 'testpass', 'published'].includes(key) && commit) {
       x.handoffCommit = commit;
       x.handoffVersion = project().version || 'V2.6';
-      x.handoffAt = d.approval.at || v35Stamp();
+      x.handoffAt = d.approval.at || nowStamp();
     }
     if (['testpass', 'published'].includes(key) && commit)
       x.testReview = {
@@ -472,13 +472,13 @@ export function initVersionAnchor() {
     }
     App.render();
   };
-  v52BaseReset = App.v47Reset;
-  App.v47Reset = function () {
-    var had = Object.keys(v35Store).length;
-    v52BaseReset();
-    if (had && Object.keys(v35Store).length === 0)
-      Object.keys(v52Store).forEach(function (k) {
-        delete v52Store[k];
+  baseResetDemoData = App.resetDemoData;
+  App.resetDemoData = function () {
+    var had = Object.keys(devReviewStore).length;
+    baseResetDemoData();
+    if (had && Object.keys(devReviewStore).length === 0)
+      Object.keys(versionAnchorStore).forEach(function (k) {
+        delete versionAnchorStore[k];
       });
   };
 }

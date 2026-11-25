@@ -7,11 +7,11 @@ import { reqRecord } from '../pages/project/requirements.js';
 import { state } from '../store/state.js';
 
 /* V33: Mock document editor shared by lifecycle detail forms only. */
-const v33Docs = Object.create(null);
+const onlineDocs = Object.create(null);
 
-let v33Enhancing = false;
+let enhancingDocFields = false;
 
-function v33DocContext(el) {
+function docFieldContext(el) {
   var label = el.closest('.req-form-field,.field');
   var title = label && label.querySelector('label');
   var text = title ? title.textContent.trim() : '';
@@ -60,9 +60,9 @@ function v33DocContext(el) {
   return null;
 }
 
-function v33DocRenderComments(box) {
+function renderDocComments(box) {
   var key = box.dataset.v33Key,
-    doc = v33Docs[key];
+    doc = onlineDocs[key];
   if (!doc) return;
   var list = box.querySelector('.v33-doc-list');
   list.innerHTML = doc.comments.length
@@ -90,19 +90,20 @@ function v33DocRenderComments(box) {
   freeze.disabled = doc.creator && doc.creator !== '何盈' && doc.creator !== '自动带出';
 }
 
-function v33Enhance() {
-  if (v33Enhancing) return;
-  v33Enhancing = true;
+function enhanceDocFields() {
+  if (enhancingDocFields) return;
+  enhancingDocFields = true;
   try {
     document
       .querySelectorAll('#drawerBody textarea,#appView textarea,#modalRoot textarea')
       .forEach(function (el) {
         if (el.dataset.v33Done) return;
-        var key = v33DocContext(el);
+        var key = docFieldContext(el);
         if (!key) return;
         el.dataset.v33Done = '1';
         var doc =
-          v33Docs[key] || (v33Docs[key] = { html: '', comments: [], frozen: false, quote: '' });
+          onlineDocs[key] ||
+          (onlineDocs[key] = { html: '', comments: [], frozen: false, quote: '' });
         if (!doc.initialized) {
           if (key.startsWith('requirement:')) doc.creator = reqRecord(state.reqSelected).creator;
           if (key.startsWith('design:')) doc.creator = App.designCurrentRecord().creator;
@@ -124,15 +125,15 @@ function v33Enhance() {
           doc.html = editor.innerHTML;
           el.value = editor.innerText;
         });
-        v33DocRenderComments(box);
+        renderDocComments(box);
       });
   } finally {
-    v33Enhancing = false;
+    enhancingDocFields = false;
   }
 }
 
-const v33Observer = new MutationObserver(function () {
-  v33Enhance();
+const docFieldObserver = new MutationObserver(function () {
+  enhanceDocFields();
 });
 
 /** V33 在线文档编辑器 */
@@ -143,7 +144,7 @@ export function initDocEditor() {
     e.preventDefault();
     e.stopPropagation();
     var box = btn.closest('.v33-doc'),
-      doc = v33Docs[box.dataset.v33Key],
+      doc = onlineDocs[box.dataset.v33Key],
       editor = box.querySelector('.v33-doc-content'),
       cmd = btn.dataset.v33DocCmd;
     if (['bold', 'italic', 'insertUnorderedList'].includes(cmd)) {
@@ -173,7 +174,7 @@ export function initDocEditor() {
         return;
       }
       doc.frozen = !doc.frozen;
-      v33DocRenderComments(box);
+      renderDocComments(box);
       showToast(doc.frozen ? '评论已冻结（Mock）' : '评论已解冻（Mock）');
       return;
     }
@@ -194,7 +195,7 @@ export function initDocEditor() {
       doc.quote = '';
       inp.value = '';
       inp.placeholder = '输入评审意见';
-      v33DocRenderComments(box);
+      renderDocComments(box);
       showToast('评论已添加');
     }
   });
@@ -249,8 +250,14 @@ export function initDocEditor() {
       showToast('同一开发人员已提交 Commit 与自测报告，检视工作台已展开');
     }
   });
-  v33Observer.observe(document.querySelector('#appView'), { childList: true, subtree: true });
-  v33Observer.observe(document.querySelector('#drawerBody'), { childList: true, subtree: true });
-  v33Observer.observe(document.querySelector('#modalRoot'), { childList: true, subtree: true });
-  v33Enhance();
+  docFieldObserver.observe(document.querySelector('#appView'), { childList: true, subtree: true });
+  docFieldObserver.observe(document.querySelector('#drawerBody'), {
+    childList: true,
+    subtree: true,
+  });
+  docFieldObserver.observe(document.querySelector('#modalRoot'), {
+    childList: true,
+    subtree: true,
+  });
+  enhanceDocFields();
 }

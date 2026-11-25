@@ -2,33 +2,33 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v47Docs, v47Flow, v47Note } from './lifecycle-flow.js';
+import { stageDocs, getFlow, logFlowNote } from './lifecycle-flow.js';
 import { state } from '../store/state.js';
 
-let v47PreviousReqDetail;
+let baseReqDetailTabBody;
 
 /* V47: replace the duplicate document metadata/comment cards inside requirement/design drawers
    with a single heading-enabled rich document and unified anchored comments. */
-function v47InlineKind(kind) {
+function inlineDocKind(kind) {
   return kind === 'requirement'
     ? 'requirement:' + String(state.reqSelected || 'current')
     : 'design:' + String(state.designSelected || 'current');
 }
 
-function v47InlineDoc(kind) {
-  var key = state.projectId + ':' + v47InlineKind(kind);
+function getInlineDoc(kind) {
+  var key = state.projectId + ':' + inlineDocKind(kind);
   return (
-    v47Docs[key] ||
-    (v47Docs[key] = {
+    stageDocs[key] ||
+    (stageDocs[key] = {
       html: '<h1>1. 文档概述</h1><h2>1.1 功能与范围</h2><p>在这里填写文档正文。</p>',
       comments: [],
     })
   );
 }
 
-function v47InlineRender(kind) {
-  var d = v47InlineDoc(kind),
-    key = v47InlineKind(kind);
+function renderInlineDoc(kind) {
+  var d = getInlineDoc(kind),
+    key = inlineDocKind(kind);
   return (
     '<section class="v47-doc" data-v47-rich="' +
     esc(key) +
@@ -77,31 +77,31 @@ function v47InlineRender(kind) {
   );
 }
 
-function v47InlineSave() {
+function saveInlineDoc() {
   var el = document.querySelector('[data-v47-inline-editor]');
   if (!el) return;
   var key = el.dataset.v47InlineEditor,
-    d = v47Docs[state.projectId + ':' + key];
+    d = stageDocs[state.projectId + ':' + key];
   if (d) {
     d.html = el.innerHTML;
-    v47Flow().docs[key] = d.html;
-    if (key.startsWith('requirement:')) v47Flow().docs.requirement = d.html;
-    if (key.startsWith('design:')) v47Flow().docs.design = d.html;
-    v47Note('保存在线文档 ' + key);
+    getFlow().docs[key] = d.html;
+    if (key.startsWith('requirement:')) getFlow().docs.requirement = d.html;
+    if (key.startsWith('design:')) getFlow().docs.design = d.html;
+    logFlowNote('保存在线文档 ' + key);
   }
 }
 
 /** V47 需求/设计抽屉内联文档 */
 export function initInlineDocuments() {
-  v47PreviousReqDetail = App.reqDetailTabBody;
+  baseReqDetailTabBody = App.reqDetailTabBody;
   App.reqDetailTabBody = function (r) {
     if (state.reqDetailTab === 'detail' || !state.reqDetailTab)
-      return '<div class="req-template">' + v47InlineRender('requirement') + '</div>';
-    return v47PreviousReqDetail(r);
+      return '<div class="req-template">' + renderInlineDoc('requirement') + '</div>';
+    return baseReqDetailTabBody(r);
   };
 
   App.designDetailPanel = function () {
-    return '<div class="design-tab-panel">' + v47InlineRender('design') + '</div>';
+    return '<div class="design-tab-panel">' + renderInlineDoc('design') + '</div>';
   };
   document.addEventListener(
     'click',
@@ -111,7 +111,7 @@ export function initInlineDocuments() {
       );
       if (!n) return;
       if (!n.dataset.v47) {
-        v47InlineSave();
+        saveInlineDoc();
         return;
       }
       var box = n.closest('[data-v47-rich]'),
@@ -121,7 +121,7 @@ export function initInlineDocuments() {
       e.stopImmediatePropagation();
       var kind = box.dataset.v47Rich,
         key = state.projectId + ':' + kind,
-        d = v47Docs[key],
+        d = stageDocs[key],
         act = n.dataset.v47;
       if (act === 'inline-format') {
         var v = n.dataset.format;
@@ -138,7 +138,7 @@ export function initInlineDocuments() {
         return;
       }
       if (act === 'inline-save') {
-        v47InlineSave();
+        saveInlineDoc();
         showToast('富文本正文已保存');
         return;
       }
@@ -148,20 +148,20 @@ export function initInlineDocuments() {
           showToast('请填写评论', 'warn');
           return;
         }
-        v47InlineSave();
+        saveInlineDoc();
         var q = box.querySelector('[data-v47-quote]').textContent.trim();
         d.comments.push({ text: (q ? '「' + q + '」 · ' : '') + txt, frozen: false });
         var wrap = box.parentElement;
-        wrap.innerHTML = v47InlineRender(
+        wrap.innerHTML = renderInlineDoc(
           kind.startsWith('requirement:') ? 'requirement' : 'design',
         );
         showToast('评论已添加');
         return;
       }
       if (act === 'inline-freeze') {
-        v47InlineSave();
+        saveInlineDoc();
         d.comments[Number(n.dataset.index)].frozen = true;
-        box.outerHTML = v47InlineRender(kind.startsWith('requirement:') ? 'requirement' : 'design');
+        box.outerHTML = renderInlineDoc(kind.startsWith('requirement:') ? 'requirement' : 'design');
         showToast('评论已冻结');
         return;
       }

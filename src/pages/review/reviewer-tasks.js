@@ -4,15 +4,15 @@ import { commonHead } from '../../components/shell.js';
 import { esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { projects } from '../../data/projects.js';
-import { v35Data, v35Store } from '../../features/dev-review.js';
+import { getDevReview, devReviewStore } from '../../features/dev-review.js';
 import { ops2Metric } from '../operations.js';
 import { state } from '../../store/state.js';
 
 /* V41: reviewer task entrance + supervisor-only AI review operations (all Mock). */
-function v41TaskEntries() {
+function reviewerTaskEntries() {
   var entries = [];
   Object.keys(projects).forEach(function (pid) {
-    var d = v35Store[pid];
+    var d = devReviewStore[pid];
     if (!d) return;
     (d.issues || []).forEach(function (issue) {
       if (issue.status === '异议待裁定' || issue.status === '待线下评审')
@@ -67,9 +67,9 @@ function v41TaskEntries() {
   });
   return entries;
 }
-App.v41TaskEntries = v41TaskEntries;
+App.reviewerTaskEntries = reviewerTaskEntries;
 
-function v41ReviewerDemoEntry() {
+function reviewerDemoEntry() {
   return {
     pid: 'thermal',
     type: 'formal',
@@ -81,18 +81,18 @@ function v41ReviewerDemoEntry() {
   };
 }
 
-function v41ReviewerEntriesWithDemo() {
-  var list = App.v41TaskEntries();
-  return list.length ? list : [v41ReviewerDemoEntry()];
+function reviewerEntriesWithDemo() {
+  var list = App.reviewerTaskEntries();
+  return list.length ? list : [reviewerDemoEntry()];
 }
-App.v41ReviewerEntriesWithDemo = v41ReviewerEntriesWithDemo;
+App.reviewerEntriesWithDemo = reviewerEntriesWithDemo;
 
-function v41EnsureDemo(pid) {
-  var d = v35Store[pid];
+function ensureReviewerDemo(pid) {
+  var d = devReviewStore[pid];
   if (d && (d.runs.length || d.issues.length || d.commits.length)) return;
   var old = state.projectId;
   state.projectId = pid;
-  d = v35Data();
+  d = getDevReview();
   d.developer = '孙宁';
   d.commit = 'mock-review-001';
   d.commits = [{ commit: d.commit, owner: d.developer, at: '演示数据' }];
@@ -130,21 +130,21 @@ function v41EnsureDemo(pid) {
   state.projectId = old;
 }
 
-function v41OpenReviewerTask(pid, type, demo) {
+function openReviewerTask(pid, type, demo) {
   if (!projects[pid]) return;
-  if (demo) v41EnsureDemo(pid);
+  if (demo) ensureReviewerDemo(pid);
   state.projectId = pid;
-  var d = v35Data();
+  var d = getDevReview();
   d.role = 'reviewer';
   d.reviewMode = type === 'dispute' ? 'disputes' : type === 'recheck' ? 'formal' : 'todos';
   state.projectSection = 'lifecycle';
   state.lifecycleStage = 'development';
   setView('project-lifecycle');
 }
-App.v41OpenReviewerTask = v41OpenReviewerTask;
+App.openReviewerTask = openReviewerTask;
 
-function v41TaskTable() {
-  var list = App.v41ReviewerEntriesWithDemo();
+function renderReviewerTaskTable() {
+  var list = App.reviewerEntriesWithDemo();
   return (
     '<div class="card table-wrap"><table class="table"><thead><tr><th>待办类型 / 任务</th><th>关联项目</th><th>关联 Commit</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
     list
@@ -173,9 +173,9 @@ function v41TaskTable() {
     '</tbody></table></div>'
   );
 }
-App.v41TaskTable = v41TaskTable;
+App.renderReviewerTaskTable = renderReviewerTaskTable;
 
-function v41ReviewerTasksPage() {
+function renderReviewerTasksPage() {
   return (
     '<section class="page">' +
     commonHead(
@@ -184,16 +184,16 @@ function v41ReviewerTasksPage() {
       '当前角色：检视工程师。正式检视、开发异议和人工复核统一展示；点击进入对应项目的开发阶段检视工作台。',
     ) +
     '<div class="notice"><i>◈</i><span>待办与开发阶段的检视状态共用数据。没有真实待办时展示一条标有「示例」的 Mock 任务，可点击进入交互演示，不代表已收到真实检视申请。</span></div>' +
-    App.v41TaskTable() +
+    App.renderReviewerTaskTable() +
     '</section>'
   );
 }
-App.v41ReviewerTasksPage = v41ReviewerTasksPage;
+App.renderReviewerTasksPage = renderReviewerTasksPage;
 
-function v41ReviewerTodoWidget() {
+function renderReviewerTodoWidget() {
   return (
     '<div class="mini-list">' +
-    App.v41ReviewerEntriesWithDemo()
+    App.reviewerEntriesWithDemo()
       .slice(0, 4)
       .map(function (t) {
         return (
@@ -216,21 +216,21 @@ function v41ReviewerTodoWidget() {
     '<div style="padding:10px 0"><button class="btn" data-v41-task="all">查看全部检视待办</button></div></div>'
   );
 }
-App.v41ReviewerTodoWidget = v41ReviewerTodoWidget;
+App.renderReviewerTodoWidget = renderReviewerTodoWidget;
 
-function v41ReviewerSummaryWidget() {
-  var n = App.v41TaskEntries().length;
+function renderReviewerSummaryWidget() {
+  var n = App.reviewerTaskEntries().length;
   return (
     '<div class="compact-metrics"><div class="compact-metric"><span>待处理检视任务</span><b>' +
     n +
     '</b></div><div class="compact-metric"><span>演示可进入任务</span><b>' +
-    App.v41ReviewerEntriesWithDemo().length +
+    App.reviewerEntriesWithDemo().length +
     '</b></div><div class="compact-metric"><span>工作台角色</span><b style="font-size:16px">检视工程师</b></div><div class="compact-metric"><span>数据类型</span><b style="font-size:16px">Mock</b></div></div>'
   );
 }
-App.v41ReviewerSummaryWidget = v41ReviewerSummaryWidget;
+App.renderReviewerSummaryWidget = renderReviewerSummaryWidget;
 
-export function v41ReviewOperations() {
+export function renderReviewOperations() {
   var data = [
     {
       pid: 'thermal',
@@ -379,14 +379,14 @@ export function initReviewerTasks() {
         setView('tasks');
         return;
       }
-      App.v41OpenReviewerTask(btn.dataset.project, btn.dataset.type, btn.dataset.demo === '1');
+      App.openReviewerTask(btn.dataset.project, btn.dataset.type, btn.dataset.demo === '1');
       return;
     }
     var projectBtn = event.target.closest('[data-v41-project]');
     if (projectBtn) {
       event.preventDefault();
       event.stopPropagation();
-      App.v41OpenReviewerTask(projectBtn.dataset.v41Project, 'formal', false);
+      App.openReviewerTask(projectBtn.dataset.v41Project, 'formal', false);
     }
   });
 }

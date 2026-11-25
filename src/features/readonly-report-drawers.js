@@ -6,7 +6,7 @@ import { state } from '../store/state.js';
 export function initReadonlyReportDrawers() {
   /* V54.1: keep report drawers read-only across legacy V37 tab switches. */
 
-  function v541Readonly(html) {
+  function makeReadonly(html) {
     return html
       .replace(/contenteditable="true"/g, 'contenteditable="false" aria-readonly="true"')
       .replace(/<button(?=[^>]*data-v491)/g, '<button disabled')
@@ -22,7 +22,7 @@ export function initReadonlyReportDrawers() {
       if (!foot || !foot.querySelector('[data-v54-report="close"]')) return;
       // Retain edits to the report's name/owner when moving between rich-text tabs.
       if (foot.querySelector('[data-v54-report="submit"]')) {
-        var current = App.v37Record(state.testingSection);
+        var current = App.getTestReport(state.testingSection);
         document.querySelectorAll('#drawer [data-v54-field]').forEach(function (input) {
           if (input.dataset.v54Field === 'name' || input.dataset.v54Field === 'owner')
             current[input.dataset.v54Field] = input.value.trim();
@@ -35,7 +35,9 @@ export function initReadonlyReportDrawers() {
       state.v37ReportTab = tab.dataset.v37ReportTab || 'detail';
       var body = document.querySelector('#drawerBody');
       if (body)
-        body.innerHTML = v541Readonly(App.v37ReportBody(state.testingSection, state.v37ReportTab));
+        body.innerHTML = makeReadonly(
+          App.renderTestReportBody(state.testingSection, state.v37ReportTab),
+        );
     },
     true,
   );

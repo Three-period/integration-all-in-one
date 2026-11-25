@@ -2,13 +2,13 @@
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v35Data, v35Store } from './dev-review.js';
+import { getDevReview, devReviewStore } from './dev-review.js';
 import { state } from '../store/state.js';
 
-let v39PreviousLifecycle;
+let baseRenderLifecycle;
 
 /* V39 可选择的 Mock 演示场景：仅供原型展示，不改真实后端或现有业务规则 */
-function v39ScenarioPanel() {
+function renderScenarioPanel() {
   var options = [
     ['fresh', '从头演示 · 开发准备'],
     ['ai-issue', 'AI发现问题 · 待开发处理'],
@@ -30,9 +30,9 @@ function v39ScenarioPanel() {
   );
 }
 
-function v39Seed(key) {
+function seedDemoScenario(key) {
   var pid = state.projectId;
-  if (typeof v35Store !== 'undefined') delete v35Store[pid];
+  if (typeof devReviewStore !== 'undefined') delete devReviewStore[pid];
   if (state.v37Reports) delete state.v37Reports[pid];
   if (state.v37Published) delete state.v37Published[pid];
   if (state.v37PublishReview) delete state.v37PublishReview[pid];
@@ -46,7 +46,7 @@ function v39Seed(key) {
   state.closingArchiveRecords = null;
   state.closingEmergencyStatus = '待审批';
   state.v37ReportTab = 'detail';
-  var d = v35Data(),
+  var d = getDevReview(),
     at = '2026-11-04 16:30',
     commit = 'mock-thermal-v26-a1';
   d.task = 'TASK-142';
@@ -110,7 +110,7 @@ function v39Seed(key) {
     d.handoff = true;
   }
   if (['testpass', 'published'].includes(key)) {
-    var r = App.v37Record('system');
+    var r = App.getTestReport('system');
     r.name = '整机测试报告';
     r.version = 'V2.6';
     r.owner = '赵敏';
@@ -159,14 +159,17 @@ function v39Seed(key) {
   App.render();
   showToast('已载入 ' + state.v39ScenarioName + '（Mock，当前项目）');
 }
-App.v39Seed = v39Seed;
+App.seedDemoScenario = seedDemoScenario;
 
 /** V39 Mock 演示场景 */
 export function initDemoScenarios() {
-  v39PreviousLifecycle = App.renderLifecycle;
+  baseRenderLifecycle = App.renderLifecycle;
   App.renderLifecycle = function () {
-    var h = v39PreviousLifecycle();
-    return h.replace('<div class="stage-block">', v39ScenarioPanel() + '<div class="stage-block">');
+    var h = baseRenderLifecycle();
+    return h.replace(
+      '<div class="stage-block">',
+      renderScenarioPanel() + '<div class="stage-block">',
+    );
   };
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-v39="load"]');
@@ -179,6 +182,6 @@ export function initDemoScenarios() {
       showToast('请选择演示场景', 'warn');
       return;
     }
-    App.v39Seed(key);
+    App.seedDemoScenario(key);
   });
 }

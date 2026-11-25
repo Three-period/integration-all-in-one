@@ -3,7 +3,7 @@ import { App } from '../core/app.js';
 import { closeDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { v47DesignKeys } from './lifecycle-flow.js';
+import { designKeysForProject } from './lifecycle-flow.js';
 import { collectDesign } from '../pages/project/design.js';
 import { testingCaseRows } from '../pages/project/testing.js';
 import { project, state } from '../store/state.js';
@@ -13,25 +13,25 @@ export function initDesignTestingScope() {
   /* V53.0: scoped design navigation, optional test reports, smoke report, case selection.
    Preserve I/II/III/IV branch definitions, stage gate and Commit handoff. */
 
-  function v53Types() {
+  function applicableDesignTypes() {
     var names = {
       architecture: '软件架构设计',
       summarydesign: '概要设计',
       detaildesign: '详细设计',
     };
     return ['软件规格书'].concat(
-      v47DesignKeys()
+      designKeysForProject()
         .map(function (x) {
           return names[x];
         })
         .filter(Boolean),
     );
   }
-  function v53Applicable(type) {
-    return v53Types().indexOf(type) !== -1;
+  function isDesignTypeApplicable(type) {
+    return applicableDesignTypes().indexOf(type) !== -1;
   }
-  function v53PriorApproved(type) {
-    var order = v53Types(),
+  function isPriorDesignApproved(type) {
+    var order = applicableDesignTypes(),
       idx = order.indexOf(type);
     if (idx < 0) return false;
     if (idx === 0) return true;
@@ -67,7 +67,7 @@ export function initDesignTestingScope() {
     var records = baseRows();
     return state.designCategory === '全部'
       ? records.filter(function (r) {
-          return v53Applicable(r.docType);
+          return isDesignTypeApplicable(r.docType);
         })
       : records;
   };
@@ -86,7 +86,8 @@ export function initDesignTestingScope() {
     return !!(
       baseLocked(record) ||
       state.designCategory === '全部' ||
-      (record && (!v53Applicable(record.docType) || !v53PriorApproved(record.docType)))
+      (record &&
+        (!isDesignTypeApplicable(record.docType) || !isPriorDesignApproved(record.docType)))
     );
   };
   var baseDetail = App.designDetailPanel;
@@ -96,8 +97,8 @@ export function initDesignTestingScope() {
       html = html.replace(/<select(?=[^>]*data-design-input="docType")/g, '<select disabled');
     if (
       state.designCategory === '全部' ||
-      !v53Applicable(record.docType) ||
-      !v53PriorApproved(record.docType)
+      !isDesignTypeApplicable(record.docType) ||
+      !isPriorDesignApproved(record.docType)
     )
       html = html
         .replace(/<input\b/g, '<input disabled')
@@ -110,8 +111,8 @@ export function initDesignTestingScope() {
     var r = App.designCurrentRecord();
     if (
       state.designCategory === '全部' ||
-      !v53Applicable(r.docType) ||
-      !v53PriorApproved(r.docType)
+      !isDesignTypeApplicable(r.docType) ||
+      !isPriorDesignApproved(r.docType)
     )
       return '<button class="btn" data-design-drawer-action="close">关闭</button>';
     return baseFoot();
@@ -123,8 +124,8 @@ export function initDesignTestingScope() {
     if (state.designDrawerMode !== 'create') return baseSave(mode);
     if (
       state.designCategory === '全部' ||
-      !v53Applicable(state.designCategory) ||
-      !v53PriorApproved(state.designCategory)
+      !isDesignTypeApplicable(state.designCategory) ||
+      !isPriorDesignApproved(state.designCategory)
     ) {
       showToast('当前分类不能新建：请完成前置设计文档审核', 'warn');
       return;
@@ -151,7 +152,7 @@ export function initDesignTestingScope() {
     App.designInit();
     var html = baseDesignRender(),
       current = state.designCategory,
-      allowed = v53Types();
+      allowed = applicableDesignTypes();
     html = html.replace(
       /(<button class=")([^"]*)(" data-design-page-action="category" data-design-category=")([^"]+)(")/g,
       function (_, a, classes, b, kind, c) {
@@ -165,12 +166,12 @@ export function initDesignTestingScope() {
         );
       },
     );
-    if (current === '全部' || !v53Applicable(current)) {
+    if (current === '全部' || !isDesignTypeApplicable(current)) {
       html = html.replace(
         '<button class="btn primary" data-design-page-action="create">＋ 新建设计文档</button>',
         '',
       );
-    } else if (!v53PriorApproved(current)) {
+    } else if (!isPriorDesignApproved(current)) {
       html = html.replace(
         'data-design-page-action="create"',
         'data-design-page-action="create" disabled title="前置文档未审核通过"',
@@ -178,8 +179,9 @@ export function initDesignTestingScope() {
     }
     var note = '';
     if (current === '全部') note = '全部设计文档只读汇总；请进入具体文档分类新建。';
-    else if (!v53Applicable(current)) note = '当前项目类别不适用此设计文档，页面只读。';
-    else if (!v53PriorApproved(current)) note = '请先完成前置设计文档审核，通过后可编辑当前文档。';
+    else if (!isDesignTypeApplicable(current)) note = '当前项目类别不适用此设计文档，页面只读。';
+    else if (!isPriorDesignApproved(current))
+      note = '请先完成前置设计文档审核，通过后可编辑当前文档。';
     if (note)
       html = html.replace(
         '<section class="req-list-panel">',
@@ -193,8 +195,8 @@ export function initDesignTestingScope() {
       if (!e.target.closest('[data-design-inline-field]')) return;
       if (
         state.designCategory === '全部' ||
-        !v53Applicable(state.designCategory) ||
-        !v53PriorApproved(state.designCategory)
+        !isDesignTypeApplicable(state.designCategory) ||
+        !isPriorDesignApproved(state.designCategory)
       ) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -211,8 +213,8 @@ export function initDesignTestingScope() {
       if (
         create &&
         (state.designCategory === '全部' ||
-          !v53Applicable(state.designCategory) ||
-          !v53PriorApproved(state.designCategory))
+          !isDesignTypeApplicable(state.designCategory) ||
+          !isPriorDesignApproved(state.designCategory))
       ) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -227,8 +229,8 @@ export function initDesignTestingScope() {
         var r = App.designCurrentRecord();
         if (
           state.designCategory === '全部' ||
-          !v53Applicable(r.docType) ||
-          !v53PriorApproved(r.docType)
+          !isDesignTypeApplicable(r.docType) ||
+          !isPriorDesignApproved(r.docType)
         ) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -239,13 +241,13 @@ export function initDesignTestingScope() {
     true,
   );
 
-  function v53TestEnabled(kind) {
+  function isTestKindEnabled(kind) {
     if (kind === 'single') return project().needsSingleTest !== '否';
     if (kind === 'long') return project().needsLongTest !== '否';
     return true;
   }
-  var baseForm = App.v47FormDetails;
-  App.v47FormDetails = function (p, mode) {
+  var baseForm = App.renderProjectFormFields;
+  App.renderProjectFormFields = function (p, mode) {
     var html = baseForm(p, mode);
     function option(key, label, value) {
       return (
@@ -284,7 +286,7 @@ export function initDesignTestingScope() {
   App.testingSubnav = function () {
     var html = baseSubnav();
     ['single', 'long'].forEach(function (k) {
-      if (!v53TestEnabled(k))
+      if (!isTestKindEnabled(k))
         html = html.replace(
           'data-testing-section="' + k + '"',
           'data-testing-section="' + k + '" data-v53-inactive="1" title="当前项目未启用此项测试"',
@@ -292,10 +294,10 @@ export function initDesignTestingScope() {
     });
     return html;
   };
-  var baseReportBody = App.v37ReportBody;
-  App.v37ReportBody = function (section, tab) {
+  var baseReportBody = App.renderTestReportBody;
+  App.renderTestReportBody = function (section, tab) {
     var html = baseReportBody(section, tab);
-    if (!v53TestEnabled(section))
+    if (!isTestKindEnabled(section))
       html = html
         .replace(/<input\b/g, '<input disabled')
         .replace(/<textarea\b/g, '<textarea disabled');
@@ -304,7 +306,7 @@ export function initDesignTestingScope() {
   var baseReport = App.renderTestingReport;
   App.renderTestingReport = function (section) {
     var html = baseReport(section);
-    if (!v53TestEnabled(section)) {
+    if (!isTestKindEnabled(section)) {
       html =
         '<div class="v53-report-readonly"><div class="v53-readonly-hint">当前项目不需要' +
         (section === 'single' ? '单板' : '长运') +
@@ -314,10 +316,10 @@ export function initDesignTestingScope() {
     }
     return html;
   };
-  var baseTestPanel = App.v52TestingReviewPanel;
-  App.v52TestingReviewPanel = function () {
+  var baseTestPanel = App.renderTestingReviewPanel;
+  App.renderTestingReviewPanel = function () {
     var html = baseTestPanel(),
-      r = App.v37Record('smoke');
+      r = App.getTestReport('smoke');
     var extra =
       '<div class="kv"><label>冒烟测试报告</label><div>' +
       esc(r.status || '草稿') +
@@ -326,7 +328,7 @@ export function initDesignTestingScope() {
       '</small></div>';
     html = html.replace('<div class="kv-grid">', '<div class="kv-grid">' + extra);
     ['single', 'long'].forEach(function (k) {
-      if (!v53TestEnabled(k)) {
+      if (!isTestKindEnabled(k)) {
         var name = k === 'single' ? '单板测试报告' : '长运测试报告';
         html = html.replace('<label>' + name + '</label>', '<label>' + name + '（不适用）</label>');
       }
@@ -341,7 +343,7 @@ export function initDesignTestingScope() {
       );
       if (!btn) return;
       var kind = btn.dataset.section || btn.dataset.testingReport || state.testingSection;
-      if (!v53TestEnabled(kind)) {
+      if (!isTestKindEnabled(kind)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         showToast('本项目未启用此项测试，报告只读', 'warn');
@@ -350,7 +352,7 @@ export function initDesignTestingScope() {
     true,
   );
 
-  function v53Selected() {
+  function selectedCaseIds() {
     if (!state.v53CaseSelection) state.v53CaseSelection = Object.create(null);
     return (
       state.v53CaseSelection[state.projectId] ||
@@ -359,7 +361,7 @@ export function initDesignTestingScope() {
   }
   var baseCases = App.renderTestingCases;
   App.renderTestingCases = function () {
-    var selected = v53Selected(),
+    var selected = selectedCaseIds(),
       rows = testingCaseRows(),
       html = baseCases();
     html = html.replace(/<input type="checkbox" data-testing-select="([^"]+)">/g, function (_, id) {
@@ -399,7 +401,7 @@ export function initDesignTestingScope() {
     function (e) {
       var input = e.target.closest('[data-testing-select]');
       if (input) {
-        let set = v53Selected(),
+        let set = selectedCaseIds(),
           id = input.dataset.testingSelect;
         if (input.checked) set.add(id);
         else set.delete(id);
@@ -407,7 +409,7 @@ export function initDesignTestingScope() {
         return;
       }
       if (e.target.matches('[data-v53-select-all]')) {
-        let set = v53Selected(),
+        let set = selectedCaseIds(),
           checked = e.target.checked;
         testingCaseRows().forEach(function (r) {
           if (checked) set.add(r.id);
@@ -424,14 +426,14 @@ export function initDesignTestingScope() {
       if (e.target.closest('[data-v53-clear-cases]')) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        v53Selected().clear();
+        selectedCaseIds().clear();
         App.render();
       }
     },
     true,
   );
-  var baseReset = App.v47Reset;
-  App.v47Reset = function () {
+  var baseReset = App.resetDemoData;
+  App.resetDemoData = function () {
     baseReset();
     if (state.designRecords === null) {
       state.v53DesignByProject = null;

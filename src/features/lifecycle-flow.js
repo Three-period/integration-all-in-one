@@ -4,34 +4,34 @@ import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import { projects } from '../data/projects.js';
-import { v35Data, v35Latest, v35Store } from './dev-review.js';
+import { getDevReview, latestAiRun, devReviewStore } from './dev-review.js';
 import { project, state } from '../store/state.js';
 
-let v47InitialProjects;
-let v47PrevBasic;
-let v47PrevSidebar;
-let v47PrevReady;
-let v47PrevCard;
-let v47PrevDevelopment;
+let initialProjects;
+let baseRenderProjectBasic;
+let baseRenderSidebar;
+let baseDevReadiness;
+let baseDevSummaryCard;
+let baseRenderDevelopment;
 
-let v47PrevReviewer;
-let v47PrevLifecycle;
-let v47PrevOps;
-let v47PrevOpsRender;
-let v47PrevOpsTabs;
-let v47PrevRequirement;
-let v47PrevDesign;
+let baseReviewerWorkspace;
+let baseRenderLifecycle;
+let baseOpsProjects;
+let baseRenderOps;
+let baseOpsTabs;
+let baseRenderRequirements;
+let baseRenderDesign;
 
-const v47Demo = Object.create(null);
+const flowStore = Object.create(null);
 
-export const v47Docs = Object.create(null);
+export const stageDocs = Object.create(null);
 
 /* V55.4: the built-in thermal demo starts at development; an explicit Mock reset still starts from planning. */
-const v47DefaultDemoSteps = { planning: true, requirements: true, design: true };
+const DEFAULT_DEMO_STEPS = { planning: true, requirements: true, design: true };
 
-const v47Stages = ['planning', 'requirements', 'design', 'development', 'testing', 'release'];
+const STAGE_ORDER = ['planning', 'requirements', 'design', 'development', 'testing', 'release'];
 
-const v47Labels = {
+const STAGE_LABELS = {
   planning: '项目立项',
   requirements: '需求阶段',
   design: '设计阶段',
@@ -40,40 +40,40 @@ const v47Labels = {
   release: '发布阶段',
 };
 
-export function v47Flow() {
+export function getFlow() {
   var k = state.projectId;
-  if (!v47Demo[k])
-    v47Demo[k] = {
-      steps: k === 'thermal' ? Object.assign({}, v47DefaultDemoSteps) : {},
+  if (!flowStore[k])
+    flowStore[k] = {
+      steps: k === 'thermal' ? Object.assign({}, DEFAULT_DEMO_STEPS) : {},
       docs: {},
       history: [],
       created: false,
       version: 'V1.0',
       designType: 'II',
     };
-  return v47Demo[k];
+  return flowStore[k];
 }
 
-export function v47Note(msg) {
-  v47Flow().history.unshift({ at: new Date().toLocaleString('zh-CN'), text: msg });
+export function logFlowNote(msg) {
+  getFlow().history.unshift({ at: new Date().toLocaleString('zh-CN'), text: msg });
 }
 
-function v47StageDone(k) {
-  var f = v47Flow(),
+function isStageDone(k) {
+  var f = getFlow(),
     x = f.steps;
-  if (k === 'development') return !!(v35Data().handoff && v35Data().approval);
-  if (k === 'testing') return !!App.v38Status().testPass;
-  if (k === 'release') return !!App.v38Status().published;
+  if (k === 'development') return !!(getDevReview().handoff && getDevReview().approval);
+  if (k === 'testing') return !!App.getStageStatus().testPass;
+  if (k === 'release') return !!App.getStageStatus().published;
   return !!x[k];
 }
-App.v47StageDone = v47StageDone;
+App.isStageDone = isStageDone;
 
-export function v47Prereq(k) {
-  var i = v47Stages.indexOf(k);
-  return i === 0 || App.v47StageDone(v47Stages[i - 1]);
+export function isStagePrereqMet(k) {
+  var i = STAGE_ORDER.indexOf(k);
+  return i === 0 || App.isStageDone(STAGE_ORDER[i - 1]);
 }
 
-function v47FormDetails(p) {
+function renderProjectFormFields(p) {
   var options = [
     ['name', '项目名称', true, p.name || '', 'text'],
     ['creator', '创建人', true, p.creator || '何盈', 'text'],
@@ -138,9 +138,9 @@ function v47FormDetails(p) {
     '</div>'
   );
 }
-App.v47FormDetails = v47FormDetails;
+App.renderProjectFormFields = renderProjectFormFields;
 
-function v47ReadForm() {
+function readProjectForm() {
   var p = {};
   document.querySelectorAll('[data-v47-field]').forEach(function (e) {
     p[e.dataset.v47Field] = (e.value || '').trim();
@@ -148,12 +148,12 @@ function v47ReadForm() {
   return p;
 }
 
-function v47ProjectModal() {
+function openProjectModal() {
   openModal(
     'v47-project',
     '新建项目 · 项目基础信息',
     '<div class="notice">依据提供的项目基础信息清单；版本类型未展示的选项留待业务确认，采用文本记录。</div>' +
-      App.v47FormDetails(
+      App.renderProjectFormFields(
         {
           creator: '何盈',
           flowStatus: '立项阶段',
@@ -165,8 +165,8 @@ function v47ProjectModal() {
   );
 }
 
-function v47CreateProject() {
-  var p = v47ReadForm();
+function createProject() {
+  var p = readProjectForm();
   var fields = [
     'name',
     'department',
@@ -215,7 +215,7 @@ function v47CreateProject() {
     },
     p,
   );
-  v47Demo[id] = {
+  flowStore[id] = {
     steps: {},
     docs: {},
     history: [],
@@ -232,35 +232,33 @@ function v47CreateProject() {
   showToast('项目创建成功；现在可以从立项开始演示');
 }
 
-function v47BasicPanel() {
+function renderBasicInfoPanel() {
   var p = project();
   return (
     '<section class="card" style="padding:17px;margin-bottom:15px"><div class="card-head"><b>项目基础信息 · 新建表单同步</b><span class="mini-note">同一份项目记录 · Mock</span></div>' +
-    App.v47FormDetails(p, 'edit') +
+    App.renderProjectFormFields(p, 'edit') +
     '<div style="margin-top:12px"><button class="v47-cta" data-v47="save-basic">保存项目基础信息</button></div></section>'
   );
 }
 
-function v47StagePanel() {
-  var f = v47Flow(),
+function renderStagePanel() {
+  var f = getFlow(),
     cur = state.lifecycleStage,
     k = cur === 'closing' ? 'release' : cur;
-  if (!v47Labels[k]) return '';
-  var prior = v47Prereq(k),
-    done = App.v47StageDone(k),
-    steps = v47Stages
-      .map(function (n) {
-        return (
-          '<span class="v47-step ' +
-          (App.v47StageDone(n) ? 'ok' : '') +
-          '">' +
-          esc(v47Labels[n]) +
-          ' · ' +
-          (App.v47StageDone(n) ? '已完成' : '待完成') +
-          '</span>'
-        );
-      })
-      .join('');
+  if (!STAGE_LABELS[k]) return '';
+  var prior = isStagePrereqMet(k),
+    done = App.isStageDone(k),
+    steps = STAGE_ORDER.map(function (n) {
+      return (
+        '<span class="v47-step ' +
+        (App.isStageDone(n) ? 'ok' : '') +
+        '">' +
+        esc(STAGE_LABELS[n]) +
+        ' · ' +
+        (App.isStageDone(n) ? '已完成' : '待完成') +
+        '</span>'
+      );
+    }).join('');
   var actions = '';
   if (k === 'planning') {
     actions =
@@ -305,7 +303,7 @@ function v47StagePanel() {
   }
   return (
     '<div class="v47-gate"><div class="v47-row"><div><b>全链路演示 · ' +
-    v47Labels[k] +
+    STAGE_LABELS[k] +
     '</b><div class="mini-note">当前项目：' +
     esc(project().name) +
     ' · ' +
@@ -317,23 +315,23 @@ function v47StagePanel() {
     '</div></div>'
   );
 }
-App.v47StagePanel = v47StagePanel;
+App.renderStagePanel = renderStagePanel;
 
-export function v47DesignKeys() {
+export function designKeysForProject() {
   return (
     {
       I: ['architecture', 'summarydesign', 'detaildesign'],
       II: ['summarydesign', 'detaildesign'],
       III: ['detaildesign'],
       IV: [],
-    }[v47Flow().designType] || ['summarydesign', 'detaildesign']
+    }[getFlow().designType] || ['summarydesign', 'detaildesign']
   );
 }
 
-function v47ApproveStage(k) {
-  var f = v47Flow(),
+function approveStage(k) {
+  var f = getFlow(),
     p = project();
-  if (!v47Prereq(k)) {
+  if (!isStagePrereqMet(k)) {
     showToast('请先完成上一个阶段', 'warn');
     return;
   }
@@ -343,7 +341,7 @@ function v47ApproveStage(k) {
   }
   if (
     k === 'design' &&
-    v47DesignKeys().some(function (n) {
+    designKeysForProject().some(function (n) {
       return !f.docs[n];
     })
   ) {
@@ -356,17 +354,17 @@ function v47ApproveStage(k) {
     state.projectSection = 'lifecycle';
     state.view = 'project-lifecycle';
   }
-  v47Note(v47Labels[k] + '审核通过（Mock）');
+  logFlowNote(STAGE_LABELS[k] + '审核通过（Mock）');
   p.status = '进行中';
   p.flowStatus = k === 'planning' ? '需求阶段' : k === 'requirements' ? '设计阶段' : '开发阶段';
   p.progress = { planning: 10, requirements: 25, design: 40 }[k];
   App.render();
-  showToast(v47Labels[k] + '模拟审核已通过，可进入下一阶段');
+  showToast(STAGE_LABELS[k] + '模拟审核已通过，可进入下一阶段');
 }
-App.v47ApproveStage = v47ApproveStage;
+App.approveStage = approveStage;
 
-function v47Test() {
-  if (!v47Prereq('testing')) {
+function runTestingDemo() {
+  if (!isStagePrereqMet('testing')) {
     showToast('开发尚未完成检视准出与 Commit 移交', 'warn');
     return;
   }
@@ -375,8 +373,8 @@ function v47Test() {
     showToast('请先到项目基本信息填写版本号（进入测试必填）', 'warn');
     return;
   }
-  var commit = v35Data().commit,
-    r = App.v37Record('system');
+  var commit = getDevReview().commit,
+    r = App.getTestReport('system');
   r.name = '整机测试报告';
   r.version = p.version;
   r.owner = '赵敏';
@@ -391,19 +389,19 @@ function v47Test() {
     status: r.status,
     at: new Date().toLocaleString('zh-CN'),
   });
-  v47Flow().steps.testing = true;
-  v47Note('整机测试报告审核通过，关联 ' + commit);
+  getFlow().steps.testing = true;
+  logFlowNote('整机测试报告审核通过，关联 ' + commit);
   p.progress = 82;
   p.flowStatus = '发布阶段';
   App.render();
   showToast('整机测试报告审核通过，已关联开发准出 Commit');
 }
-App.v47Test = v47Test;
+App.runTestingDemo = runTestingDemo;
 
-function v47Release() {
-  var z = App.v38Status(),
+function runReleaseDemo() {
+  var z = App.getStageStatus(),
     p = project();
-  if (!v47Prereq('release') || !z.testPass) {
+  if (!isStagePrereqMet('release') || !z.testPass) {
     showToast('整机测试报告未审核通过，无法发布', 'warn');
     return;
   }
@@ -420,21 +418,21 @@ function v47Release() {
     version: p.version || 'V1.0',
     at: new Date().toLocaleString('zh-CN'),
   };
-  v47Flow().steps.release = true;
-  v47Note('发布评审通过、文档归档完成、版本已发布（Mock）');
+  getFlow().steps.release = true;
+  logFlowNote('发布评审通过、文档归档完成、版本已发布（Mock）');
   p.status = '已发布';
   p.flowStatus = '已发布';
   p.progress = 100;
   App.render();
   showToast('模拟版本已发布；项目全链路演示完成');
 }
-App.v47Release = v47Release;
+App.runReleaseDemo = runReleaseDemo;
 
-function v47DocKey(kind) {
+function stageDocKey(kind) {
   return state.projectId + ':' + kind;
 }
 
-function v47DocOpen(kind) {
+function openStageDoc(kind) {
   var labels = {
     requirement: '软件需求规格书',
     design: '设计说明书',
@@ -444,10 +442,10 @@ function v47DocOpen(kind) {
     review: '项目复盘文档',
     report: '测试报告',
   };
-  var id = v47DocKey(kind),
+  var id = stageDocKey(kind),
     d =
-      v47Docs[id] ||
-      (v47Docs[id] = {
+      stageDocs[id] ||
+      (stageDocs[id] = {
         html:
           '<h1>1. ' +
           (labels[kind] || '在线文档') +
@@ -511,30 +509,30 @@ function v47DocOpen(kind) {
   );
 }
 
-function v47DocsCollect(kind) {
+function collectStageDoc(kind) {
   var el = document.querySelector('#v47Editor');
   if (el) {
-    var d = v47Docs[v47DocKey(kind)];
+    var d = stageDocs[stageDocKey(kind)];
     d.html = el.innerHTML;
-    v47Flow().docs[kind] = d.html;
-    v47Note('保存' + kind + '富文本版本');
+    getFlow().docs[kind] = d.html;
+    logFlowNote('保存' + kind + '富文本版本');
   }
 }
 
-function v47Reset() {
+function resetDemoData() {
   if (
     !window.confirm(
       '确认重置 Mock 演示数据？将恢复项目、需求/设计文档、开发检视、测试、发布、待办和看板演示状态。此操作不可撤回。',
     )
   )
     return;
-  Object.keys(v47Demo).forEach(function (k) {
-    delete v47Demo[k];
+  Object.keys(flowStore).forEach(function (k) {
+    delete flowStore[k];
   });
-  Object.keys(v47Docs).forEach(function (k) {
-    delete v47Docs[k];
+  Object.keys(stageDocs).forEach(function (k) {
+    delete stageDocs[k];
   });
-  v47Demo.thermal = {
+  flowStore.thermal = {
     steps: {},
     docs: {},
     history: [],
@@ -545,11 +543,11 @@ function v47Reset() {
   Object.keys(projects).forEach(function (k) {
     delete projects[k];
   });
-  Object.keys(v47InitialProjects).forEach(function (k) {
-    projects[k] = JSON.parse(JSON.stringify(v47InitialProjects[k]));
+  Object.keys(initialProjects).forEach(function (k) {
+    projects[k] = JSON.parse(JSON.stringify(initialProjects[k]));
   });
-  Object.keys(v35Store).forEach(function (k) {
-    delete v35Store[k];
+  Object.keys(devReviewStore).forEach(function (k) {
+    delete devReviewStore[k];
   });
   if (state.v37Reports) state.v37Reports = {};
   if (state.v37Published) state.v37Published = {};
@@ -576,21 +574,21 @@ function v47Reset() {
   App.render();
   showToast('Mock 数据已重置，可重新从项目立项开始演示');
 }
-App.v47Reset = v47Reset;
+App.resetDemoData = resetDemoData;
 
 /** V47 统一 Mock 生命周期与角色门禁 */
 export function initLifecycleFlow() {
-  v47InitialProjects = JSON.parse(JSON.stringify(projects));
-  v47PrevBasic = App.renderProjectBasic;
+  initialProjects = JSON.parse(JSON.stringify(projects));
+  baseRenderProjectBasic = App.renderProjectBasic;
   App.renderProjectBasic = function () {
-    var html = v47PrevBasic();
+    var html = baseRenderProjectBasic();
     var a = html.indexOf('<div class="grid cols-2">');
-    if (a >= 0) html = html.slice(0, a) + v47BasicPanel() + html.slice(a);
+    if (a >= 0) html = html.slice(0, a) + renderBasicInfoPanel() + html.slice(a);
     return html;
   };
-  v47PrevSidebar = App.renderSidebar;
+  baseRenderSidebar = App.renderSidebar;
   App.renderSidebar = function () {
-    v47PrevSidebar();
+    baseRenderSidebar();
     var sb = document.querySelector('#sidebar');
     if (sb && state.role !== 'supervisor')
       sb.querySelectorAll('[data-action="ops-tab"],[data-nav="ops-review"]').forEach(function (el) {
@@ -602,10 +600,10 @@ export function initLifecycleFlow() {
         '<div style="margin-top:auto;padding-top:15px"><button class="v47-reset" data-v47="reset">↺ 重置 Mock 演示数据</button></div>',
       );
   };
-  v47PrevReady = App.v35Ready;
-  App.v35Ready = function () {
-    var r = v47PrevReady(),
-      d = v35Data();
+  baseDevReadiness = App.getDevReadiness;
+  App.getDevReadiness = function () {
+    var r = baseDevReadiness(),
+      d = getDevReview();
     if (d.v47NeedsNewCommit) {
       r.smoke = false;
       r.self = false;
@@ -613,21 +611,21 @@ export function initLifecycleFlow() {
     }
     return r;
   };
-  v47PrevCard = App.v35SummaryCard;
-  App.v35SummaryCard = function (title, status, note, type, badge) {
-    if (type === 'repo' && v35Data().v47NeedsNewCommit) {
+  baseDevSummaryCard = App.renderDevSummaryCard;
+  App.renderDevSummaryCard = function (title, status, note, type, badge) {
+    if (type === 'repo' && getDevReview().v47NeedsNewCommit) {
       status = '待提交 · 整改新 Commit';
       badge = 'warn';
     }
-    return v47PrevCard(title, status, note, type, badge);
+    return baseDevSummaryCard(title, status, note, type, badge);
   };
-  v47PrevDevelopment = App.renderDevelopment;
+  baseRenderDevelopment = App.renderDevelopment;
   App.renderDevelopment = function () {
     if (state.role !== 'reviewer' && state.role !== 'developer')
       return '<div class="notice warn">开发阶段仅研发人员或检视工程师可以查看。请前往个人工作台切换角色。</div>';
-    var d = v35Data();
+    var d = getDevReview();
     d.role = state.role === 'reviewer' ? 'reviewer' : 'developer';
-    var html = v47PrevDevelopment();
+    var html = baseRenderDevelopment();
     html = html.replace(
       /<div class="v35-head">[\s\S]*?<\/div><\/div><div class="v35-tabs">[\s\S]*?<\/div>/,
       '',
@@ -635,13 +633,13 @@ export function initLifecycleFlow() {
     return html;
   };
 
-  App.v43OpenAiResults = function () {
+  App.openAiResultsEvidence = function () {
     if (state.role !== 'reviewer') {
       showToast('请切换至检视工程师角色后查看 AI 检视资料', 'warn');
       return;
     }
-    var d = v35Data(),
-      r = v35Latest();
+    var d = getDevReview(),
+      r = latestAiRun();
     var names = ['文件一致性', '文件正确性', '方案与代码一致性', '点检项检查'];
     var aiIssues = d.issues.filter(function (issue) {
       return (
@@ -744,9 +742,9 @@ export function initLifecycleFlow() {
       .join('');
     openDrawer('AI 四类检查 · 文件/规则/整改闭环', notice + groups);
   };
-  v47PrevReviewer = App.v35Reviewer;
-  App.v35Reviewer = function (d) {
-    var h = v47PrevReviewer(d);
+  baseReviewerWorkspace = App.renderReviewerWorkspace;
+  App.renderReviewerWorkspace = function (d) {
+    var h = baseReviewerWorkspace(d);
     h = h.replace(
       /(先保存当前 Commit 的独立抽检结论，再查看 AI 对照结果。)/g,
       '正式检视阶段即可查看四类 AI 检查；三项必检影响准出，不影响查看。',
@@ -757,20 +755,20 @@ export function initLifecycleFlow() {
     );
     return h;
   };
-  v47PrevLifecycle = App.renderLifecycle;
+  baseRenderLifecycle = App.renderLifecycle;
   App.renderLifecycle = function () {
-    var html = v47PrevLifecycle();
+    var html = baseRenderLifecycle();
     if (state.lifecycleStage === 'development')
       html = html.replace(
         /<div class="notice" style="align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border-color:#e4e7ec;color:#475467">[\s\S]*?data-v39="load">载入场景<\/button><\/div>/,
         '',
       );
-    var panel = App.v47StagePanel();
+    var panel = App.renderStagePanel();
     return html.replace(/(<section class="page"[^>]*>)/, '$1' + panel);
   };
-  v47PrevOps = App.ops2Projects;
+  baseOpsProjects = App.ops2Projects;
   App.ops2Projects = function () {
-    var html = v47PrevOps();
+    var html = baseOpsProjects();
     var f = Object.entries(projects),
       counts = {};
     f.forEach(function (x) {
@@ -881,19 +879,19 @@ export function initLifecycleFlow() {
       '</div></div><p class="mini-note">阶段分布、里程碑及风险来自当前 Mock 项目；延期趋势与变更结构为标注的历史演示数据。</p>';
     return html + charts;
   };
-  v47PrevOpsRender = App.renderOps2;
+  baseRenderOps = App.renderOps2;
   App.renderOps2 = function () {
     if (state.role !== 'supervisor') {
       return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。请返回个人工作台切换角色为「部门主管」。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
     }
-    return v47PrevOpsRender();
+    return baseRenderOps();
   };
   App.renderOperations = function () {
     return App.renderOps2();
   };
-  v47PrevOpsTabs = App.ops2Tabs;
+  baseOpsTabs = App.ops2Tabs;
   App.ops2Tabs = function () {
-    return state.role === 'supervisor' ? v47PrevOpsTabs() : '';
+    return state.role === 'supervisor' ? baseOpsTabs() : '';
   };
   document.addEventListener(
     'click',
@@ -905,7 +903,7 @@ export function initLifecycleFlow() {
       if (node.dataset.action === 'new-project') {
         e.preventDefault();
         e.stopImmediatePropagation();
-        v47ProjectModal();
+        openProjectModal();
         return;
       }
       if (node.dataset.v35) {
@@ -919,7 +917,7 @@ export function initLifecycleFlow() {
       e.preventDefault();
       e.stopImmediatePropagation();
       if (a === 'reset') {
-        App.v47Reset();
+        App.resetDemoData();
         return;
       }
       if (a === 'go-home') {
@@ -932,32 +930,32 @@ export function initLifecycleFlow() {
         return;
       }
       if (a === 'create-project') {
-        v47CreateProject();
+        createProject();
         return;
       }
       if (a === 'save-basic') {
-        var p = v47ReadForm();
+        var p = readProjectForm();
         Object.assign(project(), p);
         project().goal = p.softwareDescription;
-        v47Note('更新项目基础信息');
+        logFlowNote('更新项目基础信息');
         App.render();
         showToast('项目基础信息已保存');
         return;
       }
       if (a === 'approve-stage') {
-        App.v47ApproveStage(node.dataset.stage);
+        App.approveStage(node.dataset.stage);
         return;
       }
       if (a === 'demo-testing') {
-        App.v47Test();
+        App.runTestingDemo();
         return;
       }
       if (a === 'demo-release') {
-        App.v47Release();
+        App.runReleaseDemo();
         return;
       }
       if (a === 'doc-open') {
-        v47DocOpen(node.dataset.doc);
+        openStageDoc(node.dataset.doc);
         return;
       }
       if (a === 'doc-format') {
@@ -977,29 +975,29 @@ export function initLifecycleFlow() {
       }
       if (a === 'doc-comment') {
         let kind = node.dataset.dockind,
-          d = v47Docs[v47DocKey(kind)],
+          d = stageDocs[stageDocKey(kind)],
           txt = document.querySelector('#v47CommentText').value.trim(),
           quote = (document.querySelector('#v47Quoted').textContent || '').replace(/^引用：/, '');
         if (!txt) {
           showToast('请填写评论', 'warn');
           return;
         }
-        v47DocsCollect(kind);
+        collectStageDoc(kind);
         d.comments.push({ text: (quote ? '「' + quote + '」 · ' : '') + txt, frozen: false });
-        v47DocOpen(kind);
+        openStageDoc(kind);
         showToast('评论已添加');
         return;
       }
       if (a === 'doc-freeze') {
-        let d = v47Docs[v47DocKey(node.dataset.dockind)];
-        v47DocsCollect(node.dataset.dockind);
+        let d = stageDocs[stageDocKey(node.dataset.dockind)];
+        collectStageDoc(node.dataset.dockind);
         d.comments[+node.dataset.index].frozen = true;
-        v47DocOpen(node.dataset.dockind);
+        openStageDoc(node.dataset.dockind);
         showToast('评论已冻结');
         return;
       }
       if (a === 'doc-save') {
-        v47DocsCollect(node.dataset.dockind);
+        collectStageDoc(node.dataset.dockind);
         if (node.dataset.close) closeDrawer();
         else showToast('富文本文档已保存');
         return;
@@ -1015,7 +1013,7 @@ export function initLifecycleFlow() {
   document.addEventListener(
     'change',
     function (e) {
-      if (e.target.id === 'v47DesignType') v47Flow().designType = e.target.value;
+      if (e.target.id === 'v47DesignType') getFlow().designType = e.target.value;
       if (e.target.id === 'roleSelect') {
         setTimeout(function () {
           if (state.view.startsWith('ops-') && state.role !== 'supervisor') {
@@ -1027,18 +1025,18 @@ export function initLifecycleFlow() {
     },
     true,
   );
-  v47PrevRequirement = App.renderRequirements;
+  baseRenderRequirements = App.renderRequirements;
   App.renderRequirements = function () {
     return (
       '<div style="margin:0 0 10px"><button class="v47-btn" data-v47="doc-open" data-doc="requirement">打开需求规格书富文本模板（H1/H2/H3 · 评论/冻结）</button></div>' +
-      v47PrevRequirement()
+      baseRenderRequirements()
     );
   };
-  v47PrevDesign = App.renderDesign;
+  baseRenderDesign = App.renderDesign;
   App.renderDesign = function () {
     return (
       '<div style="margin:0 0 10px"><button class="v47-btn" data-v47="doc-open" data-doc="design">打开设计文档富文本模板（H1/H2/H3 · 评论/冻结）</button></div>' +
-      v47PrevDesign()
+      baseRenderDesign()
     );
   };
 }
