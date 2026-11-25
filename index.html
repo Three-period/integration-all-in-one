@@ -1941,6 +1941,8 @@ document.addEventListener('click',function(event){
 })();
 
 
+</script>
+<script>
 /* V52: unified cross-stage commit anchor and test/release/closing gates */
 var v52Store=Object.create(null);
 function v52Data(pid){pid=pid||state.projectId;if(!v52Store[pid])v52Store[pid]={handoffCommit:'',handoffVersion:'',handoffAt:'',history:[],testReview:null,releaseReview:null,published:null,closingCommit:''};return v52Store[pid]}
@@ -2140,8 +2142,6 @@ v47Reset=function(){var had=Object.keys(v35Store).length;v52BaseReset();if(had&&
   // the green tab and the release page derive from v52Status().testPass.
 })();
 
-</script>
-<script>
 
 /* V47 — unified Mock lifecycle, role-gated workspaces, evidence, rich documents */
 (function(){
