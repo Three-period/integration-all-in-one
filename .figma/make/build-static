@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Static prototype: no bundler; copy the site files into dist.
+rm -rf dist
+mkdir -p dist
+cp index.html review-v5.js dist/
+if [[ -d assets ]]; then cp -R assets dist/; fi

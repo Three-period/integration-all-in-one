@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Static HTML/JS prototype: no dependency manifest, nothing to install.
+exit 0
