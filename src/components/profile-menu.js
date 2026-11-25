@@ -1,5 +1,5 @@
 /** 个人菜单：个人信息、修改密码与退出登录。 */
-import { logout } from '../core/auth.js';
+import { leaveApp } from '../app/session.js';
 import { esc } from '../core/dom.js';
 import { ROLE_LABELS } from '../domain/permissions.js';
 import { state } from '../store/state.js';
@@ -72,8 +72,7 @@ export function bindProfileMenu() {
       return;
     }
     if (action === 'logout-confirm') {
-      logout();
-      window.location.reload();
+      leaveApp();
       return;
     }
   });

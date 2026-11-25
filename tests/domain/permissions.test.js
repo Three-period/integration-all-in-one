@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROLE_LABELS, can } from '../../src/domain/permissions.js';
+import { ROLE_LABELS, can, landingFor } from '../../src/domain/permissions.js';
 
 describe('permissions', () => {
   it('defines all ten roles', () => {
@@ -20,5 +20,18 @@ describe('permissions', () => {
 
   it('fails loudly on unknown permissions', () => {
     expect(() => can('developer', 'nope')).toThrow('未定义的权限');
+  });
+
+  it('only product and project managers configure approvers', () => {
+    expect(can('project', 'project.configure')).toBe(true);
+    expect(can('product', 'project.configure')).toBe(true);
+    expect(can('rdDirector', 'project.configure')).toBe(false);
+  });
+
+  it('lands each role on its own interface', () => {
+    expect(landingFor('developer')).toEqual({ view: 'project-lifecycle', stage: 'development' });
+    expect(landingFor('tester')).toEqual({ view: 'project-lifecycle', stage: 'testing' });
+    expect(landingFor('supervisor')).toEqual({ view: 'ops-projects' });
+    expect(landingFor('rdDirector')).toEqual({ view: 'dashboard' });
   });
 });

@@ -57,7 +57,10 @@ export async function openPage(url) {
     page.evaluate(() => new Promise((r) => setTimeout(() => setTimeout(r, 0), 0)));
   const fresh = async () => {
     await page.goto(url, { waitUntil: 'load' });
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
     await page.goto(url, { waitUntil: 'load' });
     await settle();
   };
@@ -102,14 +105,26 @@ export const hashSnapshot = (snap) => {
   return out;
 };
 
-/** Switch role from the dashboard role selector. */
-export async function setRole(page, settle, role) {
-  await page.evaluate((r) => {
-    const s = document.querySelector('#roleSelect');
-    if (s) {
-      s.value = r;
-      s.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }, role);
+/** 通过登录页切换账号：已登录时先从个人菜单退出。返回 'ok' 或失败原因。 */
+export function loginAs(username) {
+  const q = (sel) => document.querySelector(sel);
+  if (!q('.login-page')) {
+    q('[data-profile-action="toggle"]').click();
+    q('[data-profile-action="logout"]').click();
+    const confirm = q('[data-profile-action="logout-confirm"]');
+    if (!confirm) return 'NOT FOUND logout-confirm';
+    confirm.click();
+  }
+  const item = q(`[data-demo-account="${username}"]`);
+  if (!item) return 'NOT FOUND account ' + username;
+  item.click();
+  q('[data-login="submit"]').click();
+  return q('.login-page') ? 'LOGIN FAILED ' + username : 'ok';
+}
+
+/** 在当前页面登录指定账号。 */
+export async function login(page, settle, username) {
+  const status = await page.evaluate(loginAs, username);
   await settle();
+  return status;
 }

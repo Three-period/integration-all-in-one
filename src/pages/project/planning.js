@@ -1,48 +1,242 @@
-/** 流程视图：全生命周期流程图与节点导航。 */
+/**
+ * 流程视图：按四个环节展示全生命周期节点。
+ *
+ * 节点状态（已完成 / 进行中 / 未开始 / 不涉及）由 domain/stages.js 的 flowNodeState 计算；
+ * 当前阶段内再按交付物细化：已提交的交付物、已通过的审核显示为已完成。
+ * 点击节点进入对应阶段页面。
+ */
 import { App } from '../../core/app.js';
+import { esc } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
-import { state } from '../../store/state.js';
+import { FINAL_DESIGN_STATUSES } from '../../domain/design.js';
+import { flowNodeState, stageState } from '../../domain/stages.js';
+import { isTestKindEnabled } from '../../domain/testing.js';
+import { getDevReview, getFlow } from '../../store/lifecycle.js';
+import { isStageDone } from '../../features/lifecycle-flow.js';
+import { stageApprovalStatus } from '../../features/stage-approval.js';
+import { project, state } from '../../store/state.js';
+
+const SUBMITTED = ['待评审', '评审中', '执行变更', ...FINAL_DESIGN_STATUSES];
+
+function designStatus(docType) {
+  App.designInit();
+  const rows = (state.designRecords || []).filter((r) => r.docType === docType);
+  return {
+    submitted: rows.some((r) => SUBMITTED.includes(r.status)),
+    approved: rows.some((r) => FINAL_DESIGN_STATUSES.includes(r.status)),
+  };
+}
+
+function reportReady(kind) {
+  const item = App.testReportRequirements().items.find((i) => i.kind === kind);
+  return !!(item && item.ready && !item.skipped);
+}
+
+/** 一份设计文档对应「编写」与「审核」两个节点。 */
+function designNodes(label, reviewLabel, docType, designTypes) {
+  return [
+    {
+      label,
+      stage: 'design',
+      kind: 'content',
+      designTypes,
+      done: () => designStatus(docType).submitted,
+    },
+    {
+      label: reviewLabel,
+      stage: 'design',
+      kind: 'approval',
+      designTypes,
+      done: () => designStatus(docType).approved,
+    },
+  ];
+}
+
+const FLOW_ROWS = [
+  {
+    title: '立项与需求',
+    back: '立项审核不通过则取消立项；需求审核不通过返回修改。',
+    nodes: [
+      {
+        label: '项目立项',
+        stage: 'planning',
+        kind: 'content',
+        target: 'basic',
+        done: () => !!stageApprovalStatus('planning'),
+      },
+      { label: '立项审核', stage: 'planning', kind: 'approval' },
+      {
+        label: '需求整理',
+        stage: 'requirements',
+        kind: 'content',
+        done: () => (state.reqRecords || []).some((r) => ['待评审', '已完成'].includes(r.status)),
+      },
+      { label: '需求审核', stage: 'requirements', kind: 'approval' },
+    ],
+  },
+  {
+    title: '分类设计',
+    note: () => getFlow().designType + ' 类项目',
+    back: '设计审核不通过返回修改；IV 类项目只评审软件规格书。',
+    nodes: [
+      ...designNodes('软件规格书', '规格书审核', '软件规格书'),
+      ...designNodes('架构设计', '架构审核', '软件架构设计', ['I']),
+      ...designNodes('概要设计', '概要审核', '概要设计', ['I', 'II']),
+      ...designNodes('详细设计', '详细审核', '详细设计', ['I', 'II', 'III']),
+    ],
+  },
+  {
+    title: '开发与测试',
+    back: '测试审核不通过返回开发或相关测试环节。',
+    nodes: [
+      {
+        label: '编码与自测',
+        stage: 'development',
+        kind: 'content',
+        done: () => !!getDevReview().formalRequest,
+      },
+      {
+        label: '代码检视',
+        stage: 'development',
+        kind: 'content',
+        done: () => !!getDevReview().approval,
+      },
+      { label: '冒烟测试', stage: 'testing', kind: 'content', done: () => reportReady('smoke') },
+      {
+        label: '单板测试',
+        stage: 'testing',
+        kind: 'content',
+        testKind: 'single',
+        done: () => reportReady('single'),
+      },
+      {
+        label: '长运测试',
+        stage: 'testing',
+        kind: 'content',
+        testKind: 'long',
+        done: () => reportReady('long'),
+      },
+      { label: '整机测试', stage: 'testing', kind: 'content', done: () => reportReady('system') },
+      { label: '测试审核', stage: 'testing', kind: 'approval' },
+    ],
+  },
+  {
+    title: '发布与结项',
+    back: '发布评审不通过返回整机测试；ECN / PCN、紧急临时下发在发布阶段办理。',
+    nodes: [
+      {
+        label: '发布评审',
+        stage: 'release',
+        kind: 'approval',
+        done: () => stageApprovalStatus('release') === '已通过',
+      },
+      {
+        label: '文档归档',
+        stage: 'release',
+        kind: 'content',
+        done: () => stageApprovalStatus('release') === '已通过',
+      },
+      { label: '版本发布', stage: 'release', kind: 'content' },
+      { label: '结项', stage: 'closing', kind: 'content' },
+      { label: '完成', stage: 'closing', kind: 'end' },
+    ],
+  },
+];
+
+const STATE_LABELS = { done: '已完成', current: '进行中', pending: '未开始', skipped: '不涉及' };
+
+function nodeState(node, ctx) {
+  const value = flowNodeState(node, ctx);
+  if (value === 'current' && node.done && node.done()) return 'done';
+  return value;
+}
+
+function renderNode(node, value, index, prevDone) {
+  const mark =
+    value === 'done'
+      ? '✓'
+      : value === 'skipped'
+        ? '–'
+        : node.kind === 'approval'
+          ? '审'
+          : String(index + 1);
+  const target = node.target === 'basic' ? 'basic' : node.stage;
+  return (
+    '<li class="lc-node is-' +
+    value +
+    ' kind-' +
+    node.kind +
+    (prevDone ? ' link-done' : '') +
+    '"><button type="button" data-flow-view-action="node" data-flow-stage="' +
+    target +
+    '" aria-label="' +
+    esc(node.label + ' · ' + STATE_LABELS[value]) +
+    '"><span class="lc-node-dot" aria-hidden="true">' +
+    mark +
+    '</span><span class="lc-node-label">' +
+    esc(node.label) +
+    '</span><small>' +
+    STATE_LABELS[value] +
+    '</small></button></li>'
+  );
+}
 
 function renderPlanning() {
-  var chart = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4540 730" width="4540" height="730" class="flow-v31-svg" aria-label="一体化研发全生命周期流程图" role="img"><style>.flow-node-spec-hover .flow-node-tooltip{opacity:0;visibility:hidden;pointer-events:auto;transition:opacity .14s ease,visibility .14s ease}.flow-node-spec-hover:hover .flow-node-tooltip,.flow-node-spec-hover:focus .flow-node-tooltip{opacity:1;visibility:visible}</style><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#8ca1bb" stroke-width="1.2"/></marker><marker id="arrBack" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#df9243" stroke-width="1.2"/></marker><marker id="arrSpecial" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#a18bd2" stroke-width="1.2"/></marker></defs><style>.flow-v31-svg{font-family:Inter,'PingFang SC','Microsoft YaHei',sans-serif}.flow-v31-svg .node-text{font-size:14px;font-weight:650;fill:#193351;pointer-events:none}.flow-v31-svg .node-sub{font-size:11px;fill:#70829b;pointer-events:none}.flow-v31-svg .edge-label{font-size:11px;fill:#70829b}.flow-v31-svg .flow-v31-clickable{cursor:pointer;outline:none}.flow-v31-svg .flow-v31-clickable:hover rect,.flow-v31-svg .flow-v31-clickable:focus rect{stroke:#043491;stroke-width:3;fill:#dfeaff}.flow-v31-svg .lane-label{font-size:13px;font-weight:700;fill:#445775}.flow-v31-svg .flow-small{font-size:11px;fill:#6e7e92}.flow-v31-svg .section-heading{font-size:14px;font-weight:700;fill:#043491}.flow-v31-svg .section-bg{fill:#fafcff;stroke:#e3ebf6;stroke-width:1.2}</style><rect class="section-bg" x="38" y="30" width="920" height="130" rx="12"/><text class="section-heading" x="54" y="55">01 立项与需求</text><rect class="section-bg" x="978" y="30" width="1280" height="580" rx="12"/><text class="section-heading" x="994" y="55">02 分类设计（I / II / III / IV 类）</text><rect class="section-bg" x="2282" y="30" width="820" height="580" rx="12"/><text class="section-heading" x="2298" y="55">03 开发与测试</text><rect class="section-bg" x="3124" y="30" width="1340" height="580" rx="12"/><text class="section-heading" x="3140" y="55">04 审核、发布与结项</text><path d="M236,104 L264,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M420,104 L448,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M624,104 L652,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M808,104 L836,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M988,104 L1012,104 L1012,163 L1034,163" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><path d="M988,104 L1012,104 L1012,286 L1414,286" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><path d="M988,104 L1012,104 L1012,406 L1804,406" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><path d="M988,104 L1012,104 L1012,526 L2260,526 L2260,104 L2290,104" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1190,163 L1204,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1360,163 L1384,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1540,163 L1564,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1720,163 L1744,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1900,163 L1924,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2080,163 L2094,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1570,286 L1584,286" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1740,286 L1764,286" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1920,286 L1944,286" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2100,286 L2114,286" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M1960,406 L1984,406" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2080,163 L2250,163" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2100,286 L2250,286" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2140,406 L2250,406" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2250,163 L2260,163 L2260,104 L2290,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2250,286 L2270,286 L2270,104 L2290,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2250,406 L2280,406 L2280,104 L2290,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2450,104 L2470,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M2630,104 L2650,104 L2650,212 L2670,212" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><text x="2660.0" y="204.0" text-anchor="middle" class="edge-label">需单板</text><path d="M2630,104 L2660,104 L2660,76 L3150,76 L3150,104" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><text x="3150.0" y="82.0" text-anchor="middle" class="edge-label">免单板</text><path d="M2830,212 L2870,212 L2870,326 L2890,326" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><text x="2880.0" y="318.0" text-anchor="middle" class="edge-label">需长运</text><path d="M2830,212 L2870,212 L2870,252 L3150,252 L3150,104" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><text x="3150.0" y="170.0" text-anchor="middle" class="edge-label">免长运</text><path d="M3050,326 L3100,326 L3100,104 L3150,104" fill="none" stroke="#799bcf" stroke-width="1.8" marker-end="url(#arr)"/><path d="M3310,104 L3330,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M3490,104 L3510,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M3670,104 L3690,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M3850,104 L3870,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M4030,104 L4050,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M4210,104 L4230,104" fill="none" stroke="#8ca1bb" stroke-width="1.8" marker-end="url(#arr)"/><path d="M342,130 L342,191 L154,191 L154,130" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><text x="186" y="187" fill="#b66f22" font-size="12">不通过，取消立项</text><path d="M914,130 L914,222 L725,222 L725,130" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><text x="756" y="217" fill="#b66f22" font-size="12">未通过，返回修改</text><path d="M1280,190 L1280,225 L1105,225 L1105,190" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><path d="M1660,313 L1660,353 L1485,353 L1485,313" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><path d="M2040,433 L2040,473 L1865,473 L1865,433" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><path d="M3230,130 L3230,572 L2368,572 L2368,130" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><text x="2650" y="564" fill="#b66f22" font-size="12">测试审核不通过：返回开发 / 相关测试环节</text><path d="M3590,130 L3590,604 L3400,604 L3400,130" fill="none" stroke="#df9243" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrBack)"/><text x="3418" y="596" fill="#b66f22" font-size="12">不通过，返回整机测试</text><path d="M3590,78 L3590,45 L3960,45 L3960,78" fill="none" stroke="#a18bd2" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrSpecial)"/><path d="M3590,130 L3590,479 L3960,479 L3960,130" fill="none" stroke="#a18bd2" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrSpecial)"/><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="planning" role="button" tabindex="0" aria-label="进入项目立项页面"><title>项目立项；点击进入对应阶段</title><rect x="90.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="158.0" y="110.0" text-anchor="middle" class="node-text">项目立项</text></g><g class="node-approval"><title>项目立项审核</title><rect x="274.0" y="77.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="342.0" y="110.0" text-anchor="middle" class="node-text">项目立项审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="requirements" role="button" tabindex="0" aria-label="进入需求收集、分析、整理页面"><title>需求收集、分析、整理；点击进入对应阶段</title><rect x="451.0" y="77.0" width="170.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="536.0" y="110.0" text-anchor="middle" class="node-text">需求收集、分析、整理</text></g><g class="node-content flow-v31-clickable flow-node-spec-hover" data-flow-current-status="制定中" data-flow-owner="王凯" data-flow-status-options="待开始,制定中,待评审,评审中,评审通过" aria-describedby="flow-spec-node-tooltip" data-flow-view-action="node" data-flow-stage="requirements" role="button" tabindex="0" aria-label="进入拟制软件规格书页面"><title>拟制软件规格书；悬停查看当前状态与负责人</title><rect x="662.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="730.0" y="110.0" text-anchor="middle" class="node-text">拟制软件规格书</text><g class="flow-node-tooltip" id="flow-spec-node-tooltip" aria-hidden="true"><rect x="662" y="134" width="176" height="72" rx="8" fill="#ffffff" stroke="#b8c7db" stroke-width="1.2"/><text x="674" y="155" fill="#61758e" font-size="11">当前状态</text><rect x="748" y="140" width="78" height="21" rx="10" fill="#e8f2ff"/><text x="787" y="155" text-anchor="middle" fill="#245da8" font-size="11" font-weight="600">制定中</text><line x1="674" y1="168" x2="826" y2="168" stroke="#edf1f6"/><text x="674" y="190" fill="#61758e" font-size="11">负责人</text><text x="748" y="190" fill="#25364b" font-size="12" font-weight="600">王凯</text></g></g><g class="node-approval"><title>软件规格书审核</title><rect x="844.0" y="77.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="912.0" y="110.0" text-anchor="middle" class="node-text">软件规格书审核</text></g><text x="1034" y="124" fill="#61758e" font-size="12">I 类项目 · 全量设计</text><text x="1034" y="247" fill="#61758e" font-size="12">II 类项目 · 概要 + 详细</text><text x="1034" y="367" fill="#61758e" font-size="12">III 类项目 · 详细设计</text><text x="1034" y="487" fill="#61758e" font-size="12">IV 类项目 · 跳过设计</text><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件架构设计页面"><title>软件架构设计；点击进入对应阶段</title><rect x="1044.0" y="135.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1112.0" y="168.0" text-anchor="middle" class="node-text">软件架构设计</text></g><g class="node-approval"><title>架构设计审核</title><rect x="1214.0" y="135.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="1282.0" y="168.0" text-anchor="middle" class="node-text">架构设计审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件概要设计页面"><title>软件概要设计；点击进入对应阶段</title><rect x="1394.0" y="135.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1462.0" y="168.0" text-anchor="middle" class="node-text">软件概要设计</text></g><g class="node-approval"><title>概要设计审核</title><rect x="1574.0" y="135.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="1642.0" y="168.0" text-anchor="middle" class="node-text">概要设计审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件详细设计页面"><title>软件详细设计；点击进入对应阶段</title><rect x="1754.0" y="135.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1822.0" y="168.0" text-anchor="middle" class="node-text">软件详细设计</text></g><g class="node-approval"><title>详细设计审核</title><rect x="1934.0" y="135.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="2002.0" y="168.0" text-anchor="middle" class="node-text">详细设计审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件概要设计页面"><title>软件概要设计；点击进入对应阶段</title><rect x="1424.0" y="258.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1492.0" y="291.0" text-anchor="middle" class="node-text">软件概要设计</text></g><g class="node-approval"><title>概要设计审核</title><rect x="1594.0" y="258.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="1662.0" y="291.0" text-anchor="middle" class="node-text">概要设计审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件详细设计页面"><title>软件详细设计；点击进入对应阶段</title><rect x="1774.0" y="258.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1842.0" y="291.0" text-anchor="middle" class="node-text">软件详细设计</text></g><g class="node-approval"><title>详细设计审核</title><rect x="1954.0" y="258.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="2022.0" y="291.0" text-anchor="middle" class="node-text">详细设计审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="design" role="button" tabindex="0" aria-label="进入软件详细设计页面"><title>软件详细设计；点击进入对应阶段</title><rect x="1814.0" y="378.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="1882.0" y="411.0" text-anchor="middle" class="node-text">软件详细设计</text></g><g class="node-approval"><title>详细设计审核</title><rect x="1994.0" y="378.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="2062.0" y="411.0" text-anchor="middle" class="node-text">详细设计审核</text></g><g class="node-end"><title>无需设计审批</title><rect x="2107.0" y="499.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="2175.0" y="532.0" text-anchor="middle" class="node-text">无需设计审批</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="development" role="button" tabindex="0" aria-label="进入软件编码 / 自测报告页面"><title>软件编码 / 自测报告；点击进入对应阶段</title><rect x="2275.0" y="76.0" width="190.0" height="64" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="2370.0" y="101" text-anchor="middle" class="node-text">软件编码 / 自测报告</text><text x="2370.0" y="118" text-anchor="middle" class="node-sub">直接进入冒烟测试</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="testing" role="button" tabindex="0" aria-label="进入冒烟测试页面"><title>冒烟测试；点击进入对应阶段</title><rect x="2482.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="2550.0" y="110.0" text-anchor="middle" class="node-text">冒烟测试</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="testing" role="button" tabindex="0" aria-label="进入单板测试页面"><title>单板测试；点击进入对应阶段</title><rect x="2682.0" y="184.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="2750.0" y="217.0" text-anchor="middle" class="node-text">单板测试</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="testing" role="button" tabindex="0" aria-label="进入长运测试页面"><title>长运测试；点击进入对应阶段</title><rect x="2902.0" y="298.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="2970.0" y="331.0" text-anchor="middle" class="node-text">长运测试</text></g><g class="node-approval"><title>测试审核</title><rect x="3162.0" y="77.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="3230.0" y="110.0" text-anchor="middle" class="node-text">测试审核</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="testing" role="button" tabindex="0" aria-label="进入整机测试页面"><title>整机测试；点击进入对应阶段</title><rect x="3342.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="3410.0" y="110.0" text-anchor="middle" class="node-text">整机测试</text></g><g class="node-approval"><title>发布评审</title><rect x="3522.0" y="77.0" width="136.0" height="48" rx="7" fill="#fff0ee" stroke="#df7770" stroke-width="1.5"/><text x="3590.0" y="110.0" text-anchor="middle" class="node-text">发布评审</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="release" role="button" tabindex="0" aria-label="进入文档归档页面"><title>文档归档；点击进入对应阶段</title><rect x="3702.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="3770.0" y="110.0" text-anchor="middle" class="node-text">文档归档</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="release" role="button" tabindex="0" aria-label="进入版本发布页面"><title>版本发布；点击进入对应阶段</title><rect x="3882.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="3950.0" y="110.0" text-anchor="middle" class="node-text">版本发布</text></g><g class="node-content flow-v31-clickable" data-flow-view-action="node" data-flow-stage="closing" role="button" tabindex="0" aria-label="进入结项页面"><title>结项；点击进入对应阶段</title><rect x="4062.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="4130.0" y="110.0" text-anchor="middle" class="node-text">结项</text></g><g class="node-end"><title>完成</title><rect x="4242.0" y="77.0" width="136.0" height="48" rx="7" fill="#edf4ff" stroke="#648bd5" stroke-width="1.5"/><text x="4310.0" y="110.0" text-anchor="middle" class="node-text">完成</text></g><g class="node-special flow-v31-clickable" data-flow-view-action="node" data-flow-stage="release" role="button" tabindex="0" aria-label="进入ECN / PCN页面"><title>ECN / PCN；点击进入对应阶段</title><rect x="3715.0" y="15.0" width="155.0" height="48" rx="7" fill="#f3efff" stroke="#9880ca" stroke-width="1.5"/><text x="3792.5" y="46.0" text-anchor="middle" class="node-text">ECN / PCN</text></g><g class="node-special flow-v31-clickable" data-flow-view-action="node" data-flow-stage="release" role="button" tabindex="0" aria-label="进入紧急临时下发页面"><title>紧急临时下发；点击进入对应阶段</title><rect x="3715.0" y="450.0" width="155.0" height="48" rx="7" fill="#f3efff" stroke="#9880ca" stroke-width="1.5"/><text x="3792.5" y="482.0" text-anchor="middle" class="node-text">紧急临时下发</text></g><rect x="675" y="264" width="320" height="85" rx="9" fill="#edf8f4" stroke="#badfd2"/><text x="693" y="290" class="node-text" text-anchor="start">测试路径提前确定</text><text x="693" y="313" class="flow-small">软件规格书定稿后，由测试组确认：</text><text x="693" y="331" class="flow-small">是否单板测试 / 是否长运测试</text><text x="2490" y="413" fill="#61758e" font-size="12">冒烟测试为必经节点；单板与长运根据已确认路径自动流转。</text><text x="2490" y="441" fill="#61758e" font-size="12">测试报告为输出物，不作为流程节点；所有测试路径汇入测试审核。</text></svg>`;
+  const p = project();
+  const ctx = {
+    stageStateOf: (stage) => stageState(stage, isStageDone),
+    designType: getFlow().designType,
+    isTestEnabled: (kind) => isTestKindEnabled(p, kind),
+    approvalStatus: (stage) => stageApprovalStatus(stage),
+  };
+  const rows = FLOW_ROWS.map((row, r) => {
+    let prevDone = false;
+    const items = row.nodes
+      .map((node, i) => {
+        const value = nodeState(node, ctx);
+        const html = renderNode(node, value, i, i > 0 && prevDone);
+        if (value !== 'skipped') prevDone = value === 'done';
+        return html;
+      })
+      .join('');
+    return (
+      '<section class="lc-row"><header class="lc-row-head"><span class="lc-row-index">0' +
+      (r + 1) +
+      '</span><h3>' +
+      row.title +
+      '</h3>' +
+      (row.note ? '<span class="tag blue">' + esc(row.note()) + '</span>' : '') +
+      '</header><ol class="lc-track">' +
+      items +
+      '</ol><p class="lc-row-back">' +
+      row.back +
+      '</p></section>'
+    );
+  }).join('');
   return (
-    '<div class="flow-view-page"><div class="flow-view-layout"><section class="flow-view-canvas"><div class="flow-view-canvas-head"><div class="flow-view-canvas-title"><strong>流程流转图</strong><span>已确认研发全生命周期流程 · V2</span></div><div class="flow-view-legend"><span><i></i>可跳转阶段节点</span><span><i class="approval-legend"></i>审核节点</span><span style="color:#c77d31">橙色虚线：退回</span></div></div><div class="flow-view-diagram-viewport" style="height:660px"><div class="flow-view-diagram" style="width:4540px;height:730px">' +
-    chart +
-    '</div></div><div class="flow-view-canvas-foot">横向滚动查看全流程；点击蓝色阶段节点可进入需求、设计、开发、测试、发布、结项等对应页面。测试路径由软件规格书定稿后测试组预先确定；测试报告仅为输出物。审核节点及退回路径仅作流程说明。</div></section><aside class="flow-view-approval"><div class="flow-view-approval-head">审批记录<span>按流程节点自动展示</span></div><div class="flow-view-approval-list"><div class="flow-view-approval-item done">项目立项审核通过<small>研发技术主管 · 2026-04-18</small></div><div class="flow-view-approval-item done">需求文档审核通过<small>李明、赵敏 · 2026-07-08</small></div><div class="flow-view-approval-item done">软件规格书审核通过<small>研发总监 · 2026-08-08</small></div><div class="flow-view-approval-item">后续阶段审批<small>流程推进后自动记录</small></div></div></aside><button type="button" class="flow-view-collapse" data-flow-view-action="toggle-approval" aria-expanded="true">【收起侧边栏】 ›</button></div></div>'
+    '<div class="lc-flow"><div class="lc-flow-head"><div><h2>流程流转图</h2><p>' +
+    esc(p.name) +
+    ' · 点击节点进入对应阶段</p></div><ul class="lc-legend"><li class="is-done">已完成</li><li class="is-current">进行中</li><li class="is-pending">未开始</li><li class="is-skipped">不涉及</li></ul></div>' +
+    rows +
+    '</div>'
   );
 }
 App.renderPlanning = renderPlanning;
 
-/** 流程视图节点与侧栏交互 */
+/** 流程视图节点导航 */
 export function bindFlowViewEvents() {
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-flow-view-action]');
+    const el = e.target.closest('[data-flow-view-action="node"]');
     if (!el) return;
     e.preventDefault();
-    e.stopPropagation();
-    var action = el.dataset.flowViewAction;
-    if (action === 'toggle-approval') {
-      var layout = el.closest('.flow-view-layout');
-      if (!layout) return;
-      var collapsed = layout.classList.toggle('approval-collapsed');
-      el.setAttribute('aria-expanded', String(!collapsed));
-      el.textContent = collapsed ? '【展开侧边栏】 ‹' : '【收起侧边栏】 ›';
+    const stage = el.dataset.flowStage;
+    if (stage === 'basic') {
+      state.projectSection = 'basic';
+      setView('project-basic');
       return;
     }
-    if (action === 'node') {
-      state.lifecycleStage = el.dataset.flowStage || 'requirements';
-      state.projectSection = 'lifecycle';
-      setView('project-lifecycle');
-    }
-  });
-}
-
-/** 流程图键盘可达性 */
-export function bindFlowchartKeyboard() {
-  document.addEventListener('keydown', function (e) {
-    var node = e.target.closest && e.target.closest('.flow-v31-clickable[data-flow-stage]');
-    if (!node || (e.key !== 'Enter' && e.key !== ' ')) return;
-    e.preventDefault();
-    node.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    state.lifecycleStage = stage;
+    state.projectSection = 'lifecycle';
+    setView('project-lifecycle');
   });
 }

@@ -152,9 +152,9 @@ function model(d) {
 
 function createReview(d) {
   var m = model(d),
-    can = canSubmit(d, m);
-  if (!can.ok) {
-    showToast(can.reason, 'warn');
+    check = canSubmit(d, m);
+  if (!check.ok) {
+    showToast(check.reason, 'warn');
     return false;
   }
   if (!can(state.role, 'dev.submit')) {
@@ -179,10 +179,10 @@ function createReview(d) {
       taskId: taskId,
       processId: p.id,
       round: m.tasks.length + 1,
-      type: can.type,
+      type: check.type,
       commit: d.commit,
       aiRunId: (r && r.id) || '',
-      issueIds: can.issues.map(function (i) {
+      issueIds: check.issues.map(function (i) {
         return i.id;
       }),
       status: '待处理',
@@ -194,7 +194,7 @@ function createReview(d) {
   m.selectedTaskId = taskId;
   m.view = 'todos';
   m.selected = [];
-  can.issues.forEach(function (i) {
+  check.issues.forEach(function (i) {
     i.humanTaskId = taskId;
     i.reviewTaskId = taskId;
     i.processId = p.id;
@@ -1329,25 +1329,25 @@ function updateDevDrawer() {
   });
   var d = data(),
     m = model(d),
-    can = canSubmit(d, m);
+    check = canSubmit(d, m);
   var block = document.createElement('section');
   block.className = 'v35-panel v5-dev-review-entry';
   block.innerHTML =
     '<div class="v35-panel-head"><h3>开发提交人工检视 · V5</h3></div><div class="v35-panel-body">' +
     '<p class="v5-note">开发异议先暂存，不即时生成待办；每次确需人工介入时才生成 REV 轮次。纯 AI 复检不生成待办。</p>' +
     '<div class="v35-notice ' +
-    (can.ok ? '' : 'warn') +
+    (check.ok ? '' : 'warn') +
     '">' +
     h(
-      can.ok
-        ? '已满足提交条件 · ' + can.type + ' · 待裁定 ' + can.issues.length + ' 条'
-        : can.reason,
+      check.ok
+        ? '已满足提交条件 · ' + check.type + ' · 待裁定 ' + check.issues.length + ' 条'
+        : check.reason,
     ) +
     '</div>' +
     '<button class="btn primary" data-v5="dev-submit" ' +
-    (!can.ok ? 'disabled' : '') +
+    (!check.ok ? 'disabled' : '') +
     '>提交' +
-    h(can.type || '正式人工检视') +
+    h(check.type || '正式人工检视') +
     '</button>' +
     (m.process
       ? '<p class="v35-mini">过程 ' +

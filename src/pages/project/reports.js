@@ -8,9 +8,9 @@ import { esc } from '../../core/dom.js';
 import { openTestingReportDrawer } from './testing.js';
 import { project, state } from '../../store/state.js';
 
-let baseClosingEmergencyForm;
-let baseClosingSubnav;
-let baseRenderClosing;
+let baseReleaseEmergencyForm;
+let baseReleaseSubnav;
+let baseRenderRelease;
 
 function getTestReports() {
   App.testingInit();
@@ -158,7 +158,7 @@ function renderEmergencyReview() {
 }
 
 function renderReleaseVersions() {
-  App.closingInit();
+  App.releaseInit();
   var r = state.v37Published && state.v37Published[state.projectId],
     d = devReviewStore[state.projectId];
   return (
@@ -225,9 +225,9 @@ export function initReportVersioning() {
       return;
     }
   });
-  baseClosingEmergencyForm = App.closingEmergencyForm;
-  App.closingEmergencyForm = function () {
-    return baseClosingEmergencyForm().replace(
+  baseReleaseEmergencyForm = App.releaseEmergencyForm;
+  App.releaseEmergencyForm = function () {
+    return baseReleaseEmergencyForm().replace(
       '<div class="closing-form-actions">',
       renderEmergencyReview() + '<div class="closing-form-actions">',
     );
@@ -245,26 +245,26 @@ export function initReportVersioning() {
     App.render();
     showToast('模拟审批结果：' + state.closingEmergencyStatus);
   });
-  baseClosingSubnav = App.closingSubnav;
-  App.closingSubnav = function () {
-    return baseClosingSubnav().replace(
+  baseReleaseSubnav = App.releaseSubnav;
+  App.releaseSubnav = function () {
+    return baseReleaseSubnav().replace(
       '</aside>',
       '<button class="' +
         (state.closingSection === 'versions' ? 'active' : '') +
         '" data-closing-page-action="section" data-closing-section="versions">版本发布</button></aside>',
     );
   };
-  baseRenderClosing = App.renderClosing;
-  App.renderClosing = function () {
+  baseRenderRelease = App.renderRelease;
+  App.renderRelease = function () {
     if (state.closingSection === 'versions')
       return (
         '<div class="closing-reference-page"><div class="closing-stage-layout">' +
-        App.closingSubnav() +
+        App.releaseSubnav() +
         '<main class="closing-main">' +
         App.renderReleaseVersions() +
         '</main></div></div>'
       );
-    return baseRenderClosing();
+    return baseRenderRelease();
   };
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-v37-publish]');

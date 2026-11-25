@@ -122,12 +122,9 @@ function renderSidebar() {
     (v === 'ops-people' ? 'active' : '') +
     '" data-action="ops-tab" data-tab="people">人员运营看板</button><button class="' +
     (v === 'ops-resources' ? 'active' : '') +
-    '" data-action="ops-tab" data-tab="resources">资源分配看板</button>' +
-    (can(state.role, 'operations.view')
-      ? '<button class="' +
-        (v === 'ops-review' ? 'active' : '') +
-        '" data-nav="ops-review">AI 检视看板</button>'
-      : '');
+    '" data-action="ops-tab" data-tab="resources">资源分配看板</button><button class="' +
+    (v === 'ops-review' ? 'active' : '') +
+    '" data-nav="ops-review">AI 检视看板</button>';
   $('#sidebar').innerHTML =
     '<div class="nav-title">工作台</div>' +
     navItem(
@@ -139,8 +136,11 @@ function renderSidebar() {
     '<div class="nav-title">研发空间</div>' +
     navItem('项目集', '▦', 'portfolio', v === 'portfolio') +
     navGroup('项目管理', '▤', 'project', projectActive, projectChildren) +
-    '<div class="nav-title">运营管理</div>' +
-    navGroup('运营看板', '▥', 'ops', opsActive, opsChildren);
+    // 运营看板仅部门主管可见。
+    (can(state.role, 'operations.view')
+      ? '<div class="nav-title">运营管理</div>' +
+        navGroup('运营看板', '▥', 'ops', opsActive, opsChildren)
+      : '');
 }
 App.renderSidebar = renderSidebar;
 

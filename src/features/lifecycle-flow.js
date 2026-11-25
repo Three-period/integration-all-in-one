@@ -1,16 +1,14 @@
 /** 统一 Mock 生命周期（V47）：阶段流转、角色门禁、项目创建与运营数据。 */
 import { can } from '../domain/permissions.js';
-import { devReviewStore, flowStore, getDevReview, getFlow, stageDocs } from '../store/lifecycle.js';
+import { flowStore, getDevReview, getFlow } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
-import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
+import { openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import { projects } from '../data/projects.js';
 import { latestAiRun } from './dev-review.js';
-import { getReleaseGate, getStageStatus } from './version-anchor.js';
+import { getReleaseGate } from './version-anchor.js';
 import {
-  STAGE_LABELS,
-  STAGE_ORDER,
   designDocTypes,
   designKeysFor,
   isStageDone as isStageDoneRule,
@@ -18,19 +16,13 @@ import {
 } from '../domain/stages.js';
 import { project, state } from '../store/state.js';
 
-let initialProjects;
-let baseRenderProjectBasic;
-let baseRenderSidebar;
 let baseDevSummaryCard;
 let baseRenderDevelopment;
 
 let baseReviewerWorkspace;
-let baseRenderLifecycle;
 let baseOpsProjects;
 let baseRenderOps;
 let baseOpsTabs;
-let baseRenderRequirements;
-let baseRenderDesign;
 
 /* V55.4: the built-in thermal demo starts at development; an explicit Mock reset still starts from planning. */
 
@@ -216,91 +208,6 @@ function createProject() {
   showToast('项目创建成功；现在可以从立项开始演示');
 }
 
-function renderBasicInfoPanel() {
-  var p = project();
-  return (
-    '<section class="card" style="padding:17px;margin-bottom:15px"><div class="card-head"><b>项目基础信息 · 新建表单同步</b><span class="mini-note">同一份项目记录 · Mock</span></div>' +
-    App.renderProjectFormFields(p, 'edit') +
-    '<div style="margin-top:12px"><button class="v47-cta" data-v47="save-basic">保存项目基础信息</button></div></section>'
-  );
-}
-
-function renderStagePanel() {
-  var f = getFlow(),
-    cur = state.lifecycleStage,
-    k = cur === 'closing' ? 'release' : cur;
-  if (!STAGE_LABELS[k]) return '';
-  var prior = isStagePrereqMet(k),
-    done = isStageDone(k),
-    steps = STAGE_ORDER.map(function (n) {
-      return (
-        '<span class="v47-step ' +
-        (isStageDone(n) ? 'ok' : '') +
-        '">' +
-        esc(STAGE_LABELS[n]) +
-        ' · ' +
-        (isStageDone(n) ? '已完成' : '待完成') +
-        '</span>'
-      );
-    }).join('');
-  var actions = '';
-  if (k === 'planning') {
-    actions =
-      '<button class="v47-cta" data-v47="approve-stage" data-stage="planning" ' +
-      (done ? 'disabled' : '') +
-      '>模拟立项审核通过</button>';
-  }
-  if (k === 'requirements') {
-    actions =
-      '<button class="v47-btn" data-v47="doc-open" data-doc="requirement">在线编写规格书</button><button class="v47-cta" data-v47="approve-stage" data-stage="requirements" ' +
-      (!prior || done ? 'disabled' : '') +
-      '>提交并模拟需求审核通过</button>';
-  }
-  if (k === 'design') {
-    actions =
-      '<select id="v47DesignType" class="input" style="max-width:105px"><option value="I" ' +
-      (f.designType === 'I' ? 'selected' : '') +
-      '>I 类</option><option value="II" ' +
-      (f.designType === 'II' ? 'selected' : '') +
-      '>II 类</option><option value="III" ' +
-      (f.designType === 'III' ? 'selected' : '') +
-      '>III 类</option><option value="IV" ' +
-      (f.designType === 'IV' ? 'selected' : '') +
-      '>IV 类</option></select><button class="v47-btn" data-v47="doc-open" data-doc="design">在线编写设计文档</button><button class="v47-cta" data-v47="approve-stage" data-stage="design" ' +
-      (!prior || done ? 'disabled' : '') +
-      '>模拟设计评审通过</button>';
-  }
-  if (k === 'development') {
-    actions = '<span class="mini-note">以当前检视工作台完成 AI / 人工检视及测试移交后准出</span>';
-  }
-  if (k === 'testing') {
-    actions =
-      '<button class="v47-cta" data-v47="demo-testing" ' +
-      (!prior || done ? 'disabled' : '') +
-      '>填写并模拟整机测试报告审核</button>';
-  }
-  if (k === 'release') {
-    actions =
-      '<button class="v47-cta" data-v47="demo-release" ' +
-      (!prior || done ? 'disabled' : '') +
-      '>模拟发布评审、归档并正式发布</button>';
-  }
-  return (
-    '<div class="v47-gate"><div class="v47-row"><div><b>全链路演示 · ' +
-    STAGE_LABELS[k] +
-    '</b><div class="mini-note">当前项目：' +
-    esc(project().name) +
-    ' · ' +
-    (done ? '本阶段已完成' : prior ? '前置条件已满足' : '前置阶段尚未完成，当前操作受阻') +
-    '</div></div><div class="v47-row">' +
-    actions +
-    '</div></div><div class="v47-steps">' +
-    steps +
-    '</div></div>'
-  );
-}
-App.renderStagePanel = renderStagePanel;
-
 export function designKeysForProject() {
   return designKeysFor(getFlow().designType);
 }
@@ -310,273 +217,8 @@ export function projectDesignDocTypes() {
   return designDocTypes(getFlow().designType);
 }
 
-function approveStage(k) {
-  var f = getFlow(),
-    p = project();
-  if (!isStagePrereqMet(k)) {
-    showToast('请先完成上一个阶段', 'warn');
-    return;
-  }
-  if (k === 'requirements' && !f.docs.requirement) {
-    showToast('请先编写并保存需求规格书', 'warn');
-    return;
-  }
-  if (
-    k === 'design' &&
-    designKeysForProject().some(function (n) {
-      return !f.docs[n];
-    })
-  ) {
-    showToast('请先完成当前类别要求的全部设计文档', 'warn');
-    return;
-  }
-  f.steps[k] = true;
-  if (k === 'planning') {
-    state.lifecycleStage = 'requirements';
-    state.projectSection = 'lifecycle';
-    state.view = 'project-lifecycle';
-  }
-  logFlowNote(STAGE_LABELS[k] + '审核通过（Mock）');
-  p.status = '进行中';
-  p.flowStatus = k === 'planning' ? '需求阶段' : k === 'requirements' ? '设计阶段' : '开发阶段';
-  p.progress = { planning: 10, requirements: 25, design: 40 }[k];
-  App.render();
-  showToast(STAGE_LABELS[k] + '模拟审核已通过，可进入下一阶段');
-}
-App.approveStage = approveStage;
-
-function runTestingDemo() {
-  if (!isStagePrereqMet('testing')) {
-    showToast('开发尚未完成检视准出与 Commit 移交', 'warn');
-    return;
-  }
-  var p = project();
-  if (!p.version) {
-    showToast('请先到项目基本信息填写版本号（进入测试必填）', 'warn');
-    return;
-  }
-  var commit = getDevReview().commit,
-    r = App.getTestReport('system');
-  r.name = '整机测试报告';
-  r.version = p.version;
-  r.owner = '赵敏';
-  r.commit = commit;
-  r.conclusion = 'Mock 整机功能、异常重连、接口与回归测试均通过，未发现未关闭严重缺陷。';
-  r.status = '审核通过';
-  r.history.push({
-    name: r.name,
-    version: r.version,
-    owner: r.owner,
-    conclusion: r.conclusion,
-    status: r.status,
-    at: new Date().toLocaleString('zh-CN'),
-  });
-  getFlow().steps.testing = true;
-  logFlowNote('整机测试报告审核通过，关联 ' + commit);
-  p.progress = 82;
-  p.flowStatus = '发布阶段';
-  App.render();
-  showToast('整机测试报告审核通过，已关联开发准出 Commit');
-}
-App.runTestingDemo = runTestingDemo;
-
-function runReleaseDemo() {
-  var z = getStageStatus(),
-    p = project();
-  if (!isStagePrereqMet('release') || !z.testPass) {
-    showToast('整机测试报告未审核通过，无法发布', 'warn');
-    return;
-  }
-  if (!state.v37PublishReview) state.v37PublishReview = {};
-  if (!state.v37Published) state.v37Published = {};
-  state.v37PublishReview[state.projectId] = {
-    status: '已通过',
-    commit: z.commit,
-    at: new Date().toLocaleString('zh-CN'),
-  };
-  state.v37Published[state.projectId] = {
-    status: '已发布',
-    commit: z.commit,
-    version: p.version || 'V1.0',
-    at: new Date().toLocaleString('zh-CN'),
-  };
-  getFlow().steps.release = true;
-  logFlowNote('发布评审通过、文档归档完成、版本已发布（Mock）');
-  p.status = '已发布';
-  p.flowStatus = '已发布';
-  p.progress = 100;
-  App.render();
-  showToast('模拟版本已发布；项目全链路演示完成');
-}
-App.runReleaseDemo = runReleaseDemo;
-
-function stageDocKey(kind) {
-  return state.projectId + ':' + kind;
-}
-
-function openStageDoc(kind) {
-  var labels = {
-    requirement: '软件需求规格书',
-    design: '设计说明书',
-    architecture: '软件架构设计说明书',
-    summarydesign: '概要设计说明书',
-    detaildesign: '详细设计说明书',
-    review: '项目复盘文档',
-    report: '测试报告',
-  };
-  var id = stageDocKey(kind),
-    d =
-      stageDocs[id] ||
-      (stageDocs[id] = {
-        html:
-          '<h1>1. ' +
-          (labels[kind] || '在线文档') +
-          '</h1><h2>1.1 内容</h2><p>请在此填写文档正文。</p>',
-        comments: [],
-      });
-  var comments = d.comments
-    .map(function (c, i) {
-      return (
-        '<div class="v47-comment">' +
-        esc(c.text) +
-        ' <span class="mini-note">' +
-        (c.frozen ? '已冻结' : '可编辑') +
-        '</span> ' +
-        (!c.frozen
-          ? '<button class="v47-btn" data-v47="doc-freeze" data-index="' +
-            i +
-            '" data-dockind="' +
-            kind +
-            '">冻结评论</button>'
-          : '') +
-        '</div>'
-      );
-    })
-    .join('');
-  var html =
-    '<div class="notice">在线富文本 · 支持正文与 H1/H2/H3、选中文本引用评论及冻结。审批仍由原阶段操作完成。</div><div class="v47-doc"><div class="v47-doc-bar">' +
-    [
-      ['P', '正文'],
-      ['H1', '一级标题'],
-      ['H2', '二级标题'],
-      ['H3', '三级标题'],
-      ['bold', '加粗'],
-      ['italic', '斜体'],
-    ]
-      .map(function (x) {
-        return (
-          '<button type="button" data-v47="doc-format" data-format="' +
-          x[0] +
-          '">' +
-          x[1] +
-          '</button>'
-        );
-      })
-      .join('') +
-    '</div><div class="v47-editor" id="v47Editor" contenteditable="true">' +
-    d.html +
-    '</div><div class="v47-comment"><b>文档在线评论 / 评审讨论</b><div class="mini-note">选中文字后点击引用评论，可关联到文档原文</div><button class="v47-btn" data-v47="doc-quote">引用当前选中文本</button><div id="v47Quoted" class="mini-note"></div><textarea id="v47CommentText" placeholder="输入评论或评审意见"></textarea><button class="v47-btn" data-v47="doc-comment" data-dockind="' +
-    kind +
-    '">添加评论</button></div>' +
-    comments +
-    '</div>';
-  openDrawer(
-    labels[kind] || '在线文档',
-    html,
-    '<button class="btn" data-v47="doc-save" data-dockind="' +
-      kind +
-      '">保存文档</button><button class="btn primary" data-v47="doc-save" data-dockind="' +
-      kind +
-      '" data-close="1">保存并关闭</button>',
-  );
-}
-
-function collectStageDoc(kind) {
-  var el = document.querySelector('#v47Editor');
-  if (el) {
-    var d = stageDocs[stageDocKey(kind)];
-    d.html = el.innerHTML;
-    getFlow().docs[kind] = d.html;
-    logFlowNote('保存' + kind + '富文本版本');
-  }
-}
-
-function resetDemoData() {
-  if (
-    !window.confirm(
-      '确认重置 Mock 演示数据？将恢复项目、需求/设计文档、开发检视、测试、发布、待办和看板演示状态。此操作不可撤回。',
-    )
-  )
-    return;
-  Object.keys(flowStore).forEach(function (k) {
-    delete flowStore[k];
-  });
-  Object.keys(stageDocs).forEach(function (k) {
-    delete stageDocs[k];
-  });
-  flowStore.thermal = {
-    steps: {},
-    docs: {},
-    history: [],
-    created: false,
-    version: 'V1.0',
-    designType: 'II',
-  };
-  Object.keys(projects).forEach(function (k) {
-    delete projects[k];
-  });
-  Object.keys(initialProjects).forEach(function (k) {
-    projects[k] = JSON.parse(JSON.stringify(initialProjects[k]));
-  });
-  Object.keys(devReviewStore).forEach(function (k) {
-    delete devReviewStore[k];
-  });
-  if (state.v37Reports) state.v37Reports = {};
-  if (state.v37Published) state.v37Published = {};
-  if (state.v37PublishReview) state.v37PublishReview = {};
-  [
-    'testingCases',
-    'testingDefects',
-    'releaseProjects',
-    'releaseProjectId',
-    'closingForms',
-    'closingArchiveRecords',
-    'v38TestProject',
-    'v38ClosingProject',
-    'reqRecords',
-    'designRecords',
-  ].forEach(function (k) {
-    state[k] = null;
-  });
-  state.projectId = 'thermal';
-  state.view = 'dashboard';
-  state.lifecycleStage = 'planning';
-  state.role = 'project';
-  state.v39ScenarioName = '未选择';
-  App.render();
-  showToast('Mock 数据已重置，可重新从项目立项开始演示');
-}
-App.resetDemoData = resetDemoData;
-
 /** V47 统一 Mock 生命周期与角色门禁 */
 export function initLifecycleFlow() {
-  initialProjects = JSON.parse(JSON.stringify(projects));
-  baseRenderProjectBasic = App.renderProjectBasic;
-  App.renderProjectBasic = function () {
-    var html = baseRenderProjectBasic();
-    var a = html.indexOf('<div class="grid cols-2">');
-    if (a >= 0) html = html.slice(0, a) + renderBasicInfoPanel() + html.slice(a);
-    return html;
-  };
-  baseRenderSidebar = App.renderSidebar;
-  App.renderSidebar = function () {
-    baseRenderSidebar();
-    var sb = document.querySelector('#sidebar');
-    if (sb && !can(state.role, 'operations.view'))
-      sb.querySelectorAll('[data-action="ops-tab"],[data-nav="ops-review"]').forEach(function (el) {
-        el.remove();
-      });
-  };
   baseDevSummaryCard = App.renderDevSummaryCard;
   App.renderDevSummaryCard = function (title, status, note, type, badge) {
     if (type === 'repo' && getDevReview().v47NeedsNewCommit) {
@@ -716,17 +358,6 @@ export function initLifecycleFlow() {
     );
     return h;
   };
-  baseRenderLifecycle = App.renderLifecycle;
-  App.renderLifecycle = function () {
-    var html = baseRenderLifecycle();
-    if (state.lifecycleStage === 'development')
-      html = html.replace(
-        /<div class="notice" style="align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border-color:#e4e7ec;color:#475467">[\s\S]*?data-v39="load">载入场景<\/button><\/div>/,
-        '',
-      );
-    var panel = App.renderStagePanel();
-    return html.replace(/(<section class="page"[^>]*>)/, '$1' + panel);
-  };
   baseOpsProjects = App.ops2Projects;
   App.ops2Projects = function () {
     var html = baseOpsProjects();
@@ -857,9 +488,7 @@ export function initLifecycleFlow() {
   document.addEventListener(
     'click',
     function (e) {
-      var node = e.target.closest(
-        '[data-v47], [data-action="new-project"], [data-v35="switch-role"], [data-v35="view-review"], [data-v35="view-dev"]',
-      );
+      var node = e.target.closest('[data-v47], [data-action="new-project"]');
       if (!node) return;
       if (node.dataset.action === 'new-project') {
         e.preventDefault();
@@ -867,20 +496,10 @@ export function initLifecycleFlow() {
         openProjectModal();
         return;
       }
-      if (node.dataset.v35) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        showToast('开发/检视工作台角色请在「个人工作台」切换', 'warn');
-        return;
-      }
       var a = node.dataset.v47;
       if (!a) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (a === 'reset') {
-        App.resetDemoData();
-        return;
-      }
       if (a === 'go-home') {
         state.view = 'dashboard';
         App.render();
@@ -903,66 +522,6 @@ export function initLifecycleFlow() {
         showToast('项目基础信息已保存');
         return;
       }
-      if (a === 'approve-stage') {
-        App.approveStage(node.dataset.stage);
-        return;
-      }
-      if (a === 'demo-testing') {
-        App.runTestingDemo();
-        return;
-      }
-      if (a === 'demo-release') {
-        App.runReleaseDemo();
-        return;
-      }
-      if (a === 'doc-open') {
-        openStageDoc(node.dataset.doc);
-        return;
-      }
-      if (a === 'doc-format') {
-        var fmt = node.dataset.format,
-          el = document.querySelector('#v47Editor');
-        if (!el) return;
-        el.focus();
-        if (fmt === 'P' || /^H[1-3]$/.test(fmt))
-          document.execCommand('formatBlock', false, fmt === 'P' ? 'p' : fmt.toLowerCase());
-        else document.execCommand(fmt, false, null);
-        return;
-      }
-      if (a === 'doc-quote') {
-        var text = window.getSelection().toString().trim();
-        document.querySelector('#v47Quoted').textContent = text ? '引用：' + text : '未选择正文';
-        return;
-      }
-      if (a === 'doc-comment') {
-        let kind = node.dataset.dockind,
-          d = stageDocs[stageDocKey(kind)],
-          txt = document.querySelector('#v47CommentText').value.trim(),
-          quote = (document.querySelector('#v47Quoted').textContent || '').replace(/^引用：/, '');
-        if (!txt) {
-          showToast('请填写评论', 'warn');
-          return;
-        }
-        collectStageDoc(kind);
-        d.comments.push({ text: (quote ? '「' + quote + '」 · ' : '') + txt, frozen: false });
-        openStageDoc(kind);
-        showToast('评论已添加');
-        return;
-      }
-      if (a === 'doc-freeze') {
-        let d = stageDocs[stageDocKey(node.dataset.dockind)];
-        collectStageDoc(node.dataset.dockind);
-        d.comments[+node.dataset.index].frozen = true;
-        openStageDoc(node.dataset.dockind);
-        showToast('评论已冻结');
-        return;
-      }
-      if (a === 'doc-save') {
-        collectStageDoc(node.dataset.dockind);
-        if (node.dataset.close) closeDrawer();
-        else showToast('富文本文档已保存');
-        return;
-      }
       if (a === 'ai-expand') {
         var target = document.querySelector('[data-ai-detail="' + node.dataset.ai + '"]');
         if (target) target.hidden = !target.hidden;
@@ -978,18 +537,4 @@ export function initLifecycleFlow() {
     },
     true,
   );
-  baseRenderRequirements = App.renderRequirements;
-  App.renderRequirements = function () {
-    return (
-      '<div style="margin:0 0 10px"><button class="v47-btn" data-v47="doc-open" data-doc="requirement">打开需求规格书富文本模板（H1/H2/H3 · 评论/冻结）</button></div>' +
-      baseRenderRequirements()
-    );
-  };
-  baseRenderDesign = App.renderDesign;
-  App.renderDesign = function () {
-    return (
-      '<div style="margin:0 0 10px"><button class="v47-btn" data-v47="doc-open" data-doc="design">打开设计文档富文本模板（H1/H2/H3 · 评论/冻结）</button></div>' +
-      baseRenderDesign()
-    );
-  };
 }

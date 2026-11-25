@@ -97,3 +97,6 @@ export function getVersionAnchor(pid) {
 
 /** 生命周期表单中在线文档的正文与评论。 */
 export const onlineDocs = Object.create(null);
+
+/** 阶段审批记录（所有项目共用一个列表，按 projectId 区分），规则见 domain/approvals.js。 */
+export const approvalRequests = [];

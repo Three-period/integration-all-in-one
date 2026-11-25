@@ -1,21 +1,9 @@
 /** 文档驱动的阶段审批与报告列表（V54）。 */
-import { getFlow, getVersionAnchor } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { closeDrawer, openDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
-import { nowStamp } from './dev-review.js';
-import {
-  currentDesignRecord as currentDesignRecordRule,
-  missingDesignReviews as missingDesignReviewsRule,
-} from '../domain/design.js';
 import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
-import {
-  projectDesignDocTypes,
-  logFlowNote,
-  isStagePrereqMet,
-  isStageDone,
-} from './lifecycle-flow.js';
 import {
   originalRenderTesting,
   getHandoffCommit,
@@ -45,40 +33,6 @@ export function initDocumentApproval() {
   function escReportText(str) {
     return esc(String(str == null ? '' : str));
   }
-  // A new draft supersedes an earlier approved version; preloaded legacy versions use
-  // their version numbers to decide which is current (see domain/design.js).
-  function currentDesignRecord(type) {
-    App.designInit();
-    return currentDesignRecordRule(state.designRecords, type);
-  }
-  function missingDesignReviews() {
-    var order = projectDesignDocTypes();
-    App.designInit();
-    return missingDesignReviewsRule(order, state.designRecords);
-  }
-  var oldDesignApprove = App.approveStage;
-  App.approveStage = function (stage) {
-    if (stage !== 'design') return oldDesignApprove(stage);
-    if (!isStagePrereqMet('design')) {
-      showToast('请先完成需求阶段准出', 'warn');
-      return;
-    }
-    var missing = missingDesignReviews();
-    if (missing.length) {
-      showToast('无法通过设计阶段审核：请先完成 ' + missing.join('、') + ' 的文档评审', 'warn');
-      return;
-    }
-    var f = getFlow(),
-      p = project();
-    f.steps.design = true;
-    logFlowNote('设计阶段统一审核通过（Mock），依据当前项目各必做设计文档的最新审核状态');
-    p.status = '进行中';
-    p.flowStatus = '开发阶段';
-    p.progress = Math.max(Number(p.progress) || 0, 40);
-    state.projectSection = 'lifecycle';
-    App.render();
-    showToast('设计阶段审核通过，已解锁开发阶段');
-  };
 
   // Report list storage is project/type scoped; migrate meaningful V53.1 single-record
   // data without overwriting existing histories, rich content or frozen comments.
@@ -123,6 +77,7 @@ export function initDocumentApproval() {
     var enabled = isReportKindEnabled(kind);
     return reportReadinessRule(enabled, enabled ? reportRows(kind) : [], commit);
   }
+  /** 测试审核前检查：各类测试报告是否已提交并绑定当前提测 Commit。 */
   function reportRequirements() {
     var z = getReleaseGate(),
       result = { commit: z.commit, items: [], missing: [] };
@@ -140,6 +95,8 @@ export function initDocumentApproval() {
     });
     return result;
   }
+
+  App.testReportRequirements = reportRequirements;
 
   // The testing section is now a read-only report index. The existing V491 rich
   // editor (H1/H2/H3, comments, freeze) lives in the right-hand drawer only.
@@ -433,215 +390,12 @@ export function initDocumentApproval() {
     },
     true,
   );
-
-  // Centralized approval card in flow view; replaces the older V48 mock action,
-  // not the original flow diagram or its navigation.
-  function renderFlowApprovalPanel() {
-    var active =
-      ['planning', 'requirements', 'design', 'development', 'testing', 'release'].find(
-        function (k) {
-          return !isStageDone(k);
-        },
-      ) || 'complete';
-    if (active === 'design' && !isStagePrereqMet('design')) active = 'requirements';
-    var title = {
-      planning: '立项审核',
-      requirements: '需求规格书审核',
-      design: '设计阶段审核',
-      development: '人工检视准出 / 自动移交',
-      testing: '测试阶段统一审核',
-      release: '发布评审 / 归档',
-      complete: '流程已完成',
-    }[active];
-    var buttons = '';
-    if (active === 'planning')
-      buttons =
-        '<button class="v47-cta" data-v47="approve-stage" data-stage="planning">模拟立项审核通过</button>';
-    if (active === 'requirements')
-      buttons =
-        '<button class="v47-btn" data-v47="doc-open" data-doc="requirement">编写需求规格书</button>' +
-        '<button class="v47-cta" data-v47="approve-stage" data-stage="requirements">模拟需求审核通过</button>';
-    if (active === 'design') {
-      var missing = missingDesignReviews();
-      buttons =
-        '<label class="mini-note">设计类别</label><select id="v47DesignType" class="input" style="max-width:115px">' +
-        ['I', 'II', 'III', 'IV']
-          .map(function (v) {
-            return (
-              '<option value="' +
-              v +
-              '"' +
-              (getFlow().designType === v ? ' selected' : '') +
-              '>' +
-              v +
-              ' 类</option>'
-            );
-          })
-          .join('') +
-        '</select>' +
-        '<div class="v54-checks">' +
-        projectDesignDocTypes()
-          .map(function (t) {
-            var r = currentDesignRecord(t),
-              good = r && ['评审通过', '已结束'].includes(r.status);
-            return (
-              '<span class="' +
-              (good ? 'v54-ok' : 'v54-pending') +
-              '">' +
-              (good ? '✓ ' : '○ ') +
-              escReportText(t) +
-              '</span>'
-            );
-          })
-          .join('') +
-        '</div>' +
-        '<button class="v47-cta" data-v54-stage="design">模拟设计阶段审核通过</button>' +
-        (missing.length
-          ? '<small class="v54-flow-note">尚需完成：' +
-            escReportText(missing.join('、')) +
-            '</small>'
-          : '');
-    }
-    if (active === 'development')
-      buttons =
-        '<div class="mini-note">请在检视工程师工作台完成 R3 人工检视，自动解锁测试阶段。</div>';
-    if (active === 'testing') {
-      var review = reportRequirements(),
-        z = getReleaseGate();
-      buttons =
-        '<div class="v54-checks">' +
-        review.items
-          .map(function (r) {
-            return (
-              '<span class="' +
-              (r.ready ? 'v54-ok' : 'v54-pending') +
-              '">' +
-              (r.skipped ? '— ' : r.ready ? '✓ ' : '○ ') +
-              escReportText(r.name) +
-              ' · ' +
-              r.status +
-              '</span>'
-            );
-          })
-          .join('') +
-        '</div>' +
-        '<button class="v47-cta" data-v54-stage="testing">模拟测试阶段审核通过</button>' +
-        (!z.commit
-          ? '<small class="v54-flow-note">请先完成 R3 检视并正式移交 Commit。</small>'
-          : review.missing.length
-            ? '<small class="v54-flow-note">未完成：' +
-              escReportText(review.missing.join('、')) +
-              '</small>'
-            : '');
-    }
-    if (active === 'release')
-      buttons =
-        '<button class="v47-cta" data-v47="demo-release">模拟发布评审、归档并正式发布</button>';
-    if (active === 'complete') buttons = '<span class="tag green">流程审核已完成</span>';
-    return (
-      '<div class="flow-view-approval-list v48-approval-list"><div class="v48-approval-actions"><b>当前审核 · ' +
-      title +
-      '</b>' +
-      '<small>当前项目：' +
-      escReportText(project().name) +
-      '</small><div class="v48-approval-buttons v54-flow-buttons">' +
-      buttons +
-      '</div></div></div>'
-    );
-  }
-  var baseRenderPlanning = App.renderPlanning;
-  App.renderPlanning = function () {
-    var html = baseRenderPlanning(),
-      start = html.indexOf('<div class="flow-view-approval-list v48-approval-list">');
-    if (start < 0) return html;
-    var end = html.indexOf('</aside>', start);
-    if (end < 0) return html;
-    return html.slice(0, start) + renderFlowApprovalPanel() + html.slice(end);
-  };
-  function approveTestingStage() {
-    if (!isStagePrereqMet('testing')) {
-      showToast('请先完成 R3 人工检视准出与 Commit 移交', 'warn');
-      return;
-    }
-    var check = reportRequirements(),
-      z = getReleaseGate();
-    if (!z.commit) {
-      showToast('缺少正式移交 Commit，无法审核测试阶段', 'warn');
-      return;
-    }
-    if (check.missing.length) {
-      showToast('测试阶段审核受阻：请提交 ' + check.missing.join('、'), 'warn');
-      return;
-    }
-    var x = getVersionAnchor();
-    x.testReview = {
-      status: '审核通过',
-      commit: z.commit,
-      reviewer: '测试主管（Mock）',
-      at: nowStamp(),
-      reportIds: check.items
-        .filter(function (i) {
-          return i.row;
-        })
-        .map(function (i) {
-          return i.row.id;
-        }),
-    };
-    getFlow().steps.testing = true;
-    project().progress = Math.max(Number(project().progress) || 0, 82);
-    project().flowStatus = '发布阶段';
-    logFlowNote('测试阶段统一审核通过，关联正式移交 Commit ' + z.commit + '；适用报告均已提交');
-    state.lifecycleStage = 'release';
-    state.projectSection = 'lifecycle';
-    state.view = 'project-lifecycle';
-    App.render();
-    showToast('测试阶段审核通过，发布阶段已解锁');
-  }
-  document.addEventListener(
-    'click',
-    function (e) {
-      var b = e.target.closest('[data-v54-stage]');
-      if (!b) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (b.dataset.v54Stage === 'design') return App.approveStage('design');
-      if (b.dataset.v54Stage === 'testing') return approveTestingStage();
-    },
-    true,
-  );
-
-  // Never offer the historical per-report 'simulate approve/reject' buttons in
-  // the report drawer or list. They are not stage approval entrypoints.
-  document.addEventListener(
-    'click',
-    function (e) {
-      var b = e.target.closest('[data-v38-report]');
-      if (!b) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      showToast('请前往流程视图统一模拟审核测试阶段', 'warn');
-    },
-    true,
-  );
-  var baseResetDemoData = App.resetDemoData;
-  App.resetDemoData = function () {
-    baseResetDemoData();
-    state.v54Reports = null;
-    state.v54Draft = null;
-    state.v54ReportQuery = '';
-    state.v54ReportFilter = '全部';
-  };
   var css = document.createElement('style');
   css.textContent =
     '.v54-report-tools{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid #e6eaf0}' +
     '.v54-report-tools .search{max-width:290px;flex:1}.v54-report-tools select{max-width:135px}' +
     '.v54-report-drawer .v54-drawer-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;background:#f8fafc;border:1px solid #e6eaf0;border-radius:8px;margin-bottom:15px}' +
     '.v54-report-drawer .v54-drawer-meta label{font-size:12px;font-weight:600;color:#475467;display:flex;flex-direction:column;gap:6px}' +
-    '.v54-flow-buttons{flex-wrap:wrap;align-items:center}.v54-checks{display:flex;flex-wrap:wrap;gap:6px;max-width:450px}' +
-    '.v54-checks span{border:1px solid #e6eaf0;background:#f8fafc;border-radius:5px;padding:5px 8px;font-size:11px;white-space:nowrap}' +
-    '.v54-checks .v54-ok{color:#027a48;background:#ecfdf3;border-color:#b7e7c8}' +
-    '.v54-checks .v54-pending{color:#b54708;background:#fffaeb;border-color:#fcdca7}' +
-    '.v54-flow-note{display:block;width:100%;font-size:11px;color:#b54708}' +
     '@media(max-width:700px){.v54-report-drawer .v54-drawer-meta{grid-template-columns:1fr}}';
   document.head.appendChild(css);
   App.render();

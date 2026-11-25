@@ -7,13 +7,12 @@ import { esc } from '../core/dom.js';
 
 import { project, state } from '../store/state.js';
 
-let baseClosingInit;
+let baseReleaseInit;
 let baseTestingInit;
 export let baseSaveTestReport;
 export let baseRenderTesting;
-let baseRenderClosing;
 let baseRenderRelease;
-let baseRenderTestingReport;
+let baseRenderClosing;
 let baseReleaseVersions;
 let baseTestingDefectRows;
 
@@ -30,8 +29,8 @@ App.renderStepBanner = renderStepBanner;
 /** V38 跨阶段共享状态 */
 export function initStageProgress() {
   /* V38: 每个项目独立的业务底稿，防止项目间交叉显示 */
-  baseClosingInit = App.closingInit;
-  App.closingInit = function () {
+  baseReleaseInit = App.releaseInit;
+  App.releaseInit = function () {
     if (state.v38ClosingProject !== state.projectId) {
       state.v38ClosingProject = state.projectId;
       state.closingForms = null;
@@ -39,7 +38,7 @@ export function initStageProgress() {
       state.closingEmergencyStatus = '待审批';
       state.closingSection = 'emergency';
     }
-    baseClosingInit();
+    baseReleaseInit();
   };
   baseTestingInit = App.testingInit;
   App.testingInit = function () {
@@ -73,57 +72,14 @@ export function initStageProgress() {
   App.renderTesting = function () {
     return App.renderStepBanner() + baseRenderTesting();
   };
-  baseRenderClosing = App.renderClosing;
-  App.renderClosing = function () {
-    return App.renderStepBanner() + baseRenderClosing();
-  };
   baseRenderRelease = App.renderRelease;
   App.renderRelease = function () {
     return App.renderStepBanner() + baseRenderRelease();
   };
-  baseRenderTestingReport = App.renderTestingReport;
-  App.renderTestingReport = function (section) {
-    var html = baseRenderTestingReport(section),
-      r = App.getTestReport(section);
-    if (r.status === '待评审')
-      html = html.replace(
-        'data-v37-report-action="submit">提交评审</button>',
-        'data-v37-report-action="submit">提交评审</button><button class="btn primary" data-v38-report="approve" data-section="' +
-          section +
-          '">模拟审核通过</button><button class="btn danger" data-v38-report="reject" data-section="' +
-          section +
-          '">模拟退回</button>',
-      );
-    return html;
+  baseRenderClosing = App.renderClosing;
+  App.renderClosing = function () {
+    return App.renderStepBanner() + baseRenderClosing();
   };
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-v38-report]');
-    if (!b) return;
-    e.preventDefault();
-    e.stopPropagation();
-    var r = App.getTestReport(b.dataset.section),
-      next = b.dataset.v38Report === 'approve' ? '审核通过' : '已退回';
-    if (r.status !== '待评审') {
-      showToast('请先提交测试报告评审', 'warn');
-      return;
-    }
-    var dev = getDevRecord();
-    if (!dev || !dev.handoff || r.commit !== dev.commit) {
-      showToast('测试报告对应 Commit 与已移交的开发版本不一致', 'warn');
-      return;
-    }
-    r.status = next;
-    r.history.push({
-      name: r.name,
-      version: r.version,
-      owner: r.owner,
-      conclusion: r.conclusion,
-      status: next,
-      at: new Date().toLocaleString('zh-CN', { hour12: false }),
-    });
-    App.render();
-    showToast('测试报告模拟审核：' + next);
-  });
   baseReleaseVersions = App.renderReleaseVersions;
   App.renderReleaseVersions = function () {
     var html = baseReleaseVersions(),

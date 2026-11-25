@@ -1,4 +1,5 @@
 /** 设计阶段：设计文档列表、详情抽屉与变更。 */
+import { submitStageApproval } from '../../features/stage-approval.js';
 import { isDesignLocked as isDesignLockedRule } from '../../domain/design.js';
 import { projectDesignDocTypes } from '../../features/lifecycle-flow.js';
 import { App } from '../../core/app.js';
@@ -545,27 +546,25 @@ export function collectDesign() {
   });
 }
 
+/** 提交设计文档：发起设计文档审核，每份文档单独审核。成功返回 true。 */
+export function submitDesignRecord(record) {
+  return submitStageApproval('design', {
+    recordId: record.id,
+    title: record.docType + ' · ' + record.title,
+    docType: record.docType,
+  });
+}
+
 function saveDesign(mode) {
   collectDesign();
   var record = App.designCurrentRecord();
-  if (mode === 'submit') record.status = '待评审';
-  if (mode === 'create') {
-    record.id = 'DSN-NEW-' + Date.now();
-    state.designRecords.unshift(Object.assign({}, record, { comments: record.comments || [] }));
-    state.designSelected = record.id;
-    state.designDraft = null;
-  } else {
-    designRecord(state.designSelected);
+  if (mode === 'submit') {
+    if (!submitDesignRecord(record)) return;
+    record.status = '待评审';
   }
   closeDrawer();
   App.render();
-  showToast(
-    mode === 'submit'
-      ? '设计文档已提交评审'
-      : mode === 'create'
-        ? '设计文档草稿已保存'
-        : '设计文档草稿已保存',
-  );
+  showToast(mode === 'submit' ? '设计文档已提交评审' : '设计文档草稿已保存');
 }
 App.saveDesign = saveDesign;
 

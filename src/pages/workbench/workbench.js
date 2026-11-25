@@ -6,6 +6,7 @@ import { person, tag } from '../../core/dom.js';
 import { rolePolicy, roles, widgetMeta } from '../../data/roles.js';
 import { currentLayout } from '../../store/layout.js';
 import { state } from '../../store/state.js';
+import { renderApprovalWidget } from '../../features/stage-approval.js';
 
 export function renderWorkbench() {
   const active = state.view === 'dashboard' ? 'dashboard' : 'dashboard';
@@ -21,7 +22,7 @@ export function renderWorkbench() {
     requirements: `<div class="chart-area" style="padding:16px"><div class="bar-row"><span>原始需求</span><div class="track"><div class="fill" style="width:100%;background:#9bbcff"></div></div><b>8</b></div><div class="bar-row"><span>评审中</span><div class="track"><div class="fill" style="width:62%;background:#ffd49a"></div></div><b>5</b></div><div class="bar-row"><span>已通过</span><div class="track"><div class="fill" style="width:42%;background:#6fd6a1"></div></div><b>3</b></div><div class="mini-note">数据来源：需求文档版本与评审状态实时汇总</div></div>`,
     development: `<div class="mini-list"><div class="mini-list-row"><i class="mini-avatar">T</i><div class="grow"><strong>实现断线自动重连</strong><small>智能温控 · 预计 8h · 截止今天</small></div>${tag('进行中', 'blue')}</div><div class="mini-list-row"><i class="mini-avatar">A</i><div class="grow"><strong>补齐设备接入接口</strong><small>设备云 · 预计 6h · 截止明天</small></div>${tag('待测试', 'purple')}</div></div>`,
     testing: `<div class="compact-metrics"><div class="compact-metric"><span>用例总数</span><b>128</b></div><div class="compact-metric"><span>执行率</span><b>82%</b></div><div class="compact-metric"><span>通过率</span><b class="up">91%</b></div><div class="compact-metric"><span>未关闭缺陷</span><b class="down">12</b></div></div>`,
-    approvals: `<div class="mini-list"><div class="mini-list-row"><i class="mini-avatar">流</i><div class="grow"><strong>项目立项审批</strong><small>液冷控制算法预研 · 当前节点：技术主管</small></div>${tag('待审批', 'orange')}</div><div class="mini-list-row"><i class="mini-avatar">流</i><div class="grow"><strong>需求变更审批</strong><small>设备云平台 3.0 · 当前节点：研发总监</small></div>${tag('待审批', 'orange')}</div></div>`,
+    approvals: renderApprovalWidget(),
     risks: `<div class="mini-list"><div class="mini-list-row"><i class="mini-avatar" style="background:#fff0ef;color:#d92d20">!</i><div class="grow"><strong>整机联调环境交付延期</strong><small>智能温控 · 责任人：王凯 · 预计影响发布</small></div>${tag('极高', 'red')}</div><div class="mini-list-row"><i class="mini-avatar" style="background:#fff4e5;color:#b54708">!</i><div class="grow"><strong>测试资源与其他重点项目冲突</strong><small>智能温控 · 责任人：赵敏</small></div>${tag('高', 'orange')}</div></div>`,
     team: `<div class="people-bars" style="padding:17px"><div class="people-bar"><span>开发团队</span><div class="bar"><i style="width:84%;background:#6f9fff"></i></div><b>84%</b></div><div class="people-bar"><span>测试团队</span><div class="bar"><i style="width:112%;background:#f79009"></i></div><b class="down">112%</b></div><div class="people-bar"><span>产品团队</span><div class="bar"><i style="width:68%;background:#6fd6a1"></i></div><b>68%</b></div></div>`,
   };

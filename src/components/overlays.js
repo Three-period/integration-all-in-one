@@ -30,3 +30,7 @@ export function closeDrawer() {
   $('#drawer').classList.remove('show', 'req-drawer-large');
   $('#drawerMask').classList.remove('show');
 }
+
+export function closeModal() {
+  $('#modalRoot').classList.remove('show');
+}

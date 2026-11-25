@@ -17,6 +17,8 @@ import {
 import { state } from '../store/state.js';
 
 function render() {
+  // 只读标记由全生命周期页按当前阶段重新设置。
+  document.body.removeAttribute('data-stage-readonly');
   App.renderSidebar();
   $('#crumb').innerHTML = App.crumb().replace(' / ', ' / <strong>') + '</strong>';
   const view = state.view;

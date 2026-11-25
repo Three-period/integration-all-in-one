@@ -8,6 +8,9 @@
  *   pnpm test:regression                     # baseline = HEAD
  *   pnpm test:regression -- --base <ref>     # baseline = any commit / branch
  *   pnpm test:regression -- --no-shots       # skip screenshot comparison
+ *   pnpm test:regression -- --functional     # 功能验收：只运行当前版本的业务场景，
+ *                                            # 检查每一步可执行、预期提示出现、无运行时错误
+ *   pnpm test:regression -- --functional --url http://localhost:3000/   # 直接使用已运行的服务
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -147,8 +150,43 @@ function compareShots(dirA, dirB) {
   return diffs;
 }
 
+/** 功能验收：逐步执行业务场景，任何一步失败或出现运行时错误即判定失败。 */
+async function functional() {
+  let url = opt('--url', '');
+  let server = null;
+  if (!url) {
+    log('构建当前工作区…');
+    build(root, path.join(out, 'current'));
+    ({ server, url } = await serve(path.join(out, 'current')));
+  }
+  try {
+    const { results, errors } = await runScenarios(url);
+    let failed = 0;
+    for (const sc of results) {
+      const bad = sc.steps.filter((s) => s.status !== 'ok');
+      failed += bad.length;
+      const last = [...sc.steps].reverse().find((s) => s.toasts.length);
+      console.log(
+        `${bad.length ? '✕' : '✓'} ${sc.name}：${sc.steps.length} 步，终点提示「${last ? last.toasts.join(' / ') : '无'}」`,
+      );
+      bad
+        .slice(0, 5)
+        .forEach((s) => console.log(`    ${s.ctx}  ${s.act.slice(0, 90)}\n      → ${s.status}`));
+    }
+    const unique = [...new Set(errors)];
+    unique.slice(0, 10).forEach((e) => console.log('  运行时错误：' + e));
+    console.log(
+      `\n结果：${failed || unique.length ? '未通过' : '通过'}（失败步骤 ${failed}，运行时错误 ${unique.length}）`,
+    );
+    process.exit(failed || unique.length ? 1 : 0);
+  } finally {
+    if (server) server.close();
+  }
+}
+
 async function main() {
   fs.mkdirSync(out, { recursive: true });
+  if (args.includes('--functional')) return functional();
   const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'regression-base-'));
   log(`构建基线 ${base}…`);
   execFileSync('git', ['worktree', 'add', '--detach', '--force', wt, base], {

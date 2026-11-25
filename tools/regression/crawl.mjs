@@ -1,9 +1,9 @@
 /**
- * Exploratory crawl: for every role, every sidebar entry and up to two levels of
+ * Exploratory crawl: for every demo account, every sidebar entry and up to two levels of
  * in-page tabs, start from a fresh page and click the first N interactive elements,
  * recording a snapshot after each action.
  */
-import { openPage, snapshot, hashSnapshot, setRole, tick } from './browser.mjs';
+import { openPage, snapshot, hashSnapshot, login, tick } from './browser.mjs';
 
 const TAB_SELECTOR = '[data-action$="tab"],[data-action="lifecycle-stage"],[data-tab],[data-stage]';
 const INTERACTIVE =
@@ -82,11 +82,11 @@ export async function crawl(url, { clicks = 30, screenshots = false, onShot } = 
   try {
     await fresh();
     const roles = await page.evaluate(() =>
-      [...document.querySelectorAll('#roleSelect option')].map((o) => o.value),
+      [...document.querySelectorAll('[data-demo-account]')].map((o) => o.dataset.demoAccount),
     );
     for (const role of roles) {
       await fresh();
-      await setRole(page, settle, role);
+      await login(page, settle, role);
       const navCount = await page.evaluate(() => {
         document.querySelectorAll('[data-nav-group]').forEach((g) => {
           if (!g.closest('.nav-group.is-open')) g.click();
@@ -96,7 +96,7 @@ export async function crawl(url, { clicks = 30, screenshots = false, onShot } = 
       for (let ni = 0; ni < navCount; ni++) {
         const goPath = async (path) => {
           await fresh();
-          await setRole(page, settle, role);
+          await login(page, settle, role);
           const label = await page.evaluate(openNav, ni);
           if (!label) return null;
           await settle();

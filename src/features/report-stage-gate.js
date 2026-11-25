@@ -224,7 +224,7 @@ export function initReportStageGate() {
   };
   // Existing retrospective save/submit event remains; allow it to read rich text through its existing 'summary' field.
 
-  App.renderReleaseReview = function () {
+  App.renderClosingReview = function () {
     const d = state.releaseReviewDraft;
     return (
       '<section class="release-panel"><div class="release-panel-head"><div><h3>项目复盘</h3><p>在线编写复盘正文 · ' +

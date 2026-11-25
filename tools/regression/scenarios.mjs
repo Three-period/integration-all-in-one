@@ -2,14 +2,22 @@
  * Scripted business flows driven only through the UI (data attributes), so they stay
  * valid while the implementation is refactored. A snapshot is recorded after every step.
  */
-import { openPage, snapshot, hashSnapshot, tick } from './browser.mjs';
+import { openPage, snapshot, hashSnapshot, loginAs, tick } from './browser.mjs';
 
 const stage = (name) => ({ sel: `[data-action="lifecycle-stage"][data-stage="${name}"]` });
-const asRole = (role) => [{ nav: 'dashboard' }, { role }, { nav: 'project-lifecycle' }];
+const login = (username) => ({ login: username });
+const nav = (name) => ({ nav: name });
+
+/** 审核人在个人工作台「审批中心」处理第一条待审核记录。 */
+const decideFirst = (decision, comment, toast) => [
+  nav('dashboard'),
+  { sel: `[data-approval-action=decide][data-decision=${decision}]` },
+  ...(comment ? [{ fill: { '[data-approval-comment]': comment } }] : []),
+  { sel: '[data-approval-action=confirm]', toast },
+];
 
 const developerSubmitsForReview = (aiMode, smokeResult = '通过') => [
-  { role: 'developer' },
-  { nav: 'project-lifecycle' },
+  login('dev'),
   stage('development'),
   { sel: '[data-v35=open][data-kind=smoke]' },
   { select: { '#v35SmokeResult': smokeResult } },
@@ -27,32 +35,38 @@ const developerSubmitsForReview = (aiMode, smokeResult = '通过') => [
 ];
 
 const reviewerApproves = [
-  ...asRole('reviewer'),
+  login('reviewer'),
   stage('development'),
   { sel: '[data-v5=choose-task]' },
   { sel: '[data-v5=manual-open]' },
   { selectAll: { '#drawer select': '无新增问题' } },
   { sel: '[data-v5=manual-save]' },
-  { sel: '[data-v5=approve]' },
+  { sel: '[data-v5=approve]', toast: '正式检视通过' },
 ];
 
 const testerSubmitsReports = [
-  ...asRole('tester'),
+  login('qa'),
   stage('testing'),
   ...['smoke', 'single', 'long', 'system'].flatMap((kind) => [
     { sel: `[data-testing-section=${kind}]` },
     { sel: '[data-v54-report=new]' },
     { sel: '[data-v54-report=submit]' },
   ]),
+  { sel: '[data-approval-action=submit][data-stage=testing]', toast: '已提交测试审核' },
 ];
 
-const managerApprovesTesting = [
-  ...asRole('project'),
-  stage('planning'),
-  { sel: '[data-v54-stage=testing]' },
-];
-
-const closeProject = [
+const releaseAndClose = [
+  login('pjm'),
+  nav('project-lifecycle'),
+  stage('release'),
+  { sel: '[data-approval-action=submit][data-stage=release]', toast: '已提交发布评审' },
+  login('director'),
+  ...decideFirst('approve', '', '发布评审已通过'),
+  login('pjm'),
+  nav('project-lifecycle'),
+  stage('release'),
+  { sel: '[data-closing-section=versions]' },
+  { sel: '[data-v52-release=publish]', toast: '版本已发布' },
   stage('closing'),
   { sel: '[data-release-page-action=open-detail]' },
   { sel: '[data-release-drawer-action=submit]' },
@@ -61,22 +75,33 @@ const closeProject = [
 export const scenarios = [
   {
     name: '冒烟结果未通过时不能申请 AI 检视',
-    steps: [...developerSubmitsForReview('pass', '失败'), { sel: '[data-action=close-drawer]' }],
+    steps: [
+      ...developerSubmitsForReview('pass', '失败').slice(0, -1),
+      { check: '[data-v35=request-ai][disabled]' },
+      { sel: '[data-action=close-drawer]' },
+    ],
   },
   {
-    name: '主流程：开发 → AI 检视 → 专业检视 → 测试 → 发布 → 结项',
+    name: '主流程：开发 → 检视 → 测试审核（先退回）→ 发布评审 → 发布 → 结项',
     steps: [
       ...developerSubmitsForReview('pass'),
       { sel: '[data-v5=dev-submit]' },
       { sel: '[data-action=close-drawer]' },
       ...reviewerApproves,
       ...testerSubmitsReports,
-      ...managerApprovesTesting,
-      stage('release'),
-      { sel: '[data-closing-section=versions]' },
-      { sel: '[data-v52-release=review]' },
-      { sel: '[data-v52-release=publish]' },
-      ...closeProject,
+      login('testlead'),
+      ...decideFirst('reject', '', '退回时请填写审核意见'),
+      { fill: { '[data-approval-comment]': '整机报告缺少异常场景' } },
+      { sel: '[data-approval-action=confirm]', toast: '测试审核已退回' },
+      login('qa'),
+      stage('testing'),
+      { sel: '[data-approval-action=submit][data-stage=testing]', toast: '已提交测试审核' },
+      login('qalead'),
+      ...decideFirst('approve', '补充后通过', '测试审核已通过'),
+      ...releaseAndClose,
+      stage('planning'),
+      { check: '.lc-node.kind-end.is-done' },
+      { check: '[data-stage=closing].is-done' },
     ],
   },
   {
@@ -106,7 +131,7 @@ export const scenarios = [
       { sel: '[data-v35=request-ai]' },
       { sel: '[data-v5=dev-submit]' },
       { sel: '[data-action=close-drawer]' },
-      ...asRole('reviewer'),
+      login('reviewer'),
       stage('development'),
       { sel: '[data-v5=choose-task]' },
       { sel: '#appView input[type=checkbox]', nth: 0 },
@@ -116,51 +141,71 @@ export const scenarios = [
       { sel: '[data-v5=manual-open]' },
       { selectAll: { '#drawer select': '无新增问题' } },
       { sel: '[data-v5=manual-save]' },
-      { sel: '[data-v5=approve]' },
+      { sel: '[data-v5=approve]', toast: '正式检视通过' },
     ],
   },
   {
-    name: '新项目：立项 → 需求规格书 → 设计审批拦截 → 设计文档评审 → 设计阶段通过',
+    name: '新项目：立项审核 → 未开始阶段只读 → 需求审核（先退回）→ 设计文档逐份审核 → 设计阶段完成',
     steps: [
-      { role: 'project' },
-      { nav: 'portfolio' },
+      login('pjm'),
+      nav('portfolio'),
       { sel: '[data-action=open-project][data-project=gateway]' },
-      { nav: 'project-lifecycle' },
+      nav('project-lifecycle'),
+      stage('requirements'),
+      { sel: '[data-req-drawer-action=create]', toast: '仅可查看' },
       stage('planning'),
-      { sel: '[data-v47=approve-stage][data-stage=planning]' },
-      stage('planning'),
-      { sel: '[data-v47=approve-stage][data-stage=requirements]' },
-      stage('planning'),
-      { sel: '[data-v47=doc-open][data-doc=requirement]' },
-      { sel: '[data-v47=doc-save][data-close]' },
-      stage('planning'),
-      { sel: '[data-v47=approve-stage][data-stage=requirements]' },
-      stage('planning'),
-      { sel: '[data-v54-stage=design]' },
-      stage('design'),
+      { sel: '[data-approval-action=submit][data-stage=planning]', toast: '已提交立项审核' },
+      login('director'),
+      ...decideFirst('approve', '', '立项审核已通过'),
+      login('pm'),
+      nav('portfolio'),
+      { sel: '[data-action=open-project][data-project=gateway]' },
+      nav('project-lifecycle'),
+      stage('requirements'),
+      { sel: '[data-req-drawer-action=create]' },
+      { sel: '[data-req-action=submit]', toast: '已提交需求审核' },
+      login('rdlead'),
+      ...decideFirst('reject', '请补充验收标准', '需求审核已退回'),
+      login('pm'),
+      nav('project-lifecycle'),
+      stage('requirements'),
+      { sel: '[data-req-drawer-action=create]' },
+      { sel: '[data-req-action=submit]', toast: '已提交需求审核' },
+      login('rdlead'),
+      ...decideFirst('approve', '', '需求审核已通过'),
       ...['软件规格书', '概要设计', '详细设计'].flatMap((type) => [
+        login('pm'),
+        nav('project-lifecycle'),
+        stage('design'),
         { sel: `[data-design-category=${type}]` },
         { sel: '[data-design-page-action=create]' },
-        { sel: '[data-design-drawer-action=submit]' },
-        { select: { '#appView select[data-design-inline-field=status]': '评审通过' } },
+        { sel: '[data-design-drawer-action=submit]', toast: '已提交设计文档审核' },
+        login('director'),
+        ...decideFirst('approve', '', '设计文档审核已通过'),
       ]),
-      stage('planning'),
-      { sel: '[data-v54-stage=design]' },
-      stage('planning'),
+      login('pm'),
+      nav('project-lifecycle'),
+      { check: '[data-stage=design].is-done' },
+      { check: '[data-stage=development].is-current' },
     ],
   },
   {
-    name: '测试通过后一键发布并结项',
+    name: '发布评审退回后重新提交，发布并结项',
     steps: [
       ...developerSubmitsForReview('pass'),
       { sel: '[data-v5=dev-submit]' },
       { sel: '[data-action=close-drawer]' },
       ...reviewerApproves,
       ...testerSubmitsReports,
-      ...managerApprovesTesting,
-      stage('planning'),
-      { sel: '[data-v47=demo-release]' },
-      ...closeProject,
+      login('testlead'),
+      ...decideFirst('approve', '', '测试审核已通过'),
+      login('pjm'),
+      nav('project-lifecycle'),
+      stage('release'),
+      { sel: '[data-approval-action=submit][data-stage=release]', toast: '已提交发布评审' },
+      login('qalead'),
+      ...decideFirst('reject', '归档文档不完整', '发布评审已退回'),
+      ...releaseAndClose,
     ],
   },
 ];
@@ -168,13 +213,7 @@ export const scenarios = [
 function runStep(s) {
   const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
   const fire = (e, type) => e.dispatchEvent(new Event(type, { bubbles: true }));
-  if (s.role) {
-    const x = document.querySelector('#roleSelect');
-    if (!x) return 'NOT FOUND #roleSelect';
-    x.value = s.role;
-    fire(x, 'change');
-    return 'ok';
-  }
+  if (s.check) return document.querySelector(s.check) ? 'ok' : 'CHECK FAILED ' + s.check;
   if (s.nav) {
     document.querySelectorAll('[data-nav-group]').forEach((g) => {
       if (!g.closest('.nav-group.is-open')) g.click();
@@ -217,12 +256,16 @@ export async function runScenarios(url) {
       for (let i = 0; i < sc.steps.length; i++) {
         ctx.label = `${sc.name} #${i + 1}`;
         await tick(page);
-        const status = await page.evaluate(runStep, sc.steps[i]);
+        const step = sc.steps[i];
+        let status = await page.evaluate(step.login ? loginAs : runStep, step.login || step);
         await settle();
         const snap = await page.evaluate(snapshot);
+        // 预期提示：动作后应出现包含该文字的提示。
+        if (status === 'ok' && step.toast && !snap.toasts.some((t) => t.includes(step.toast)))
+          status = `EXPECTED TOAST「${step.toast}」，实际「${snap.toasts.join(' / ') || '无'}」`;
         steps.push({
           ctx: ctx.label,
-          act: JSON.stringify(sc.steps[i]),
+          act: JSON.stringify(step),
           status,
           toasts: snap.toasts,
           snap: hashSnapshot(snap),

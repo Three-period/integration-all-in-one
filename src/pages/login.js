@@ -4,7 +4,9 @@ import { ROLE_LABELS } from '../domain/permissions.js';
 import { esc } from '../core/dom.js';
 import { login } from '../core/auth.js';
 
-export function renderLogin() {
+/** 显示登录页；登录成功后移除登录页并调用 onLogin(user)。 */
+export function renderLogin(onLogin) {
+  document.querySelectorAll('.login-page').forEach((el) => el.remove());
   document.body.classList.add('is-login');
   const root = document.createElement('main');
   root.className = 'login-page';
@@ -47,7 +49,9 @@ export function renderLogin() {
       field('error').textContent = result.reason;
       return;
     }
-    window.location.reload();
+    root.remove();
+    document.body.classList.remove('is-login');
+    onLogin(result.user);
   });
   field('username').focus();
 }

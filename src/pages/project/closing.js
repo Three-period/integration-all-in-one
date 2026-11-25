@@ -1,80 +1,58 @@
-/** 结项阶段：结项申请、紧急下发与归档。 */
+/** 结项阶段：结项申请列表、详情抽屉与结项评审。 */
 import { App } from '../../core/app.js';
-import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
+import { closeDrawer, openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
-import { esc, tag } from '../../core/dom.js';
-import { testingOption } from './testing.js';
+import { $, esc, tag } from '../../core/dom.js';
 import { project, state } from '../../store/state.js';
 
 function closingInit() {
-  if (!state.closingSection) state.closingSection = 'emergency';
-  if (!state.closingEmergencyStatus) state.closingEmergencyStatus = '待审批';
-  if (!state.closingForms)
-    state.closingForms = {
-      ecn: {
-        id: 'ECN-202608-001',
-        title: '设备结构调整工程变更',
-        relatedVersion: 'V2.6',
-        status: '草稿',
-        changeContent: '填写工程变更内容',
-        impactScope: '填写影响范围与受影响模块',
-        reason: '填写变更原因',
-        approver: '研发总监',
-        plannedDate: '2026-08-20',
-        creator: '何盈',
-        created: '2026-08-16',
-      },
-      pcn: {
-        id: 'PCN-202608-001',
-        title: '测试环境配置过程变更',
-        relatedVersion: 'V2.6',
-        status: '草稿',
-        changeContent: '填写过程变更内容',
-        impactScope: '填写影响范围与受影响流程',
-        reason: '填写变更原因',
-        approver: '质量负责人',
-        plannedDate: '2026-08-20',
-        creator: '何盈',
-        created: '2026-08-16',
-      },
-    };
-  if (!state.closingArchiveRecords)
-    state.closingArchiveRecords = [
+  if (!state.releaseSection) state.releaseSection = 'closing';
+  if (!state.releaseQuery) state.releaseQuery = '';
+  if (!state.releaseStatusFilter) state.releaseStatusFilter = '全部';
+  if (!state.releaseFilterOpen) state.releaseFilterOpen = false;
+  if (state.releaseProjectId !== state.projectId) {
+    state.releaseProjectId = state.projectId;
+    state.releaseProjects = [
       {
-        name: 'ECN-202608-001 · 设备结构调整工程变更',
-        type: 'ECN',
-        version: 'V2.6',
-        status: '已归档',
-        owner: '何盈',
-        archived: '2026-08-16',
-      },
-      {
-        name: 'PCN-202608-001 · 测试环境配置过程变更',
-        type: 'PCN',
-        version: 'V2.6',
-        status: '已归档',
-        owner: '何盈',
-        archived: '2026-08-16',
-      },
-      {
-        name: '结项交付物清单 · ' + project().name,
-        type: '结项文档',
-        version: 'V2.6',
-        status: '待归档',
-        owner: '王凯',
-        archived: '-',
+        id: 'REL-' + project().code,
+        name: project().name,
+        expected: project().end,
+        actual: '-',
+        outputs: '0',
+        status: '进行中',
+        delivery: '待填写本项目结项交付物',
+        owner: project().owner,
+        review: '待提交',
       },
     ];
+    state.releaseSelected = state.releaseProjects[0].id;
+    state.releaseReviewDraft = {
+      summary: '',
+      achievements: '',
+      issues: '',
+      lessons: '',
+      actions: '',
+      status: '草稿',
+    };
+  }
+  if (!state.releaseSelected) state.releaseSelected = 'REL-001';
+  if (!state.releaseReviewDraft)
+    state.releaseReviewDraft = {
+      summary: '',
+      achievements: '',
+      issues: '',
+      lessons: '',
+      actions: '',
+    };
 }
-App.closingInit = closingInit;
 
 function closingStatusType(status) {
-  return status === '已归档' || status === '已通过'
+  return status === '已结项' || status === '已完成'
     ? 'green'
-    : status === '审批中' || status === '待审批'
+    : status === '待结项' || status === '待提交'
       ? 'orange'
-      : status === '已拒绝'
-        ? 'red'
+      : status === '进行中'
+        ? 'blue'
         : 'gray';
 }
 
@@ -84,44 +62,37 @@ function closingStatusTag(status) {
 
 function closingSubnav() {
   return (
-    '<aside class="closing-subnav"><div class="closing-subnav-head">发布阶段</div><button class="closing-create" data-closing-page-action="create">＋ 新建</button><button class="' +
-    (state.closingSection === 'ecn' ? 'active' : '') +
-    '" data-closing-page-action="section" data-closing-section="ecn">ECN 表单</button><button class="' +
-    (state.closingSection === 'pcn' ? 'active' : '') +
-    '" data-closing-page-action="section" data-closing-section="pcn">PCN 表单</button><button class="' +
-    (state.closingSection === 'archive' ? 'active' : '') +
-    '" data-closing-page-action="section" data-closing-section="archive">文档归档</button></aside>'
+    '<aside class="release-subnav"><div class="release-subnav-head">结项阶段</div><button class="release-create" data-release-page-action="create">＋ 新建</button><button class="' +
+    (state.releaseSection === 'closing' ? 'active' : '') +
+    '" data-release-page-action="section" data-release-section="closing">项目结项</button><button class="' +
+    (state.releaseSection === 'review' ? 'active' : '') +
+    '" data-release-page-action="section" data-release-section="review">项目复盘</button></aside>'
   );
 }
-App.closingSubnav = closingSubnav;
 
-function closingField(label, name, value, kind, values, wide, readonly) {
+function closingRows() {
+  closingInit();
+  var query = (state.releaseQuery || '').toLowerCase();
+  return state.releaseProjects.filter(function (item) {
+    var hit =
+      !query || (item.id + ' ' + item.name + ' ' + item.owner).toLowerCase().indexOf(query) > -1;
+    return (
+      hit && (state.releaseStatusFilter === '全部' || item.status === state.releaseStatusFilter)
+    );
+  });
+}
+
+function closingField(label, name, value, kind, wide) {
   var control =
-    kind === 'select'
-      ? '<select data-closing-input="' +
+    kind === 'area'
+      ? '<textarea data-release-input="' + name + '">' + esc(value || '') + '</textarea>'
+      : '<input ' +
+        (kind === 'date' ? 'type="date" ' : '') +
+        'data-release-input="' +
         name +
-        '"' +
-        (readonly ? ' disabled' : '') +
-        '>' +
-        testingOption(values || [], value) +
-        '</select>'
-      : kind === 'area'
-        ? '<textarea data-closing-input="' +
-          name +
-          '"' +
-          (readonly ? ' readonly' : '') +
-          '>' +
-          esc(value || '') +
-          '</textarea>'
-        : '<input ' +
-          (kind === 'date' ? 'type="date" ' : '') +
-          'data-closing-input="' +
-          name +
-          '" value="' +
-          esc(value || '') +
-          '"' +
-          (readonly ? ' readonly' : '') +
-          '>';
+        '" value="' +
+        esc(value || '') +
+        '">';
   return (
     '<div class="req-form-field ' +
     (wide ? 'full' : '') +
@@ -133,273 +104,258 @@ function closingField(label, name, value, kind, values, wide, readonly) {
   );
 }
 
-function closingCurrentForm(type) {
-  App.closingInit();
-  return state.closingForms[type];
+function closingDetailBody(item) {
+  return (
+    '<div class="req-form-heading"><div><strong>' +
+    esc(item.name) +
+    '</strong><small>' +
+    esc(item.id) +
+    ' · 项目结项详情</small></div>' +
+    closingStatusTag(item.status) +
+    '</div><div class="req-template"><div class="req-template-head">项目结项申请</div><div class="req-form-grid">' +
+    closingField('项目名称', 'name', item.name, 'text', false) +
+    closingField('预期完成时间', 'expected', item.expected, 'date', false) +
+    closingField('实际完成时间', 'actual', item.actual, 'date', false) +
+    closingField('交付产出数量', 'outputs', item.outputs, 'text', false) +
+    closingField('项目负责人', 'owner', item.owner, 'text', false) +
+    closingField('交付物清单', 'delivery', item.delivery, 'area', true) +
+    '</div></div><div class="detail-section"><h4>结项校验</h4><div class="notice ' +
+    (item.status === '已结项' ? 'success' : 'warn') +
+    '"><i>' +
+    (item.status === '已结项' ? '✓' : '!') +
+    '</i><span>' +
+    (item.status === '已结项'
+      ? '项目交付物已完成归档，可查看复盘报告。'
+      : '请补充实际完成时间、交付物清单，并完成相关审批后提交结项。') +
+    '</span></div></div>'
+  );
+}
+App.closingDetailBody = closingDetailBody;
+
+function closingDetailFoot() {
+  return '<button class="btn" data-release-drawer-action="cancel">取消</button><button class="btn" data-release-drawer-action="save">保存草稿</button><button class="btn primary" data-release-drawer-action="submit">提交结项</button>';
 }
 
-function closingFormPage(type) {
-  var form = closingCurrentForm(type);
-  var isEcn = type === 'ecn';
-  var title = isEcn ? 'ECN 工程变更通知' : 'PCN 过程变更通知';
-  var kind = isEcn ? 'ECN' : 'PCN';
+export function closingCurrent() {
+  closingInit();
+  if (state.releaseMode === 'create') {
+    if (!state.releaseDraft)
+      state.releaseDraft = {
+        id: 'NEW-RELEASE',
+        name: project().name,
+        expected: project().end,
+        actual: '-',
+        outputs: '0',
+        status: '草稿',
+        delivery: '填写交付物清单',
+        owner: '王凯',
+        review: '待提交',
+      };
+    return state.releaseDraft;
+  }
   return (
-    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>' +
-    title +
-    '</h3><p>' +
-    kind +
-    ' 详细表单 · 在线填写与审批留痕</p></div><div class="closing-panel-actions">' +
-    closingStatusTag(form.status) +
-    '<button class="btn" data-closing-page-action="section" data-closing-section="emergency">返回结项首页</button></div></div><div class="closing-form"><div class="req-form-grid">' +
-    closingField('表单编号', 'id', form.id, 'text', null, false, true) +
-    closingField('变更名称', 'title', form.title, 'text', null, false, false) +
-    closingField(
-      '关联版本',
-      'relatedVersion',
-      form.relatedVersion,
-      'select',
-      ['V2.6', 'V2.5'],
-      false,
-      false,
-    ) +
-    closingField(
-      '审批人',
-      'approver',
-      form.approver,
-      'select',
-      ['研发总监', '质量负责人', '项目负责人'],
-      false,
-      false,
-    ) +
-    closingField('计划生效日期', 'plannedDate', form.plannedDate, 'date', null, false, false) +
-    closingField('创建人', 'creator', form.creator, 'text', null, false, true) +
-    closingField('变更内容', 'changeContent', form.changeContent, 'area', null, true, false) +
-    closingField('影响范围', 'impactScope', form.impactScope, 'area', null, true, false) +
-    closingField('变更原因', 'reason', form.reason, 'area', null, true, false) +
-    '</div><div class="closing-form-section"><h4>审批记录</h4><div class="timeline"><div class="timeline-item"><b>表单已创建</b><small>' +
-    esc(form.created) +
-    ' · ' +
-    esc(form.creator) +
-    '</small></div><div class="timeline-item"><b>待提交审批</b><small>提交后将进入对应审批流程</small></div></div></div><div class="closing-form-actions"><button class="btn" data-closing-page-action="save-form" data-closing-type="' +
-    type +
-    '">保存草稿</button><button class="btn primary" data-closing-page-action="submit-form" data-closing-type="' +
-    type +
-    '">提交审批</button></div></div></section>'
+    state.releaseProjects.find(function (item) {
+      return item.id === state.releaseSelected;
+    }) || state.releaseProjects[0]
   );
 }
 
-function closingEmergencyHome() {
-  return (
-    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>发布管理</h3><p>完成ECN/PCN、发布审批、文档归档与版本发布。</p></div><div class="closing-panel-actions"><button class="btn warning" data-closing-page-action="open-emergency">紧急发布通道</button></div></div><div class="closing-emergency"><div class="closing-emergency-box"><strong>紧急发布通道</strong>用于在紧急场景下发起快速发布申请。填写发布内容并完成审批后，才可执行紧急下发。<div class="closing-emergency-meta"><div><span>审批状态</span><b>' +
-    closingStatusTag(state.closingEmergencyStatus) +
-    '</b></div><div><span>关联版本</span><b>V2.6</b></div><div><span>当前负责人</span><b>王凯</b></div></div></div><div class="closing-form-section"><h4>结项交付物概览</h4><div class="mini-list" style="padding:0"><div class="mini-list-row"><i class="mini-avatar">文</i><div class="grow"><strong>ECN / PCN 变更文档</strong><small>变更内容与审批记录已纳入归档范围</small></div>' +
-    closingStatusTag('已归档') +
-    '</div><div class="mini-list-row"><i class="mini-avatar">测</i><div class="grow"><strong>测试报告与版本基线</strong><small>测试阶段交付物，可在归档页统一查看</small></div>' +
-    closingStatusTag('待归档') +
-    '</div></div></div></div></section>'
+function openClosingDetail(id, mode) {
+  closingInit();
+  state.releaseMode = mode || 'edit';
+  if (state.releaseMode === 'create') state.releaseDraft = null;
+  state.releaseSelected = id || state.releaseSelected;
+  var item = closingCurrent();
+  openDrawer(
+    (state.releaseMode === 'create' ? '新建项目结项 · ' : '项目结项 · ') + item.name,
+    App.closingDetailBody(item),
+    closingDetailFoot(),
   );
+  $('#drawer').classList.add('req-drawer-large');
 }
 
-function closingEmergencyForm() {
-  var approved = state.closingEmergencyStatus === '已通过';
+function renderClosingList() {
+  var rows = closingRows();
+  var html = rows
+    .map(function (item) {
+      return (
+        '<tr data-release-page-action="open-detail" data-release-id="' +
+        esc(item.id) +
+        '"><td>' +
+        esc(item.id) +
+        '</td><td><button class="release-link" data-release-page-action="open-detail" data-release-id="' +
+        esc(item.id) +
+        '">' +
+        esc(item.name) +
+        '</button></td><td>' +
+        esc(item.expected) +
+        '</td><td>' +
+        esc(item.actual) +
+        '</td><td>' +
+        esc(item.outputs) +
+        '</td><td>' +
+        closingStatusTag(item.status) +
+        '</td><td>' +
+        esc(item.delivery) +
+        '</td><td><button class="op" data-release-page-action="open-detail" data-release-id="' +
+        esc(item.id) +
+        '">查看</button></td></tr>'
+      );
+    })
+    .join('');
   return (
-    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>紧急发布申请</h3><p>填写紧急发布单，审批通过后执行紧急下发。</p></div><div class="closing-panel-actions">' +
-    closingStatusTag(state.closingEmergencyStatus) +
-    '<button class="btn" data-closing-page-action="section" data-closing-section="emergency">返回</button></div></div><div class="closing-form"><div class="req-form-grid">' +
-    closingField('发布单编号', 'emergencyId', 'ERP-202608-001', 'text', null, false, true) +
-    closingField('关联版本', 'emergencyVersion', 'V2.6', 'select', ['V2.6', 'V2.5'], false, false) +
-    closingField(
-      '发布负责人',
-      'emergencyOwner',
-      '王凯',
-      'select',
-      ['王凯', '何盈', '赵敏'],
-      false,
-      false,
-    ) +
-    closingField('预计发布时间', 'emergencyDate', '2026-08-20', 'date', null, false, false) +
-    closingField(
-      '发布内容',
-      'emergencyContent',
-      '填写需要紧急下发的内容。',
-      'area',
-      null,
-      true,
-      false,
-    ) +
-    closingField(
-      '影响范围',
-      'emergencyScope',
-      '填写影响范围、风险与回滚方案。',
-      'area',
-      null,
-      true,
-      false,
-    ) +
-    '</div><div class="closing-form-section"><h4>审批说明</h4><div class="notice warn"><i>!</i><span>紧急下发属于高风险操作，必须完成审批后才可执行。</span></div></div><div class="closing-form-actions"><button class="btn" data-closing-page-action="section" data-closing-section="emergency">取消</button><button class="btn" data-closing-page-action="save-emergency">保存草稿</button><button class="btn primary" data-closing-page-action="submit-emergency">提交审批</button><button class="btn warning" data-closing-page-action="dispatch-emergency" ' +
-    (approved ? '' : 'disabled') +
-    '>紧急下发</button></div></div></section>'
-  );
-}
-App.closingEmergencyForm = closingEmergencyForm;
-
-function closingArchivePage() {
-  return (
-    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>文档归档</h3><p>统一归档 ECN、PCN、测试报告与结项交付物。</p></div><div class="closing-panel-actions"><button class="btn" data-closing-page-action="archive-all">批量归档</button></div></div><div class="closing-archive-wrap"><table class="closing-archive-table"><thead><tr><th>文档名称</th><th>类型</th><th>关联版本</th><th>归档状态</th><th>归档人</th><th>归档时间</th><th>操作</th></tr></thead><tbody>' +
-    state.closingArchiveRecords
-      .map(function (item) {
+    '<section class="release-panel"><div class="release-panel-head"><div><h3>项目结项</h3><p>管理项目结项申请、交付物清单与审批状态。</p></div><div class="release-actions"><button class="btn primary" data-release-page-action="create">＋ 新建结项</button></div></div><div class="release-toolbar"><input class="input search" data-release-search placeholder="搜索项目名称 / 项目编号 / 负责人" value="' +
+    esc(state.releaseQuery) +
+    '"><button class="btn" data-release-page-action="toggle-filter">筛选</button><select class="input" data-release-filter="status"><option>全部项目状态</option>' +
+    ['待结项', '进行中', '已结项']
+      .map(function (v) {
         return (
-          '<tr><td>' +
-          esc(item.name) +
-          '</td><td>' +
-          esc(item.type) +
-          '</td><td>' +
-          esc(item.version) +
-          '</td><td>' +
-          closingStatusTag(item.status) +
-          '</td><td>' +
-          esc(item.owner) +
-          '</td><td>' +
-          esc(item.archived) +
-          '</td><td><button class="op" data-closing-page-action="archive-view" data-closing-name="' +
-          esc(item.name) +
-          '">查看详情</button></td></tr>'
+          '<option ' + (state.releaseStatusFilter === v ? 'selected' : '') + '>' + v + '</option>'
         );
       })
       .join('') +
+    '</select><button class="btn" data-release-page-action="add-condition">＋ 添加条件</button><span class="push mini-note">共 ' +
+    rows.length +
+    ' 个项目</span></div>' +
+    (state.releaseFilterOpen
+      ? '<div class="release-filter-panel"><label>项目名称</label><select class="input"><option>全部项目</option>' +
+        state.releaseProjects
+          .map(function (item) {
+            return '<option>' + esc(item.name) + '</option>';
+          })
+          .join('') +
+        '</select><label>负责人</label><select class="input"><option>全部负责人</option><option>王凯</option><option>陈思</option><option>赵敏</option></select><button class="btn" data-release-page-action="reset">重置</button></div>'
+      : '') +
+    '<div class="release-table-wrap"><table class="release-table"><thead><tr><th>序号</th><th>项目名称</th><th>预期完成时间</th><th>实际完成时间</th><th>交付产出数量</th><th>结项状态</th><th>交付物清单</th><th>操作</th></tr></thead><tbody>' +
+    (html ||
+      '<tr><td colspan="8"><div class="release-empty">没有匹配的项目，请调整筛选条件。</div></td></tr>') +
     '</tbody></table></div></section>'
   );
 }
 
-function renderClosing() {
-  App.closingInit();
-  var body =
-    state.closingSection === 'ecn'
-      ? closingFormPage('ecn')
-      : state.closingSection === 'pcn'
-        ? closingFormPage('pcn')
-        : state.closingSection === 'archive'
-          ? closingArchivePage()
-          : state.closingSection === 'emergency-form'
-            ? App.closingEmergencyForm()
-            : closingEmergencyHome();
+function renderClosingReview() {
+  var d = state.releaseReviewDraft;
   return (
-    '<div class="closing-reference-page"><div class="closing-stage-layout">' +
-    App.closingSubnav() +
-    '<main class="closing-main">' +
+    '<section class="release-panel"><div class="release-panel-head"><div><h3>项目复盘</h3><p>在线填写复盘文档，沉淀项目经验、问题与改进措施。当前状态：' +
+    esc(d.status || '草稿') +
+    '</p></div><div class="release-actions"><button class="btn" data-release-page-action="review-save">保存草稿</button><button class="btn primary" data-release-page-action="review-submit">提交复盘</button></div></div><div class="release-review"><div class="release-review-editor"><div class="release-review-title"><span>项目复盘报告</span><span class="mini-note">在线文档 · 支持评论与版本留痕</span></div><div class="release-review-body"><div class="req-form-grid">' +
+    closingField('复盘项目', 'reviewProject', project().name, 'text', false) +
+    closingField('复盘负责人', 'reviewOwner', project().owner, 'text', false) +
+    closingField('项目总结', 'summary', d.summary, 'area', true) +
+    closingField('目标与成果', 'achievements', d.achievements, 'area', true) +
+    closingField('问题与风险回顾', 'issues', d.issues, 'area', true) +
+    closingField('经验沉淀', 'lessons', d.lessons, 'area', true) +
+    closingField('后续改进措施', 'actions', d.actions, 'area', true) +
+    '</div><div class="release-review-actions"><button class="btn" data-release-page-action="review-save">保存草稿</button><button class="btn primary" data-release-page-action="review-submit">提交复盘</button></div></div></div></div></section>'
+  );
+}
+App.renderClosingReview = renderClosingReview;
+
+function renderClosing() {
+  closingInit();
+  var body = state.releaseSection === 'review' ? App.renderClosingReview() : renderClosingList();
+  return (
+    '<div class="release-reference-page"><div class="release-stage-layout">' +
+    closingSubnav() +
+    '<main class="release-main">' +
     body +
     '</main></div></div>'
   );
 }
 App.renderClosing = renderClosing;
 
-/** 结项阶段交互 */
+/** 发布阶段交互 */
 export function bindClosingEvents() {
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-closing-page-action]');
+    var el = e.target.closest('[data-release-page-action]');
     if (!el) return;
     e.preventDefault();
     e.stopPropagation();
-    var action = el.dataset.closingPageAction;
+    var action = el.dataset.releasePageAction;
     if (action === 'section') {
-      state.closingSection = el.dataset.closingSection || 'emergency';
+      state.releaseSection = el.dataset.releaseSection || 'closing';
       App.render();
       return;
     }
     if (action === 'create') {
-      openModal(
-        'closing-create',
-        '新建发布相关表单',
-        '<div class="notice"><i>＋</i><span>请选择需要创建的变更表单类型。</span></div><div class="grid cols-2"><button class="btn" data-closing-page-action="choose-form" data-closing-type="ecn">新建 ECN 表单</button><button class="btn" data-closing-page-action="choose-form" data-closing-type="pcn">新建 PCN 表单</button></div>',
-        '<button class="btn" data-closing-page-action="modal-cancel">取消</button>',
-      );
+      state.releaseMode = 'create';
+      openClosingDetail(null, 'create');
       return;
     }
-    if (action === 'choose-form') {
-      document.querySelector('#modalRoot').classList.remove('show');
-      state.closingSection = el.dataset.closingType || 'ecn';
+    if (action === 'open-detail') {
+      state.releaseSelected = el.dataset.releaseId || state.releaseSelected;
+      openClosingDetail(state.releaseSelected, 'edit');
+      return;
+    }
+    if (action === 'toggle-filter') {
+      state.releaseFilterOpen = !state.releaseFilterOpen;
       App.render();
       return;
     }
-    if (action === 'modal-cancel') {
-      document.querySelector('#modalRoot').classList.remove('show');
-      return;
-    }
-    if (action === 'open-emergency') {
-      state.closingSection = 'emergency-form';
+    if (action === 'reset') {
+      state.releaseQuery = '';
+      state.releaseStatusFilter = '全部';
+      state.releaseFilterOpen = false;
       App.render();
       return;
     }
-    if (action === 'save-form' || action === 'submit-form') {
-      var type = el.dataset.closingType || 'ecn';
-      var form = closingCurrentForm(type);
-      document.querySelectorAll('[data-closing-input]').forEach(function (input) {
-        if (input.dataset.closingInput in form && !input.readOnly && !input.disabled)
-          form[input.dataset.closingInput] = input.value;
+    if (action === 'add-condition') {
+      showToast('已添加项目筛选条件');
+      return;
+    }
+    if (action === 'review-save' || action === 'review-submit') {
+      var d = state.releaseReviewDraft;
+      document.querySelectorAll('[data-release-input]').forEach(function (input) {
+        if (input.dataset.releaseInput in d) d[input.dataset.releaseInput] = input.value;
       });
-      if (action === 'submit-form') form.status = '待审批';
-      App.render();
-      showToast(action === 'submit-form' ? '变更表单已提交审批' : '变更表单草稿已保存');
-      return;
-    }
-    if (action === 'save-emergency') {
-      state.closingEmergencyStatus = '草稿';
-      App.render();
-      showToast('紧急发布单草稿已保存');
-      return;
-    }
-    if (action === 'submit-emergency') {
-      state.closingEmergencyStatus = '审批中';
-      App.render();
-      showToast('紧急发布单已提交审批');
-      return;
-    }
-    if (action === 'dispatch-emergency') {
-      if (state.closingEmergencyStatus !== '已通过') {
-        showToast('审批通过后才可紧急下发');
-        return;
-      }
-      showToast('紧急发布已下发');
-      return;
-    }
-    if (action === 'archive-all') {
-      state.closingArchiveRecords.forEach(function (r) {
-        r.status = '已归档';
-        r.archived = new Date().toISOString().slice(0, 10);
-        r.owner = '当前操作人';
-      });
-      App.render();
-      showToast('演示归档已完成，归档状态已更新');
-      return;
-    }
-    if (action === 'archive-view') {
-      openDrawer(
-        '文档详情 · ' + el.dataset.closingName,
-        '<div class="doc-preview"><h3>' +
-          esc(el.dataset.closingName) +
-          '</h3><p><b>归档状态：</b>' +
-          esc(
-            (
-              state.closingArchiveRecords.find(function (r) {
-                return r.name === el.dataset.closingName;
-              }) || {}
-            ).status || '待确认',
-          ) +
-          '</p><p><b>关联内容：</b>变更记录、审批记录、版本信息与交付物快照。</p></div>',
-        '<button class="btn" data-closing-page-action="close-drawer">关闭</button>',
-      );
-      return;
-    }
-    if (action === 'close-drawer') {
-      closeDrawer();
+      if (action === 'review-submit') d.status = '待评审';
+      showToast(action === 'review-submit' ? '项目复盘已提交' : '项目复盘草稿已保存');
       return;
     }
   });
+  document.addEventListener('input', function (e) {
+    if (e.target.matches('[data-release-search]')) {
+      state.releaseQuery = e.target.value;
+      App.render();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var filter = e.target.closest('[data-release-filter]');
+    if (filter) {
+      state.releaseStatusFilter = filter.value === '全部项目状态' ? '全部' : filter.value;
+      App.render();
+    }
+  });
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-closing-drawer-action]');
+    var el = e.target.closest('[data-release-drawer-action]');
     if (!el) return;
     e.preventDefault();
     e.stopPropagation();
-    if (el.dataset.closingDrawerAction === 'close') closeDrawer();
+    var item = closingCurrent();
+    if (el.dataset.releaseDrawerAction === 'cancel') {
+      closeDrawer();
+      return;
+    }
+    if (el.dataset.releaseDrawerAction === 'save' || el.dataset.releaseDrawerAction === 'submit') {
+      var body = document.querySelector('#drawerBody');
+      if (body)
+        body.querySelectorAll('[data-release-input]').forEach(function (input) {
+          if (input.dataset.releaseInput in item && !input.readOnly)
+            item[input.dataset.releaseInput] = input.value;
+        });
+      if (el.dataset.releaseDrawerAction === 'submit') item.status = '待结项';
+      if (state.releaseMode === 'create') {
+        item.id = 'REL-NEW-' + Date.now();
+        state.releaseProjects.unshift(Object.assign({}, item));
+        state.releaseSelected = item.id;
+        state.releaseDraft = null;
+        state.releaseMode = 'edit';
+      }
+      closeDrawer();
+      App.render();
+      showToast(
+        el.dataset.releaseDrawerAction === 'submit' ? '结项申请已提交' : '项目结项草稿已保存',
+      );
+    }
   });
 }

@@ -1,4 +1,5 @@
 /** 需求阶段：需求列表、筛选、详情与抽屉。 */
+import { submitStageApproval } from '../../features/stage-approval.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -99,6 +100,14 @@ function reqInit() {
   if (!state.reqDetailTab) state.reqDetailTab = 'detail';
   if (!state.reqColumns)
     state.reqColumns = ['需求ID', '需求名称', '状态', '优先级', '创建人', '分类'];
+}
+
+/** 提交需求：发起需求审核，推送给项目配置的审核角色。成功返回 true。 */
+function submitRequirement(record) {
+  if (!submitStageApproval('requirements', { recordId: record.id, title: record.title }))
+    return false;
+  record.status = '待评审';
+  return true;
 }
 
 export function reqRecord(id) {
@@ -573,7 +582,7 @@ export function bindRequirementDrawerEvents() {
     if (action === 'save' || action === 'submit') {
       collectRequirement();
       var isSubmit = action === 'submit';
-      if (isSubmit) reqRecord(state.reqSelected).status = '待评审';
+      if (isSubmit && !submitRequirement(reqRecord(state.reqSelected))) return;
       closeDrawer();
       App.render();
       showToast(isSubmit ? '需求已提交，进入评审准备' : '需求草稿已保存');
@@ -701,7 +710,7 @@ export function bindRequirementPageEvents() {
     }
     if (action === 'save' || action === 'submit' || action === 'create-and-continue') {
       collectInlineRequirement();
-      if (action === 'submit') reqRecord(state.reqSelected).status = '待评审';
+      if (action === 'submit' && !submitRequirement(reqRecord(state.reqSelected))) return;
       if (action === 'create-and-continue') {
         state.reqSelected = '1000xxx';
         state.reqDraftMode = true;

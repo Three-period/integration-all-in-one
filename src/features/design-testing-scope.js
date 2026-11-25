@@ -1,8 +1,8 @@
 /** 设计导航、可选测试报告、冒烟报告与用例选择（V53）。 */
+import { submitDesignRecord } from '../pages/project/design.js';
 import { App } from '../core/app.js';
 import { closeDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
-import { esc } from '../core/dom.js';
 import { projectDesignDocTypes } from './lifecycle-flow.js';
 import { isPriorDesignApproved as isPriorDesignApprovedRule } from '../domain/design.js';
 import { isTestKindEnabled as isTestKindEnabledRule } from '../domain/testing.js';
@@ -110,8 +110,9 @@ export function initDesignTestingScope() {
     r.id = 'DSN-NEW-' + Date.now();
     r.projectId = state.projectId;
     r.docType = state.designCategory;
-    r.status = mode === 'submit' ? '待评审' : '待开始';
     if (!r.title || r.title === '新建设计文档') r.title = r.docType;
+    if (mode === 'submit' && !submitDesignRecord(r)) return;
+    r.status = mode === 'submit' ? '待评审' : '待开始';
     state.designRecords.unshift(Object.assign({}, r, { comments: (r.comments || []).slice() }));
     state.designSelected = r.id;
     state.designDraft = null;
@@ -289,25 +290,6 @@ export function initDesignTestingScope() {
     }
     return html;
   };
-  var baseTestPanel = App.renderTestingReviewPanel;
-  App.renderTestingReviewPanel = function () {
-    var html = baseTestPanel(),
-      r = App.getTestReport('smoke');
-    var extra =
-      '<div class="kv"><label>冒烟测试报告</label><div>' +
-      esc(r.status || '草稿') +
-      '</div><small class="mini-note">' +
-      esc(r.commit || '尚未关联版本') +
-      '</small></div>';
-    html = html.replace('<div class="kv-grid">', '<div class="kv-grid">' + extra);
-    ['single', 'long'].forEach(function (k) {
-      if (!isTestKindEnabled(k)) {
-        var name = k === 'single' ? '单板测试报告' : '长运测试报告';
-        html = html.replace('<label>' + name + '</label>', '<label>' + name + '（不适用）</label>');
-      }
-    });
-    return html;
-  };
   document.addEventListener(
     'click',
     function (e) {
@@ -405,15 +387,6 @@ export function initDesignTestingScope() {
     },
     true,
   );
-  var baseReset = App.resetDemoData;
-  App.resetDemoData = function () {
-    baseReset();
-    if (state.designRecords === null) {
-      state.v53DesignByProject = null;
-      state.v53DesignLoadedProject = null;
-      state.v53CaseSelection = null;
-    }
-  };
   var style = document.createElement('style');
   style.textContent =
     '.req-category-nav .v53-doc-inactive{color:#a1a8b5!important;background:#f6f7f9!important}' +
