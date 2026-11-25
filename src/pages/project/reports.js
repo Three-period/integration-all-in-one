@@ -1,9 +1,10 @@
 /** 测试报告与发布版本记录（V37）。 */
+import { devReviewStore } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
-import { devReviewStore } from '../../features/dev-review.js';
+
 import { openTestingReportDrawer } from './testing.js';
 import { project, state } from '../../store/state.js';
 
@@ -159,7 +160,7 @@ function renderEmergencyReview() {
 function renderReleaseVersions() {
   App.closingInit();
   var r = state.v37Published && state.v37Published[state.projectId],
-    d = typeof devReviewStore !== 'undefined' && devReviewStore[state.projectId];
+    d = devReviewStore[state.projectId];
   return (
     '<section class="closing-panel"><div class="closing-panel-head"><div><h3>版本发布</h3><p>发布评审 / 文档归档 / 版本发布 · Mock 演示</p></div></div><div class="closing-form"><div class="notice">当前项目：' +
     esc(project().name) +

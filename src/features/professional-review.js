@@ -1,10 +1,10 @@
 /** 专业检视（V55）：30/70 卡片布局与 R3 出口流转到测试。 */
+import { getDevReview } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import {
   devBadge,
   devButton,
-  getDevReview,
   escText,
   logDevEvent,
   devPanel,

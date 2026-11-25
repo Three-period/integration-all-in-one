@@ -1,4 +1,5 @@
 /** 在线文档编辑器（V33）：生命周期表单中的富文本、评论与版本。 */
+import { onlineDocs } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from './toast.js';
 import { esc } from '../core/dom.js';
@@ -7,7 +8,6 @@ import { reqRecord } from '../pages/project/requirements.js';
 import { state } from '../store/state.js';
 
 /* V33: Mock document editor shared by lifecycle detail forms only. */
-const onlineDocs = Object.create(null);
 
 let enhancingDocFields = false;
 

@@ -1,4 +1,5 @@
 /** 检视流程 V5（V56）：开发与 AI 检视的作用域 Mock 工作流。 */
+import { devReviewStore, getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer } from '../../components/overlays.js';
 import { commonHead } from '../../components/shell.js';
@@ -7,24 +8,28 @@ import { esc } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { projects } from '../../data/projects.js';
 import {
-  getDevReview,
   logDevEvent,
   devPanel,
   nowStamp,
-  devReviewStore,
+  getDevReadiness,
+  isRecheckRun,
 } from '../../features/dev-review.js';
 import { getHandoffCommit, syncHandoff } from '../../features/version-anchor.js';
 import { project, state } from '../../store/state.js';
+import {
+  MANUAL_CHECKS as CHECKS,
+  REVIEW_CLOSED_STATUSES as CLOSED,
+  REVIEWER_ACTOR as ACTOR,
+  currentRun,
+  formalSubmitCheck,
+  humanItems,
+  isIssueEligible,
+  openItems,
+  reviewApprovalState,
+} from '../../domain/review-gates.js';
 
 let oldAI;
 let oldPerformAi;
-let oldRecheck;
-
-const CHECKS = ['高风险必查', 'AI 未有效覆盖', '独立抽检'];
-
-const CLOSED = ['已关闭', '已闭环', '授权例外', '已裁定无问题'];
-
-const ACTOR = '检视工程师';
 
 function h(v) {
   return esc(String(v == null ? '' : v));
@@ -34,37 +39,22 @@ function stamp() {
   return nowStamp();
 }
 
+/** 正式检视准出门禁（规则见 domain/review-gates.js）。 */
+function approvalState(d, m) {
+  return reviewApprovalState(d, m, state.role);
+}
+
+/** 开发能否提交正式人工检视申请。 */
+function canSubmit(d, m) {
+  return formalSubmitCheck(d, m, getDevReadiness());
+}
+
+function issueEligible(d, m, i) {
+  return isIssueEligible(chosenTask(m), i);
+}
+
 function data() {
   return getDevReview();
-}
-
-function currentRun(d) {
-  return (
-    (d.runs || [])
-      .slice()
-      .reverse()
-      .find(function (r) {
-        return r.commit === d.commit;
-      }) || null
-  );
-}
-
-function openItems(d) {
-  return (d.issues || []).filter(function (i) {
-    return CLOSED.indexOf(i.status) < 0;
-  });
-}
-
-function humanItems(d) {
-  return openItems(d).filter(function (i) {
-    return ['异议待裁定', '待人工处置', '待线下评审'].indexOf(i.status) >= 0;
-  });
-}
-
-function selfItems(d) {
-  return openItems(d).filter(function (i) {
-    return ['异议待裁定', '待人工处置', '待线下评审'].indexOf(i.status) < 0;
-  });
 }
 
 function newId(prefix, list) {
@@ -157,105 +147,6 @@ function model(d) {
     });
   }
   return m;
-}
-
-function approvalState(d, m) {
-  var process = m.process,
-    run = currentRun(d),
-    blockers = openItems(d),
-    missing = CHECKS.filter(function (k) {
-      return !(process && process.manualChecks[k] && process.manualChecks[k].completed);
-    });
-  var aiValid = !!(
-    run &&
-    run.result === '完成' &&
-    Array.isArray(run.checks) &&
-    run.checks.length > 0 &&
-    run.checks.every(function (c) {
-      return c.result === '通过';
-    })
-  );
-  // A failed AI run can only be cleared through explicit, recorded per-issue human
-  // "no issue" verdicts. It must never silently pass on missing checks or a new Commit.
-  var failedRunIssues = run
-    ? (d.issues || []).filter(function (i) {
-        return (i.run === run.id && i.source === 'AI 执行异常') || i.aiFailedRunId === run.id;
-      })
-    : [];
-  var manualResolution = !!(
-    process &&
-    run &&
-    run.result === '执行失败' &&
-    failedRunIssues.length > 0 &&
-    failedRunIssues.every(function (i) {
-      return (
-        CLOSED.includes(i.status) &&
-        (m.verdicts || []).some(function (v) {
-          return v.issueId === i.id && v.result === '无问题';
-        })
-      );
-    })
-  );
-  var hasTask = !!(process && process.firstFormalTaskId);
-  var gate1 = blockers.length === 0 && (aiValid || manualResolution),
-    gate2 = missing.length === 0;
-  return {
-    process: process,
-    gate1: gate1,
-    gate2: gate2,
-    passed: gate1 && gate2 && hasTask && state.role === 'reviewer' && !process.approval,
-    missing: missing,
-    blockers: blockers,
-    aiValid: aiValid || manualResolution,
-    aiManuallyResolved: manualResolution,
-    hasTask: hasTask,
-  };
-}
-
-function canSubmit(d, m) {
-  var run = currentRun(d),
-    ready = App.getDevReadiness(),
-    own = selfItems(d),
-    human = humanItems(d),
-    p = m.process;
-  if (!ready.commit || !ready.smoke || !ready.self)
-    return { ok: false, reason: '请先完成冒烟、自测并提交当前 Commit' };
-  if (!run) return { ok: false, reason: '当前 Commit 尚未生成 AI 检视批次' };
-  if (own.length)
-    return {
-      ok: false,
-      reason:
-        '仍有 ' +
-        own.length +
-        ' 条开发/AI可自主处理问题：' +
-        own
-          .map(function (x) {
-            return x.id;
-          })
-          .join('、'),
-    };
-  if (
-    run.result !== '完成' &&
-    !human.some(function (x) {
-      return x.status === '待人工处置';
-    })
-  )
-    return { ok: false, reason: 'AI 执行异常，请先重试或登记人工处置异常' };
-  if (!p) return { ok: true, type: '首次正式检视', issues: human };
-  var unsettled = human.filter(function (i) {
-    return !i.humanTaskId;
-  });
-  if (!unsettled.length)
-    return { ok: false, reason: '没有新增待人工介入问题，保留原检视过程，直接查看准出门禁' };
-  return {
-    ok: true,
-    type: unsettled.some(function (i) {
-      return i.source === 'AI 执行异常';
-    })
-      ? 'AI异常定向处置'
-      : '追加异议裁定',
-    issues: unsettled,
-  };
 }
 
 function createReview(d) {
@@ -355,16 +246,6 @@ function markTask(d, m) {
   ) {
     if (t.status !== '已返回整改') t.status = '处理中';
   } else if (t.status !== '已返回整改') t.status = '待处理';
-}
-
-function issueEligible(d, m, i) {
-  var t = chosenTask(m);
-  return !!(
-    t &&
-    t.issueIds.indexOf(i.id) >= 0 &&
-    ['异议待裁定', '待人工处置'].includes(i.status) &&
-    !i.meetingGroupId
-  );
 }
 
 function selectedIssues(d, m) {
@@ -1514,25 +1395,11 @@ export function initReviewProcess() {
     updateDevDrawer();
   };
   oldPerformAi = App.performAiReview;
-  oldRecheck = App.isRecheckRun;
-  App.isRecheckRun = function () {
-    var d = data();
-    return (
-      oldRecheck() ||
-      openItems(d).some(function (i) {
-        return (
-          ['待整改', '待复检'].includes(i.status) &&
-          i.commit !== d.commit &&
-          (i.source === '人工检视' || i.humanVerdictBy === ACTOR || i.meetingGroupId)
-        );
-      })
-    );
-  };
   App.performAiReview = function (mode) {
     var d = data(),
       oldRun = (currentRun(d) || {}).id || '',
       oldCount = d.issues.length;
-    var wasRecheck = App.isRecheckRun();
+    var wasRecheck = isRecheckRun();
     if (mode === 'pass' && wasRecheck) {
       // Recheck accepted issues; never close merely because Commit changed.
       d.issues.forEach(function (i) {

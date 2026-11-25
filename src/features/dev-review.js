@@ -1,50 +1,21 @@
 /** 开发阶段与 AI 代码检视（V35/V44-V46）：冒烟、自测、Commit、AI 检视与裁定。 */
+import { getDevPrep, getDevReview } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
+import {
+  devReadiness,
+  findCurrentRecord as findCurrentRecordRule,
+  isAiReviewClear as isAiReviewClearRule,
+  isFormalReviewReady as isFormalReviewReadyRule,
+  latestRun,
+  pendingIssues as pendingIssuesRule,
+} from '../domain/dev-review.js';
+import { isRecheckRun as isRecheckRunRule } from '../domain/review-gates.js';
 import { project, state } from '../store/state.js';
 
 /* V35: Same-task, same-developer, same-commit mock lifecycle for development & review. */
-export const devReviewStore = Object.create(null);
-
-export function getDevReview() {
-  var id = state.projectId || 'thermal';
-  if (!devReviewStore[id])
-    devReviewStore[id] = {
-      task: 'TASK-142',
-      developer: '孙宁',
-      role: 'developer',
-      tab: 'dev',
-      repo: project().repo,
-      branch: 'release/v2.6',
-      commit: '',
-      commits: [],
-      smokes: [],
-      selfTests: [],
-      inspections: [],
-      prep: null,
-      formalRequest: null,
-      runs: [],
-      issues: [],
-      manual: [],
-      disputes: [],
-      approval: null,
-      handoff: false,
-      section: 'overview',
-      reviewMode: 'todos',
-      reviewIssue: '',
-      log: [],
-      seq: 0,
-      smokeResult: '通过',
-      smokeText: '关键链路启动与基本功能检查完成。',
-      selfText: '已覆盖主要功能及异常分支，测试结果符合预期。',
-      selfComments: [],
-      selfFrozen: false,
-      aiMode: 'issues',
-    };
-  return devReviewStore[id];
-}
 
 export function logDevEvent(t) {
   var d = getDevReview();
@@ -64,39 +35,14 @@ export function nowStamp() {
 }
 
 function findCurrentRecord(list) {
-  var d = getDevReview();
-  return list
-    .slice()
-    .reverse()
-    .find(function (r) {
-      return r.commit === d.commit && r.owner === d.developer;
-    });
+  return findCurrentRecordRule(getDevReview(), list);
 }
 
-function getDevPrep() {
-  var d = getDevReview();
-  if (!d.prep || d.prep.owner !== d.developer)
-    d.prep = { owner: d.developer, smoke: null, self: null };
-  return d.prep;
+/** 当前项目提交 AI 检视的准入状态（规则见 domain/dev-review.js）。 */
+export function getDevReadiness() {
+  var dev = getDevReview();
+  return devReadiness(dev, getDevPrep());
 }
-
-function getDevReadiness() {
-  var d = getDevReview(),
-    p = getDevPrep();
-  var owner = d.commits.find(function (c) {
-    return c.commit === d.commit && c.owner === d.developer;
-  });
-  var smoke = !!(owner && findCurrentRecord(d.smokes)),
-    self = !!(owner && findCurrentRecord(d.selfTests));
-  return {
-    smoke: smoke,
-    self: self,
-    commit: !!d.commit && !!owner,
-    stageSmoke: !!p.smoke,
-    stageSelf: !!p.self,
-  };
-}
-App.getDevReadiness = getDevReadiness;
 
 function getPrepReadiness() {
   var p = getDevPrep();
@@ -104,36 +50,20 @@ function getPrepReadiness() {
 }
 
 export function latestAiRun() {
-  var d = getDevReview();
-  return d.runs
-    .slice()
-    .reverse()
-    .find(function (r) {
-      return r.commit === d.commit;
-    });
+  return latestRun(getDevReview());
 }
 
 export function pendingIssues() {
-  var d = getDevReview();
-  return d.issues.filter(function (i) {
-    return !['已关闭', '授权例外'].includes(i.status);
-  });
+  return pendingIssuesRule(getDevReview());
 }
 
 /* V46: a new Commit with acknowledged fixes is a reinspection, not another first inspection. */
-function isRecheckRun() {
-  var d = getDevReview();
-  return !!(
-    d.commit &&
-    d.issues.some(function (i) {
-      return i.source === 'AI 检视' && i.status === '待复检' && i.commit !== d.commit;
-    })
-  );
+export function isRecheckRun() {
+  return isRecheckRunRule(getDevReview());
 }
-App.isRecheckRun = isRecheckRun;
 
 function renderAiModePicker() {
-  var repeat = App.isRecheckRun();
+  var repeat = isRecheckRun();
   return (
     '<div class="v35-field"><label>模拟 AI 执行结果（仅演示）</label><select id="v35AiMode">' +
     (repeat
@@ -148,20 +78,11 @@ function renderAiModePicker() {
 }
 
 function isAiReviewClear() {
-  var r = latestAiRun();
-  return !!(
-    r &&
-    r.result === '完成' &&
-    r.checks.every(function (c) {
-      return c.result === '通过';
-    }) &&
-    pendingIssues().length === 0
-  );
+  return isAiReviewClearRule(getDevReview());
 }
 
 export function isFormalReviewReady() {
-  var d = getDevReview();
-  return !!(isAiReviewClear() && d.formalRequest && d.formalRequest.commit === d.commit);
+  return isFormalReviewReadyRule(getDevReview());
 }
 
 export function devBadge(label, cl) {
@@ -434,7 +355,7 @@ function renderCheckCard(c) {
 function openAiReviewDrawer() {
   var d = getDevReview(),
     r = latestAiRun(),
-    ready = App.getDevReadiness(),
+    ready = getDevReadiness(),
     can = ready.smoke && ready.self && ready.commit;
   var tabs =
     '<div class="v35-section-tabs">' +
@@ -945,12 +866,12 @@ function applyReviewVerdict(i, result, comment) {
 
 function performAiReview(mode) {
   var d = getDevReview(),
-    ready = App.getDevReadiness();
+    ready = getDevReadiness();
   if (!(ready.commit && ready.smoke && ready.self)) {
     showToast('准入失败：须依次完成冒烟、自测和 Commit', 'warn');
     return;
   }
-  var recheck = App.isRecheckRun(),
+  var recheck = isRecheckRun(),
     recheckIssues = d.issues.filter(function (i) {
       return i.source === 'AI 检视' && i.status === '待复检' && i.commit !== d.commit;
     });

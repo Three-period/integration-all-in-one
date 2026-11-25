@@ -1,15 +1,10 @@
 /** 阶段门禁、检视到测试的自动流转与集中审批面板（V48）。 */
+import { getDevReview, getFlow } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import {
-  getDevReview,
-  isFormalReviewReady,
-  logDevEvent,
-  pendingIssues,
-  nowStamp,
-} from './dev-review.js';
-import { designKeysForProject, getFlow, logFlowNote } from './lifecycle-flow.js';
+import { isFormalReviewReady, logDevEvent, pendingIssues, nowStamp } from './dev-review.js';
+import { designKeysForProject, logFlowNote, isStageDone } from './lifecycle-flow.js';
 import { project, state } from '../store/state.js';
 
 /** V48 阶段门禁与集中审批 */
@@ -45,10 +40,10 @@ export function initStageGate() {
     var f = getFlow(),
       active =
         ['planning', 'requirements', 'design', 'testing', 'release'].find(function (x) {
-          return !App.isStageDone(x);
+          return !isStageDone(x);
         }) || 'release';
     // For development phase, the reviewer's R3 action remains in the reviewer workspace.
-    if (App.isStageDone('design') && !App.isStageDone('development')) active = 'development';
+    if (isStageDone('design') && !isStageDone('development')) active = 'development';
     var btn = '';
     if (active === 'planning')
       btn =
@@ -90,7 +85,7 @@ export function initStageGate() {
     if (active === 'testing')
       btn = '<button class="v47-cta" data-v47="demo-testing">模拟整机测试报告审核通过</button>';
     if (active === 'release')
-      btn = App.isStageDone('release')
+      btn = isStageDone('release')
         ? '<span class="mini-note">所有流程审核已完成</span>'
         : '<button class="v47-cta" data-v47="demo-release">模拟发布评审、归档与正式发布</button>';
     var names = {
@@ -159,15 +154,6 @@ export function initStageGate() {
     },
     true,
   );
-  // Test handoff must be same approved commit, never a stale/mock-only state.
-  var oldDevDone = App.isStageDone;
-  App.isStageDone = function (k) {
-    if (k === 'development') {
-      var d = getDevReview();
-      return !!(d.approval && d.handoff && d.commit && d.approval.commit === d.commit);
-    }
-    return oldDevDone(k);
-  };
   // The existing five V47 cards were appended after unrelated content and may be hard to find.
   // Reposition them conspicuously at the top of the project analytics view, preserving data.
   var oldProjects = App.ops2Projects;

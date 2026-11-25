@@ -1,10 +1,11 @@
 /** 检视工程师任务入口与主管 AI 检视运营（V41）。 */
+import { devReviewStore, getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { commonHead } from '../../components/shell.js';
 import { esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { projects } from '../../data/projects.js';
-import { getDevReview, devReviewStore } from '../../features/dev-review.js';
+
 import { ops2Metric } from '../operations.js';
 import { state } from '../../store/state.js';
 

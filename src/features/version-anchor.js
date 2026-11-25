@@ -1,14 +1,22 @@
 /** 跨阶段 Commit 锚点（V52）：测试、发布、结项绑定同一提测版本。 */
+import {
+  devReviewStore,
+  getDevReview,
+  getFlow,
+  getVersionAnchor,
+  versionAnchorStore,
+} from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { getDevReview, nowStamp, devReviewStore } from './dev-review.js';
-import { getFlow, logFlowNote } from './lifecycle-flow.js';
+import { nowStamp } from './dev-review.js';
+import { logFlowNote } from './lifecycle-flow.js';
 import { getDevRecord, baseRenderTesting, baseSaveTestReport } from './stage-progress.js';
 import { releaseCurrent } from '../pages/project/release.js';
+import { computeReleaseGate } from '../domain/release-gate.js';
+import { isHandoffReady } from '../domain/stages.js';
 import { project, state } from '../store/state.js';
 
-let baseIsStageDone;
 let originalSaveTestReport;
 export let originalRenderTesting;
 let baseReleaseDetailBody;
@@ -16,28 +24,11 @@ let baseSeedDemoScenario;
 let baseResetDemoData;
 
 /* V52: unified cross-stage commit anchor and test/release/closing gates */
-const versionAnchorStore = Object.create(null);
-
-export function getVersionAnchor(pid) {
-  pid = pid || state.projectId;
-  if (!versionAnchorStore[pid])
-    versionAnchorStore[pid] = {
-      handoffCommit: '',
-      handoffVersion: '',
-      handoffAt: '',
-      history: [],
-      testReview: null,
-      releaseReview: null,
-      published: null,
-      closingCommit: '',
-    };
-  return versionAnchorStore[pid];
-}
 
 export function syncHandoff() {
   var d = getDevReview(),
     x = getVersionAnchor();
-  if (d.handoff && d.approval && d.commit && d.approval.commit === d.commit) {
+  if (isHandoffReady(d)) {
     if (x.handoffCommit !== d.approval.commit) {
       if (x.handoffCommit)
         x.history.unshift({
@@ -68,25 +59,24 @@ export function getHandoffCommit() {
   return syncHandoff();
 }
 
+/** 当前项目的版本门禁（规则见 domain/release-gate.js）；读取前会先同步提测 Commit。 */
 export function getReleaseGate() {
-  var x = getVersionAnchor(),
-    commit = getHandoffCommit(),
-    tr = x.testReview,
-    rr = x.releaseReview,
-    pub = x.published;
-  var testPass = !!(commit && tr && tr.status === '审核通过' && tr.commit === commit);
-  var releasePass = !!(testPass && rr && rr.status === '已通过' && rr.commit === commit);
-  var published =
-    releasePass && pub && pub.status === '已发布' && pub.commit === commit ? pub : null;
+  var anchor = getVersionAnchor();
+  return computeReleaseGate(anchor, getHandoffCommit());
+}
+
+/** 跨阶段汇总：提测 Commit、开发记录、系统测试报告与测试 / 发布状态。 */
+export function getStageStatus() {
+  var z = getReleaseGate(),
+    dev = getDevRecord(),
+    report = App.getTestReport('system');
   return {
-    commit: commit,
-    version: x.handoffVersion,
-    testReview: tr,
-    testPass: testPass,
-    releaseReview: rr,
-    releasePass: releasePass,
-    published: published,
-    closingCommit: x.closingCommit,
+    dev: dev,
+    commit: z.commit || null,
+    report: report,
+    testPass: z.testPass,
+    published: z.published,
+    review: z.releaseReview,
   };
 }
 
@@ -185,30 +175,6 @@ function renderAnchoredReleaseVersions() {
 
 /** V52 跨阶段 Commit 锚点与测试/发布/结项门禁 */
 export function initVersionAnchor() {
-  App.getStageStatus = function () {
-    var z = getReleaseGate(),
-      dev = getDevRecord(),
-      report = App.getTestReport('system');
-    return {
-      dev: dev,
-      commit: z.commit || null,
-      report: report,
-      testPass: z.testPass,
-      published: z.published,
-      review: z.releaseReview,
-    };
-  };
-  baseIsStageDone = App.isStageDone;
-  App.isStageDone = function (k) {
-    if (k === 'development') return !!getHandoffCommit();
-    if (k === 'testing') return !!getReleaseGate().testPass;
-    if (k === 'release') return !!getReleaseGate().published;
-    if (k === 'closing') {
-      var z = getReleaseGate();
-      return !!(z.published && z.closingCommit && z.closingCommit === z.commit);
-    }
-    return baseIsStageDone(k);
-  };
   /* Reports are outputs. Bind every saved/submitted report to the immutable handoff Commit. */
   originalSaveTestReport = baseSaveTestReport;
   App.saveTestReport = function (submit) {

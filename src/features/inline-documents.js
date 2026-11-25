@@ -1,8 +1,9 @@
 /** 需求 / 设计抽屉内联文档（V47）。 */
+import { getFlow, stageDocs } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { stageDocs, getFlow, logFlowNote } from './lifecycle-flow.js';
+import { logFlowNote } from './lifecycle-flow.js';
 import { state } from '../store/state.js';
 
 let baseReqDetailTabBody;

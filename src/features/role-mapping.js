@@ -1,6 +1,7 @@
 /** 规范角色映射与测试阶段渲染（V55.5）。 */
+import { getDevReview } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
-import { getDevReview } from './dev-review.js';
+
 import { renderVersionBanner } from './version-anchor.js';
 import { renderTestingDefects } from '../pages/project/testing.js';
 import { state } from '../store/state.js';

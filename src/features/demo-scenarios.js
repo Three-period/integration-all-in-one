@@ -1,8 +1,9 @@
 /** Mock 演示场景（V39）：一键载入不同阶段的演示数据。 */
+import { devReviewStore, getDevReview } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { getDevReview, devReviewStore } from './dev-review.js';
+
 import { state } from '../store/state.js';
 
 let baseRenderLifecycle;
@@ -32,7 +33,7 @@ function renderScenarioPanel() {
 
 function seedDemoScenario(key) {
   var pid = state.projectId;
-  if (typeof devReviewStore !== 'undefined') delete devReviewStore[pid];
+  delete devReviewStore[pid];
   if (state.v37Reports) delete state.v37Reports[pid];
   if (state.v37Published) delete state.v37Published[pid];
   if (state.v37PublishReview) delete state.v37PublishReview[pid];

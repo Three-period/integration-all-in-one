@@ -1,9 +1,10 @@
 /** 检视证据抽屉与分类资产列表（V43）。 */
+import { getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
-import { getDevReview, latestAiRun } from '../../features/dev-review.js';
+import { latestAiRun } from '../../features/dev-review.js';
 import { project } from '../../store/state.js';
 
 /* V43: Reviewer evidence drawers + categorized asset lists, isolated incremental patch */

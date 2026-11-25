@@ -1,9 +1,15 @@
 /** 开发阶段：开发报告与仓库信息。 */
+import { getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc, tag } from '../../core/dom.js';
-import { devBadge, getDevReview, latestAiRun, pendingIssues } from '../../features/dev-review.js';
+import {
+  devBadge,
+  latestAiRun,
+  pendingIssues,
+  getDevReadiness,
+} from '../../features/dev-review.js';
 import { project, state } from '../../store/state.js';
 
 function developmentInit() {
@@ -192,7 +198,7 @@ function saveDevelopmentReport(mode) {
 
 function renderDevelopment() {
   var d = getDevReview(),
-    ready = App.getDevReadiness(),
+    ready = getDevReadiness(),
     r = latestAiRun();
   var nav =
     '<div class="v35-tabs">' +

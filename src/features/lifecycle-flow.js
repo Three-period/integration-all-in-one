@@ -1,16 +1,24 @@
 /** 统一 Mock 生命周期（V47）：阶段流转、角色门禁、项目创建与运营数据。 */
+import { devReviewStore, flowStore, getDevReview, getFlow, stageDocs } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import { projects } from '../data/projects.js';
-import { getDevReview, latestAiRun, devReviewStore } from './dev-review.js';
+import { latestAiRun } from './dev-review.js';
+import { getReleaseGate, getStageStatus } from './version-anchor.js';
+import {
+  STAGE_LABELS,
+  STAGE_ORDER,
+  designKeysFor,
+  isStageDone as isStageDoneRule,
+  isStagePrereqMet as isStagePrereqMetRule,
+} from '../domain/stages.js';
 import { project, state } from '../store/state.js';
 
 let initialProjects;
 let baseRenderProjectBasic;
 let baseRenderSidebar;
-let baseDevReadiness;
 let baseDevSummaryCard;
 let baseRenderDevelopment;
 
@@ -22,55 +30,29 @@ let baseOpsTabs;
 let baseRenderRequirements;
 let baseRenderDesign;
 
-const flowStore = Object.create(null);
-
-export const stageDocs = Object.create(null);
-
 /* V55.4: the built-in thermal demo starts at development; an explicit Mock reset still starts from planning. */
-const DEFAULT_DEMO_STEPS = { planning: true, requirements: true, design: true };
-
-const STAGE_ORDER = ['planning', 'requirements', 'design', 'development', 'testing', 'release'];
-
-const STAGE_LABELS = {
-  planning: '项目立项',
-  requirements: '需求阶段',
-  design: '设计阶段',
-  development: '开发阶段',
-  testing: '测试阶段',
-  release: '发布阶段',
-};
-
-export function getFlow() {
-  var k = state.projectId;
-  if (!flowStore[k])
-    flowStore[k] = {
-      steps: k === 'thermal' ? Object.assign({}, DEFAULT_DEMO_STEPS) : {},
-      docs: {},
-      history: [],
-      created: false,
-      version: 'V1.0',
-      designType: 'II',
-    };
-  return flowStore[k];
-}
 
 export function logFlowNote(msg) {
   getFlow().history.unshift({ at: new Date().toLocaleString('zh-CN'), text: msg });
 }
 
-function isStageDone(k) {
-  var f = getFlow(),
-    x = f.steps;
-  if (k === 'development') return !!(getDevReview().handoff && getDevReview().approval);
-  if (k === 'testing') return !!App.getStageStatus().testPass;
-  if (k === 'release') return !!App.getStageStatus().published;
-  return !!x[k];
+/** 当前项目某阶段是否已完成（规则见 domain/stages.js），只读取该阶段需要的数据。 */
+export function isStageDone(stage) {
+  return isStageDoneRule(stage, {
+    get flowSteps() {
+      return getFlow().steps;
+    },
+    get dev() {
+      return getDevReview();
+    },
+    get gate() {
+      return getReleaseGate();
+    },
+  });
 }
-App.isStageDone = isStageDone;
 
-export function isStagePrereqMet(k) {
-  var i = STAGE_ORDER.indexOf(k);
-  return i === 0 || App.isStageDone(STAGE_ORDER[i - 1]);
+export function isStagePrereqMet(stage) {
+  return isStagePrereqMetRule(stage, isStageDone);
 }
 
 function renderProjectFormFields(p) {
@@ -247,15 +229,15 @@ function renderStagePanel() {
     k = cur === 'closing' ? 'release' : cur;
   if (!STAGE_LABELS[k]) return '';
   var prior = isStagePrereqMet(k),
-    done = App.isStageDone(k),
+    done = isStageDone(k),
     steps = STAGE_ORDER.map(function (n) {
       return (
         '<span class="v47-step ' +
-        (App.isStageDone(n) ? 'ok' : '') +
+        (isStageDone(n) ? 'ok' : '') +
         '">' +
         esc(STAGE_LABELS[n]) +
         ' · ' +
-        (App.isStageDone(n) ? '已完成' : '待完成') +
+        (isStageDone(n) ? '已完成' : '待完成') +
         '</span>'
       );
     }).join('');
@@ -318,14 +300,7 @@ function renderStagePanel() {
 App.renderStagePanel = renderStagePanel;
 
 export function designKeysForProject() {
-  return (
-    {
-      I: ['architecture', 'summarydesign', 'detaildesign'],
-      II: ['summarydesign', 'detaildesign'],
-      III: ['detaildesign'],
-      IV: [],
-    }[getFlow().designType] || ['summarydesign', 'detaildesign']
-  );
+  return designKeysFor(getFlow().designType);
 }
 
 function approveStage(k) {
@@ -399,7 +374,7 @@ function runTestingDemo() {
 App.runTestingDemo = runTestingDemo;
 
 function runReleaseDemo() {
-  var z = App.getStageStatus(),
+  var z = getStageStatus(),
     p = project();
   if (!isStagePrereqMet('release') || !z.testPass) {
     showToast('整机测试报告未审核通过，无法发布', 'warn');
@@ -599,17 +574,6 @@ export function initLifecycleFlow() {
         'beforeend',
         '<div style="margin-top:auto;padding-top:15px"><button class="v47-reset" data-v47="reset">↺ 重置 Mock 演示数据</button></div>',
       );
-  };
-  baseDevReadiness = App.getDevReadiness;
-  App.getDevReadiness = function () {
-    var r = baseDevReadiness(),
-      d = getDevReview();
-    if (d.v47NeedsNewCommit) {
-      r.smoke = false;
-      r.self = false;
-      r.commit = false;
-    }
-    return r;
   };
   baseDevSummaryCard = App.renderDevSummaryCard;
   App.renderDevSummaryCard = function (title, status, note, type, badge) {

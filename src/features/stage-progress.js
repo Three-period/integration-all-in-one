@@ -1,8 +1,10 @@
 /** 跨阶段共享状态与按项目隔离的业务底稿（V38）。 */
+import { getStageStatus } from './version-anchor.js';
+import { devReviewStore } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { devReviewStore } from './dev-review.js';
+
 import { project, state } from '../store/state.js';
 
 let baseClosingInit;
@@ -17,27 +19,8 @@ let baseTestingDefectRows;
 
 /* V38 跨阶段 Mock 共享状态：不增加角色权限、不对接真实服务 */
 export function getDevRecord() {
-  return (typeof devReviewStore === 'object' && devReviewStore[state.projectId]) || null;
+  return devReviewStore[state.projectId] || null;
 }
-
-function getStageStatus() {
-  var dev = getDevRecord(),
-    report = App.getTestReport('system');
-  return {
-    dev: dev,
-    commit: dev && dev.handoff ? dev.commit : null,
-    report: report,
-    testPass: !!(
-      dev &&
-      dev.handoff &&
-      report.status === '审核通过' &&
-      report.commit === dev.commit
-    ),
-    published: state.v37Published && state.v37Published[state.projectId],
-    review: state.v37PublishReview && state.v37PublishReview[state.projectId],
-  };
-}
-App.getStageStatus = getStageStatus;
 
 function renderStepBanner() {
   return '';
@@ -144,7 +127,7 @@ export function initStageProgress() {
   baseReleaseVersions = App.renderReleaseVersions;
   App.renderReleaseVersions = function () {
     var html = baseReleaseVersions(),
-      z = App.getStageStatus();
+      z = getStageStatus();
     var prerequisite =
       '<div class="notice ' +
       (z.commit && z.testPass ? 'success' : 'warn') +
@@ -166,7 +149,7 @@ export function initStageProgress() {
     function (e) {
       var b = e.target.closest('[data-v37-publish="publish"]');
       if (!b) return;
-      var z = App.getStageStatus();
+      var z = getStageStatus();
       if (!z.commit || !z.testPass) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -180,7 +163,7 @@ export function initStageProgress() {
     function (e) {
       var b = e.target.closest('[data-release-drawer-action="submit"]');
       if (!b || state.lifecycleStage !== 'closing') return;
-      var z = App.getStageStatus();
+      var z = getStageStatus();
       if (!z.published) {
         e.preventDefault();
         e.stopImmediatePropagation();

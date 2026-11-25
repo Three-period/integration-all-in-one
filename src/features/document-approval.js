@@ -1,14 +1,19 @@
 /** 文档驱动的阶段审批与报告列表（V54）。 */
+import { getFlow, getVersionAnchor } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { closeDrawer, openDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { nowStamp } from './dev-review.js';
-import { designKeysForProject, getFlow, logFlowNote, isStagePrereqMet } from './lifecycle-flow.js';
+import {
+  designKeysForProject,
+  logFlowNote,
+  isStagePrereqMet,
+  isStageDone,
+} from './lifecycle-flow.js';
 import {
   originalRenderTesting,
   getHandoffCommit,
-  getVersionAnchor,
   getReleaseGate,
   renderVersionBanner,
 } from './version-anchor.js';
@@ -471,7 +476,7 @@ export function initDocumentApproval() {
     var active =
       ['planning', 'requirements', 'design', 'development', 'testing', 'release'].find(
         function (k) {
-          return !App.isStageDone(k);
+          return !isStageDone(k);
         },
       ) || 'complete';
     if (active === 'design' && !isStagePrereqMet('design')) active = 'requirements';
