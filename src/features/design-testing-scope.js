@@ -3,8 +3,10 @@ import { App } from '../core/app.js';
 import { closeDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
-import { designKeysForProject } from './lifecycle-flow.js';
-import { collectDesign } from '../pages/project/design.js';
+import { projectDesignDocTypes } from './lifecycle-flow.js';
+import { isPriorDesignApproved as isPriorDesignApprovedRule } from '../domain/design.js';
+import { isTestKindEnabled as isTestKindEnabledRule } from '../domain/testing.js';
+import { collectDesign, isDesignLocked } from '../pages/project/design.js';
 import { testingCaseRows } from '../pages/project/testing.js';
 import { project, state } from '../store/state.js';
 
@@ -13,31 +15,13 @@ export function initDesignTestingScope() {
   /* V53.0: scoped design navigation, optional test reports, smoke report, case selection.
    Preserve I/II/III/IV branch definitions, stage gate and Commit handoff. */
 
-  function applicableDesignTypes() {
-    var names = {
-      architecture: '软件架构设计',
-      summarydesign: '概要设计',
-      detaildesign: '详细设计',
-    };
-    return ['软件规格书'].concat(
-      designKeysForProject()
-        .map(function (x) {
-          return names[x];
-        })
-        .filter(Boolean),
-    );
-  }
   function isDesignTypeApplicable(type) {
-    return applicableDesignTypes().indexOf(type) !== -1;
+    return projectDesignDocTypes().indexOf(type) !== -1;
   }
   function isPriorDesignApproved(type) {
-    var order = applicableDesignTypes(),
-      idx = order.indexOf(type);
-    if (idx < 0) return false;
-    if (idx === 0) return true;
-    App.designInit();
-    return state.designRecords.some(function (r) {
-      return r.docType === order[idx - 1] && ['评审通过', '已结束'].indexOf(r.status) >= 0;
+    return isPriorDesignApprovedRule(type, projectDesignDocTypes(), function () {
+      App.designInit();
+      return state.designRecords;
     });
   }
   var initDesign = App.designInit;
@@ -81,19 +65,10 @@ export function initDesignTestingScope() {
     }
     return record;
   };
-  var baseLocked = App.designIsLocked;
-  App.designIsLocked = function (record) {
-    return !!(
-      baseLocked(record) ||
-      state.designCategory === '全部' ||
-      (record &&
-        (!isDesignTypeApplicable(record.docType) || !isPriorDesignApproved(record.docType)))
-    );
-  };
   var baseDetail = App.designDetailPanel;
   App.designDetailPanel = function (record) {
     var html = baseDetail(record);
-    if (state.designDrawerMode === 'create' || App.designIsLocked(record))
+    if (state.designDrawerMode === 'create' || isDesignLocked(record))
       html = html.replace(/<select(?=[^>]*data-design-input="docType")/g, '<select disabled');
     if (
       state.designCategory === '全部' ||
@@ -152,7 +127,7 @@ export function initDesignTestingScope() {
     App.designInit();
     var html = baseDesignRender(),
       current = state.designCategory,
-      allowed = applicableDesignTypes();
+      allowed = projectDesignDocTypes();
     html = html.replace(
       /(<button class=")([^"]*)(" data-design-page-action="category" data-design-category=")([^"]+)(")/g,
       function (_, a, classes, b, kind, c) {
@@ -242,9 +217,7 @@ export function initDesignTestingScope() {
   );
 
   function isTestKindEnabled(kind) {
-    if (kind === 'single') return project().needsSingleTest !== '否';
-    if (kind === 'long') return project().needsLongTest !== '否';
-    return true;
+    return isTestKindEnabledRule(project(), kind);
   }
   var baseForm = App.renderProjectFormFields;
   App.renderProjectFormFields = function (p, mode) {

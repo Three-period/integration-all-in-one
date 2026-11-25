@@ -10,7 +10,13 @@ pnpm dev          # 本地开发（热更新）
 pnpm build        # 生产构建，输出到 dist/
 pnpm lint         # ESLint 检查
 pnpm format       # Prettier 格式化
+pnpm test         # 业务规则单元测试（Vitest）
+pnpm test:regression                    # 行为回归：与上一次提交对比
+pnpm test:regression -- --base <ref>    # 与指定提交 / 分支对比
+pnpm test:regression -- --no-shots      # 跳过截图对比，速度更快
 ```
+
+回归测试会自动构建对照版本和当前工作区，然后做三类比对：按角色和页面遍历点击、4 条业务主流程场景、页面截图。需要本机安装 Chrome 或 Chromium，也可以用 `CHROME_PATH` 指定浏览器路径。这些工具只是开发依赖，不影响 `pnpm dev` 和 `pnpm build`。
 
 ## 目录结构
 
@@ -20,12 +26,15 @@ src/
   main.js             入口：引入样式，并按固定顺序执行各模块的 init 步骤
   core/               基础设施：App 扩展点、DOM 工具、视图切换
   data/               Mock 数据：项目、角色与权限、资产
-  store/              全局状态与工作台布局持久化
+  domain/             业务规则（纯函数，可单元测试）：阶段流转、版本门禁、开发检视、设计、测试、检视门禁
+  store/              全局界面状态、工作台布局，以及按项目隔离的生命周期业务数据（lifecycle.js）
   components/         通用 UI：外壳导航、弹窗/抽屉、提示、个人菜单、文档编辑器
   app/                根渲染、全局事件分发、启动
   pages/              页面：工作台、项目集、项目（各生命周期阶段）、项目调整、运营、资产、检视
   features/           跨页面的业务流程：阶段流转与门禁、AI 检视、版本锚点、审批等
   styles/             样式，按 main.js 中的引入顺序层叠
+tests/domain/         业务规则单元测试
+tools/regression/     行为回归工具
 ```
 
 ## 关键约定
@@ -45,12 +54,14 @@ App.renderTesting = function () {
 
 不会被覆盖的函数直接通过 `import` 使用。
 
+**业务规则放在 `domain/`。** 规则函数只接收数据、返回结果，不读写全局状态。`features/` 和 `pages/` 中保留薄适配层，负责读取当前项目的数据，再调用规则。部分数据在首次读取时会创建默认值，提测 Commit 在读取门禁前会先同步，所以适配层用 getter 按需取数，保证取数时机和原来一致。
+
 ## 重构说明
 
 本项目由单文件原型（`index.html` + `review-v5.js`）重构而来。重构前后用无头浏览器做了对比验证：6 个角色 × 所有导航入口与页内 Tab，共 3,282 步交互的 DOM 快照完全一致，168 个页面截图像素一致，且没有新增运行时错误。
 
 各 `features/` 模块头部和 `bootSequence` 注释中保留了来源版本号（如 V48、V54），方便追溯。下一阶段建议：
 
-1. 将 `App` 上的多层包装链逐页合并为单一实现，减少扩展点数量。
-2. 把分散在 `features/` 中的业务规则（阶段门禁、审批、检视闭环）抽成不依赖 DOM 的纯函数，补充单元测试。
-3. 将分散的事件监听收敛为基于 `data-action` 的统一分发表。
+- 阶段 A（已完成）：业务规则抽到 `domain/` 并补单元测试；5 类按项目隔离的数据合并到 `store/lifecycle.js`；带版本号的标识符统一改为语义命名。
+- 阶段 B：将 `App` 上的多层包装链逐页合并为单一实现，减少扩展点数量。
+- 阶段 C：将分散的事件监听收敛为基于 `data-action` 的统一分发表。

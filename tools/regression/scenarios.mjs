@@ -115,7 +115,7 @@ export const scenarios = [
     ],
   },
   {
-    name: '新项目：立项审批 → 需求规格书与审批 → 设计审批被拦截',
+    name: '新项目：立项 → 需求规格书 → 设计审批拦截 → 设计文档评审 → 设计阶段通过',
     steps: [
       { role: 'project' },
       { nav: 'portfolio' },
@@ -133,6 +133,15 @@ export const scenarios = [
       stage('planning'),
       { sel: '[data-v54-stage=design]' },
       stage('design'),
+      ...['软件规格书', '概要设计', '详细设计'].flatMap((type) => [
+        { sel: `[data-design-category=${type}]` },
+        { sel: '[data-design-page-action=create]' },
+        { sel: '[data-design-drawer-action=submit]' },
+        { select: { '#appView select[data-design-inline-field=status]': '评审通过' } },
+      ]),
+      stage('planning'),
+      { sel: '[data-v54-stage=design]' },
+      stage('planning'),
     ],
   },
   {

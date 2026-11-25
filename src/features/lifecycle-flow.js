@@ -10,6 +10,7 @@ import { getReleaseGate, getStageStatus } from './version-anchor.js';
 import {
   STAGE_LABELS,
   STAGE_ORDER,
+  designDocTypes,
   designKeysFor,
   isStageDone as isStageDoneRule,
   isStagePrereqMet as isStagePrereqMetRule,
@@ -301,6 +302,11 @@ App.renderStagePanel = renderStagePanel;
 
 export function designKeysForProject() {
   return designKeysFor(getFlow().designType);
+}
+
+/** 当前项目设计阶段需要评审的文档类型（含软件规格书），按评审先后排列。 */
+export function projectDesignDocTypes() {
+  return designDocTypes(getFlow().designType);
 }
 
 function approveStage(k) {

@@ -5,7 +5,7 @@ export default [
   { ignores: ['dist/**', 'node_modules/**', '.regression/**'] },
   js.configs.recommended,
   {
-    files: ['src/**/*.js'],
+    files: ['src/**/*.js', 'tests/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

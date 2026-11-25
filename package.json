@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src tools",
+    "lint": "eslint src tools tests",
     "format": "prettier --write \"src/**/*.{js,css}\" index.html",
-    "test:regression": "node tools/regression/run.mjs"
+    "test:regression": "node tools/regression/run.mjs",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

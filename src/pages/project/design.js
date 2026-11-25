@@ -1,4 +1,6 @@
 /** 设计阶段：设计文档列表、详情抽屉与变更。 */
+import { isDesignLocked as isDesignLockedRule } from '../../domain/design.js';
+import { projectDesignDocTypes } from '../../features/lifecycle-flow.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -183,10 +185,17 @@ function designTypes() {
   return ['软件规格书', '软件架构设计', '概要设计', '详细设计'];
 }
 
-function designIsLocked(record) {
-  return record && ['已结束', '评审通过'].indexOf(record.status) > -1;
+/** 设计文档是否只读（规则见 domain/design.js）。 */
+export function isDesignLocked(record) {
+  return isDesignLockedRule(record, {
+    category: state.designCategory,
+    getOrder: projectDesignDocTypes,
+    getRecords: function () {
+      App.designInit();
+      return state.designRecords;
+    },
+  });
 }
-App.designIsLocked = designIsLocked;
 
 function designStatusType(status) {
   if (status === '评审通过' || status === '已结束') return 'green';
@@ -331,7 +340,7 @@ function designField(label, name, value, wide, kind, locked, values) {
 }
 
 function designDetailPanel(record) {
-  var locked = App.designIsLocked(record);
+  var locked = isDesignLocked(record);
   var comments = record.comments || [];
   return (
     '<div class="design-tab-panel"><div class="req-template"><div class="req-template-head">' +
@@ -491,7 +500,7 @@ function designDrawerBody(record) {
 
 function designDrawerFoot() {
   var record = App.designCurrentRecord();
-  if (state.designDrawerMode !== 'create' && App.designIsLocked(record))
+  if (state.designDrawerMode !== 'create' && isDesignLocked(record))
     return '<button class="btn" data-design-drawer-action="close">关闭</button><button class="btn warning" data-design-drawer-action="request-change">发起变更</button>';
   return '<button class="btn" data-design-drawer-action="cancel">取消</button><button class="btn" data-design-drawer-action="save">保存草稿</button><button class="btn primary" data-design-drawer-action="submit">提交评审</button>';
 }
@@ -606,7 +615,7 @@ function renderDesign() {
   if (selected) state.designSelected = selected.id;
   var tableRows = rows
     .map(function (item) {
-      var locked = App.designIsLocked(item);
+      var locked = isDesignLocked(item);
       return (
         '<tr class="' +
         (state.designSelected === item.id ? 'selected' : '') +

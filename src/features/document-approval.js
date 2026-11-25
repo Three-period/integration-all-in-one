@@ -6,7 +6,12 @@ import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { nowStamp } from './dev-review.js';
 import {
-  designKeysForProject,
+  currentDesignRecord as currentDesignRecordRule,
+  missingDesignReviews as missingDesignReviewsRule,
+} from '../domain/design.js';
+import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
+import {
+  projectDesignDocTypes,
   logFlowNote,
   isStagePrereqMet,
   isStageDone,
@@ -32,11 +37,7 @@ export function initDocumentApproval() {
     system: '整机测试报告',
   };
   function isReportKindEnabled(kind) {
-    return kind === 'single'
-      ? project().needsSingleTest !== '否'
-      : kind === 'long'
-        ? project().needsLongTest !== '否'
-        : true;
+    return isTestKindEnabled(project(), kind);
   }
   function reportStamp() {
     return new Date().toLocaleString('zh-CN', { hour12: false });
@@ -44,45 +45,16 @@ export function initDocumentApproval() {
   function escReportText(str) {
     return esc(String(str == null ? '' : str));
   }
-  function requiredDesignTypes() {
-    var names = {
-      architecture: '软件架构设计',
-      summarydesign: '概要设计',
-      detaildesign: '详细设计',
-    };
-    return ['软件规格书'].concat(
-      designKeysForProject()
-        .map(function (k) {
-          return names[k];
-        })
-        .filter(Boolean),
-    );
-  }
   // A new draft supersedes an earlier approved version; preloaded legacy versions use
-  // their version numbers to decide which is current.
+  // their version numbers to decide which is current (see domain/design.js).
   function currentDesignRecord(type) {
     App.designInit();
-    var rows = state.designRecords.filter(function (x) {
-      return x.docType === type;
-    });
-    function vnum(x) {
-      var m = String(x.version || '').match(/(\d+)\.(\d+)(?:\.(\d+))?/);
-      return m ? Number(m[1]) * 1000000 + Number(m[2]) * 1000 + Number(m[3] || 0) : 0;
-    }
-    rows.sort(function (a, b) {
-      var an = /^DSN-NEW-/.test(a.id),
-        bn = /^DSN-NEW-/.test(b.id);
-      if (an !== bn) return an ? -1 : 1;
-      if (an && bn) return Number(b.id.slice(8)) - Number(a.id.slice(8));
-      return vnum(b) - vnum(a);
-    });
-    return rows[0] || null;
+    return currentDesignRecordRule(state.designRecords, type);
   }
   function missingDesignReviews() {
-    return requiredDesignTypes().filter(function (type) {
-      var r = currentDesignRecord(type);
-      return !r || ['评审通过', '已结束'].indexOf(r.status) < 0;
-    });
+    var order = projectDesignDocTypes();
+    App.designInit();
+    return missingDesignReviewsRule(order, state.designRecords);
   }
   var oldDesignApprove = App.approveStage;
   App.approveStage = function (stage) {
@@ -148,16 +120,8 @@ export function initDocumentApproval() {
     return reportBucket(kind).rows;
   }
   function reportReadiness(kind, commit) {
-    if (!isReportKindEnabled(kind)) return { ready: true, skipped: true };
-    var rows = reportRows(kind),
-      matching = rows.find(function (r) {
-        return (
-          ['待评审', '审核通过', '已提交'].includes(r.status) &&
-          r.commit === commit &&
-          !!String(r.conclusion || '').trim()
-        );
-      });
-    return { ready: !!matching, row: matching || null };
+    var enabled = isReportKindEnabled(kind);
+    return reportReadinessRule(enabled, enabled ? reportRows(kind) : [], commit);
   }
   function reportRequirements() {
     var z = getReleaseGate(),
@@ -516,7 +480,7 @@ export function initDocumentApproval() {
           .join('') +
         '</select>' +
         '<div class="v54-checks">' +
-        requiredDesignTypes()
+        projectDesignDocTypes()
           .map(function (t) {
             var r = currentDesignRecord(t),
               good = r && ['评审通过', '已结束'].includes(r.status);
