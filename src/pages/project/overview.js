@@ -34,7 +34,7 @@ function overviewDocs() {
 }
 
 export function renderProjectOverview() {
-  const content = `${commonHead('项目管理 / 项目概况', '项目概况', '从进度、质量、风险、成员和文档五个维度查看项目健康度。', '<button class="btn" data-action="share">⌁ 共享</button><button class="btn" data-action="refresh">↻ 刷新数据</button>')}<div class="seg-tabs">${[
+  const content = `${commonHead('项目管理 / 项目概况', '项目概况', '从进度、质量、风险、成员和文档五个维度查看项目健康度。', '<button class="btn" data-action="share">共享</button><button class="btn" data-action="refresh">↻ 刷新数据</button>')}<div class="seg-tabs">${[
     ['dashboard', '项目仪表盘'],
     ['gantt', '甘特图'],
     ['members', '项目组成员'],

@@ -163,12 +163,8 @@ export function initStageGate() {
     if (start < 0) return html;
     var tail = html.slice(start);
     var head = html.slice(0, start);
-    // Move original five cards in front of the KPIs, and label the section explicitly.
-    return (
-      '<div class="v48-dashboard-title"><h3>项目全景运营 · 五项新增 Mock 数据</h3><p>项目阶段、里程碑、延期、需求变更与风险分布 · 随演示项目状态更新</p></div>' +
-      tail +
-      head
-    );
+    // Move original five cards in front of the rest of the project dashboard.
+    return tail + head;
   };
   // Force visible project dashboard after project operations tab selection; retain supervisor-only access.
   var oldRenderOps = App.renderOps2;

@@ -575,11 +575,6 @@ export function initLifecycleFlow() {
       sb.querySelectorAll('[data-action="ops-tab"],[data-nav="ops-review"]').forEach(function (el) {
         el.remove();
       });
-    if (sb && !sb.querySelector('[data-v47="reset"]'))
-      sb.insertAdjacentHTML(
-        'beforeend',
-        '<div style="margin-top:auto;padding-top:15px"><button class="v47-reset" data-v47="reset">↺ 重置 Mock 演示数据</button></div>',
-      );
   };
   baseDevSummaryCard = App.renderDevSummaryCard;
   App.renderDevSummaryCard = function (title, status, note, type, badge) {
@@ -846,7 +841,7 @@ export function initLifecycleFlow() {
           );
         })
         .join('') +
-      '</div></div><p class="mini-note">阶段分布、里程碑及风险来自当前 Mock 项目；延期趋势与变更结构为标注的历史演示数据。</p>';
+      '</div></div>';
     return html + charts;
   };
   baseRenderOps = App.renderOps2;

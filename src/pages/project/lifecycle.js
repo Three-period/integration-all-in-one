@@ -24,7 +24,7 @@ function renderLifecycle() {
         '项目管理 / 全生命周期',
         '全生命周期',
         '按项目类型流程模板组织从规划、需求到发布和结项的完整研发过程。',
-        '<button class="btn" data-action="open-flow">流程记录</button><button class="btn" data-action="share">⌁ 共享</button>',
+        '<button class="btn" data-action="open-flow">流程记录</button><button class="btn" data-action="share">共享</button>',
       );
   return renderProjectShell(
     head + lifecycleReferenceRail() + '<div class="stage-block">' + body + '</div>',

@@ -142,13 +142,7 @@ function ops2ProjectButton(id, name, meta) {
 
 function ops2Projects() {
   return (
-    '<div class="ops2-metrics">' +
-    ops2Metric('总项目数', '24', '全部项目 · 自动统计') +
-    ops2Metric('进行中', '16', '较上月 +2', 'good') +
-    ops2Metric('已延期', '3', '需主管关注', 'warn') +
-    ops2Metric('本月交付', '5', '已完成 4 项', 'good') +
-    ops2Metric('按时交付率', '92%', '较上月 +6.4%', 'good') +
-    '</div><div class="ops2-toolbar"><select class="input ops2-select" data-ops2-filter="department"><option>全部部门</option><option>研发中心</option><option>软件一科</option><option>质量部</option></select><select class="input ops2-select" data-ops2-filter="type"><option>全部项目类型</option><option>产品开发</option><option>预研项目</option><option>紧急定制</option><option>设备适配</option><span class="ops2-spacer"></span><span class="mini-note">数据更新时间：刚刚</span></div><div class="ops2-grid cols-2"><div class="ops2-card"><div class="ops2-card-head"><strong>项目健康度矩阵</strong><span class="mini-note">点击项目定位异常</span></div><div class="ops2-matrix"><div class="ops2-quadrant good"><strong>高进度 · 高质量</strong>' +
+    '<div class="ops2-toolbar"><span class="ops2-spacer"></span><span class="mini-note">数据更新时间：刚刚</span></div><div class="ops2-grid cols-2"><div class="ops2-card"><div class="ops2-card-head"><strong>项目健康度矩阵</strong><span class="mini-note">点击项目定位异常</span></div><div class="ops2-matrix"><div class="ops2-quadrant good"><strong>高进度 · 高质量</strong>' +
     ops2ProjectButton('thermal', '液冷控制算法', '进度 72% · 质量 94%') +
     '</div><div class="ops2-quadrant mid"><strong>低进度 · 高质量</strong>' +
     ops2ProjectButton('gateway', '边缘网关适配', '进度 48% · 质量 91%') +
@@ -192,9 +186,9 @@ function ops2Head(title, subtitle) {
   return (
     '<div class="ops2-head"><div><h2>' +
     title +
-    '</h2><p>' +
-    subtitle +
-    '</p></div><div class="ops2-actions">' +
+    '</h2>' +
+    (subtitle ? '<p>' + subtitle + '</p>' : '') +
+    '</div><div class="ops2-actions">' +
     actions +
     '</div></div>'
   );
@@ -222,7 +216,7 @@ function renderOps2() {
     '<section class="page"><div class="ops2-page">' +
     ops2Head(
       tab === 'review'
-        ? 'AI 代码检视运营看板'
+        ? 'AI 检视运营看板'
         : tab === 'people'
           ? '人员运营看板'
           : tab === 'resources'
@@ -230,7 +224,9 @@ function renderOps2() {
             : '项目运营看板',
       tab === 'review'
         ? '主管视图 · AI 检视演示数据（Mock，不连接真实服务）'
-        : '主管专用视图 · 数据自动统计',
+        : tab === 'projects'
+          ? ''
+          : '主管专用视图 · 数据自动统计',
     ) +
     App.ops2Tabs() +
     body +

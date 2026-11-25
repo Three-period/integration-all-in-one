@@ -139,8 +139,7 @@ function renderSidebar() {
     navItem('项目集', '▦', 'portfolio', v === 'portfolio') +
     navGroup('项目管理', '▤', 'project', projectActive, projectChildren) +
     '<div class="nav-title">运营管理</div>' +
-    navGroup('运营看板', '▥', 'ops', opsActive, opsChildren) +
-    '<div class="sidebar-foot"><div class="mini-user"><span class="avatar">何</span><span>当前用户：何盈</span></div>数据更新于 2026-08-11 18:00<br/>所有操作均纳入审计日志</div>';
+    navGroup('运营看板', '▥', 'ops', opsActive, opsChildren);
 }
 App.renderSidebar = renderSidebar;
 
