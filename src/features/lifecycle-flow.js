@@ -139,15 +139,14 @@ function openProjectModal() {
   openModal(
     'v47-project',
     '新建项目 · 项目基础信息',
-    '<div class="notice">依据提供的项目基础信息清单；版本类型未展示的选项留待业务确认，采用文本记录。</div>' +
-      App.renderProjectFormFields(
-        {
-          creator: '何盈',
-          flowStatus: '立项阶段',
-          createdAt: new Date().toISOString().slice(0, 10),
-        },
-        'new',
-      ),
+    App.renderProjectFormFields(
+      {
+        creator: '何盈',
+        flowStatus: '立项阶段',
+        createdAt: new Date().toISOString().slice(0, 10),
+      },
+      'new',
+    ),
     '<button class="btn" data-v47="cancel-modal">取消</button><button class="btn primary" data-v47="create-project">创建项目</button>',
   );
 }
