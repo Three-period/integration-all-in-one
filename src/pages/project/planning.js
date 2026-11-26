@@ -1,5 +1,5 @@
 /**
- * 流程视图：按四个环节展示全生命周期节点。
+ * 流程视图：桌面 / 平板显示流程图（见 flow-diagram.js），手机显示按环节排列的节点列表。
  *
  * 节点状态（已完成 / 进行中 / 未开始 / 不涉及）由 domain/stages.js 的 flowNodeState 计算；
  * 当前阶段内再按交付物细化：已提交的交付物、已通过的审核显示为已完成。
@@ -8,10 +8,11 @@
 import { App } from '../../core/app.js';
 import { esc } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
-import { FINAL_DESIGN_STATUSES } from '../../domain/design.js';
+import { FINAL_DESIGN_STATUSES, currentDesignRecord } from '../../domain/design.js';
 import { flowNodeState, stageState } from '../../domain/stages.js';
 import { isTestKindEnabled } from '../../domain/testing.js';
-import { getDevReview, getFlow } from '../../store/lifecycle.js';
+import { approvalRequests, getDevReview, getFlow } from '../../store/lifecycle.js';
+import { renderFlowDiagram } from './flow-diagram.js';
 import { isStageDone } from '../../features/lifecycle-flow.js';
 import { stageApprovalStatus } from '../../features/stage-approval.js';
 import { project, state } from '../../store/state.js';
@@ -181,6 +182,47 @@ function renderNode(node, value, index, prevDone) {
   );
 }
 
+/** 某份设计文档是否有待审核的提交。 */
+function designUnderReview(docType) {
+  return approvalRequests.some(
+    (r) =>
+      r.projectId === state.projectId &&
+      r.stage === 'design' &&
+      r.status === '待审核' &&
+      r.deliverable.docType === docType,
+  );
+}
+
+/** 流程图节点状态：设计文档节点按各自文档的提交 / 审核情况细化，其余节点同列表规则。 */
+function diagramStateOf(ctx) {
+  return function (n) {
+    if (!n.docType) {
+      if (n.report) return nodeState({ ...n, done: () => reportReady(n.report) }, ctx);
+      return nodeState(n, ctx);
+    }
+    const base = flowNodeState({ ...n, kind: 'content' }, ctx);
+    if (base !== 'current') return base;
+    const doc = designStatus(n.docType);
+    if (n.kind === 'content') return doc.submitted ? 'done' : 'current';
+    if (doc.approved) return 'done';
+    return designUnderReview(n.docType) ? 'current' : 'pending';
+  };
+}
+
+function renderDiagram(ctx) {
+  App.designInit();
+  const spec = currentDesignRecord(state.designRecords || [], '软件规格书');
+  return renderFlowDiagram({
+    stateOf: diagramStateOf(ctx),
+    designType: ctx.designType,
+    specTip: { status: spec ? spec.status : '待开始', owner: project().owner },
+    planningSubmitted: () => !!stageApprovalStatus('planning'),
+    requirementSubmitted: () =>
+      (state.reqRecords || []).some((r) => ['待评审', '已完成'].includes(r.status)),
+    releaseApproved: () => stageApprovalStatus('release') === '已通过',
+  });
+}
+
 function renderPlanning() {
   const p = project();
   const ctx = {
@@ -216,9 +258,12 @@ function renderPlanning() {
   return (
     '<div class="lc-flow"><div class="lc-flow-head"><div><h2>流程流转图</h2><p>' +
     esc(p.name) +
-    ' · 点击节点进入对应阶段</p></div><ul class="lc-legend"><li class="is-done">已完成</li><li class="is-current">进行中</li><li class="is-pending">未开始</li><li class="is-skipped">不涉及</li></ul></div>' +
+    ' · 点击节点进入对应阶段</p></div><ul class="lc-legend"><li class="is-done">已完成</li><li class="is-current">进行中</li><li class="is-pending">未开始</li><li class="is-skipped">不涉及</li><li class="is-approval">审核节点</li><li class="is-back">退回路径</li><li class="is-special">特殊流程</li></ul></div>' +
+    '<div class="lc-diagram">' +
+    renderDiagram(ctx) +
+    '</div><div class="lc-rows">' +
     rows +
-    '</div>'
+    '</div></div>'
   );
 }
 App.renderPlanning = renderPlanning;
@@ -238,5 +283,13 @@ export function bindFlowViewEvents() {
     state.lifecycleStage = stage;
     state.projectSection = 'lifecycle';
     setView('project-lifecycle');
+  });
+  // 流程图节点为 SVG 元素，补充键盘操作：Enter / 空格进入对应阶段。
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest && e.target.closest('g[data-flow-view-action="node"]');
+    if (!el) return;
+    e.preventDefault();
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

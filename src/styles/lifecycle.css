@@ -479,3 +479,264 @@ body[data-stage-readonly] #drawer :is(input, textarea, select, [contenteditable=
   padding: 0 0 12px;
   margin-bottom: 14px;
 }
+
+/* 流程视图 · 流程图（≥768 显示；手机显示 .lc-rows 列表） */
+.lc-diagram {
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.lc-rows {
+  display: none;
+}
+.fd-svg {
+  display: block;
+  width: 100%;
+  min-width: 960px;
+  height: auto;
+  font-family: inherit;
+}
+.fd-section {
+  fill: #fafcff;
+  stroke: #e3ebf6;
+  stroke-width: 1.2;
+}
+.fd-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--blue);
+}
+.fd-edge {
+  fill: none;
+  stroke: #c9d2de;
+  stroke-width: 1.8;
+  marker-end: url(#fd-arrow-grey);
+}
+.fd-edge.is-done {
+  stroke: var(--blue);
+  marker-end: url(#fd-arrow-done);
+}
+.fd-edge.is-skipped {
+  stroke: #dfe4eb;
+  stroke-dasharray: 4 4;
+}
+.fd-edge.is-special {
+  stroke: #a18bd2;
+  stroke-dasharray: 6 5;
+  marker-end: url(#fd-arrow-special);
+}
+.fd-back {
+  fill: none;
+  stroke: #df9243;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+  marker-end: url(#fd-arrow-back);
+}
+.fd-arrow-grey {
+  fill: #c9d2de;
+}
+.fd-arrow-done {
+  fill: var(--blue);
+}
+.fd-arrow-back {
+  fill: #df9243;
+}
+.fd-arrow-special {
+  fill: #a18bd2;
+}
+.fd-edge-label {
+  font-size: 11px;
+  fill: #70829b;
+  text-anchor: middle;
+}
+.fd-edge-label.is-start {
+  text-anchor: start;
+}
+.fd-back-label {
+  font-size: 11px;
+  fill: #b66f22;
+  text-anchor: middle;
+}
+.fd-lane {
+  font-size: 12px;
+  fill: #8a96a8;
+}
+.fd-lane.is-active {
+  fill: var(--blue);
+  font-weight: 700;
+}
+.fd-note rect {
+  fill: #edf8f4;
+  stroke: #badfd2;
+}
+.fd-note-title {
+  font-size: 13px;
+  font-weight: 700;
+  fill: #193351;
+}
+.fd-note-text {
+  font-size: 11.5px;
+  fill: #61758e;
+}
+
+/* 节点：阶段节点蓝色系，审核节点红色系 */
+.fd-node {
+  cursor: pointer;
+  outline: none;
+}
+.fd-circle {
+  fill: #f2f4f7;
+  stroke: #cfd6e0;
+  stroke-width: 2;
+  transition: stroke-width 0.15s ease;
+}
+.fd-node:hover .fd-circle,
+.fd-node:focus-visible .fd-circle {
+  stroke-width: 3.5;
+}
+.fd-node:focus-visible .fd-label {
+  text-decoration: underline;
+}
+.fd-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #344054;
+  text-anchor: middle;
+}
+.fd-mark {
+  font-size: 15px;
+  font-weight: 700;
+  fill: #fff;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.fd-mark-sm {
+  font-size: 11px;
+  fill: #b9c1cd;
+}
+.fd-dot {
+  fill: var(--blue);
+}
+.fd-halo {
+  fill: rgba(4, 52, 145, 0.12);
+}
+.fd-node.is-done .fd-circle {
+  fill: var(--blue);
+  stroke: var(--blue);
+}
+.fd-node.is-current .fd-circle {
+  fill: #fff;
+  stroke: var(--blue);
+  stroke-width: 2.5;
+}
+.fd-node.is-pending .fd-label {
+  fill: #8a96a8;
+}
+.fd-node.is-skipped .fd-circle {
+  fill: none;
+  stroke: #d5dbe4;
+  stroke-dasharray: 4 3;
+}
+.fd-node.is-skipped .fd-label,
+.fd-node.is-skipped .fd-mark {
+  fill: #b8c0cc;
+}
+.fd-node.kind-approval .fd-circle {
+  stroke: #ecc3bf;
+  fill: #fbf3f2;
+}
+.fd-node.kind-approval.is-done .fd-circle {
+  fill: #d92d20;
+  stroke: #d92d20;
+}
+.fd-node.kind-approval.is-current .fd-circle {
+  fill: #fff;
+  stroke: #d92d20;
+}
+.fd-node.kind-approval.is-current .fd-halo {
+  fill: rgba(217, 45, 32, 0.12);
+}
+.fd-node.kind-approval.is-current .fd-mark-sm {
+  fill: #d92d20;
+}
+.fd-node.kind-approval.is-pending .fd-circle {
+  fill: #f6f3f3;
+  stroke: #e3cfcd;
+}
+.fd-node.kind-approval.is-skipped .fd-circle {
+  fill: none;
+  stroke: #e6d6d4;
+}
+.fd-node.kind-special .fd-circle {
+  fill: #f3efff;
+  stroke: #9880ca;
+}
+.fd-node.kind-end.is-done .fd-circle {
+  fill: var(--blue);
+}
+.fd-tip {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+.fd-tip rect {
+  fill: #fff;
+  stroke: #b8c7db;
+}
+.fd-node.has-tip:hover .fd-tip,
+.fd-node.has-tip:focus .fd-tip {
+  opacity: 1;
+}
+.fd-tip-k {
+  font-size: 11px;
+  fill: #61758e;
+}
+.fd-tip-v {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #25364b;
+}
+
+/* 图例补充：审核节点、退回路径、特殊流程 */
+.lc-legend .is-approval::before {
+  border-color: #d92d20;
+  background: #d92d20;
+}
+.lc-legend .is-back::before {
+  width: 16px;
+  height: 0;
+  border-radius: 0;
+  border: 0;
+  border-top: 2px dashed #df9243;
+  background: none;
+}
+.lc-legend .is-special::before {
+  border-color: #9880ca;
+  background: #f3efff;
+}
+
+@media (max-width: 767px) {
+  .lc-diagram {
+    display: none;
+  }
+  .lc-rows {
+    display: grid;
+    gap: 12px;
+  }
+}
+
+/* 手机列表中的审核节点与流程图一致使用红色 */
+.lc-node.kind-approval.is-done .lc-node-dot {
+  border-color: #d92d20;
+  background: #d92d20;
+}
+.lc-node.kind-approval.is-current .lc-node-dot {
+  border-color: #d92d20;
+  color: #d92d20;
+  box-shadow: 0 0 0 5px rgba(217, 45, 32, 0.12);
+}
+.lc-node.kind-approval.is-current small {
+  color: #d92d20;
+}
