@@ -14,9 +14,29 @@ pnpm test         # 业务规则单元测试（Vitest）
 pnpm test:regression                    # 行为回归：与上一次提交对比
 pnpm test:regression -- --base <ref>    # 与指定提交 / 分支对比
 pnpm test:regression -- --no-shots      # 跳过截图对比，速度更快
+pnpm test:regression -- --functional    # 功能验收：只跑当前版本的业务场景
+pnpm test:regression -- --functional --url http://localhost:3000/   # 直接用已启动的服务
 ```
 
-回归测试会自动构建对照版本和当前工作区，然后做三类比对：按角色和页面遍历点击、4 条业务主流程场景、页面截图。需要本机安装 Chrome 或 Chromium，也可以用 `CHROME_PATH` 指定浏览器路径。这些工具只是开发依赖，不影响 `pnpm dev` 和 `pnpm build`。
+回归测试会自动构建对照版本和当前工作区，然后做三类比对：按账号和页面遍历点击、5 条跨角色业务场景、页面截图。功能验收模式逐步执行业务场景，检查每一步可执行、预期提示出现且没有运行时错误。需要本机安装 Chrome 或 Chromium，也可以用 `CHROME_PATH` 指定浏览器路径。这些工具只是开发依赖，不影响 `pnpm dev` 和 `pnpm build`。
+
+## 演示账号
+
+所有账号的密码都是 `Demo@2026`，登录页下方可点选填入。登录 / 退出不刷新页面，模拟数据在当前标签页内保留，便于换账号走完跨角色流程；刷新页面后恢复初始数据。
+
+| 账号 | 角色 | 登录后进入 |
+| --- | --- | --- |
+| pm | 产品经理 | 个人工作台 |
+| pjm | 项目经理 | 个人工作台 |
+| dev | 开发工程师 | 开发阶段 |
+| qa | 测试工程师 | 测试阶段 |
+| reviewer | 检视工程师 | 开发阶段（检视工作台） |
+| lead | 部门主管 | 项目运营看板 |
+| director / rdlead / testlead / qalead | 研发总监 / 研发主管 / 测试主管 / 质量主管 | 个人工作台（审批中心） |
+
+鉴权通过 `src/core/auth.js` 的 `login / logout / currentUser` 访问；接入平台统一登录时实现同样三个方法并调用 `setAuthProvider` 即可。
+
+阶段审核：立项、需求、设计文档、测试、发布在交付物页面提交，推送给项目配置的审核角色（基本信息页可调整，默认值见 `src/domain/approvals.js`），任意一位审核人通过或退回即可，退回必须填写意见。
 
 ## 目录结构
 

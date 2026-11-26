@@ -1,6 +1,9 @@
 /** 设计阶段：设计文档列表、详情抽屉与变更。 */
 import { submitStageApproval } from '../../features/stage-approval.js';
-import { isDesignLocked as isDesignLockedRule } from '../../domain/design.js';
+import {
+  isDesignLocked as isDesignLockedRule,
+  isPriorDesignApproved as isPriorDesignApprovedRule,
+} from '../../domain/design.js';
 import { projectDesignDocTypes } from '../../features/lifecycle-flow.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer, openModal } from '../../components/overlays.js';
@@ -8,7 +11,7 @@ import { showToast } from '../../components/toast.js';
 import { $, esc, tag } from '../../core/dom.js';
 import { state } from '../../store/state.js';
 
-function designInit() {
+function baseDesignInit() {
   if (!state.designRecords) {
     state.designRecords = [
       {
@@ -176,6 +179,28 @@ function designInit() {
   if (!state.designStatusFilter) state.designStatusFilter = '全部';
   if (!state.designTab) state.designTab = 'detail';
 }
+/** 设计文档按项目隔离：切换项目时保存当前项目文档并载入目标项目文档（仅内置项目带示例数据）。 */
+function designInit() {
+  var pid = state.projectId;
+  if (!state.v53DesignByProject) state.v53DesignByProject = Object.create(null);
+  if (state.v53DesignLoadedProject !== pid) {
+    if (state.v53DesignLoadedProject && state.designRecords)
+      state.v53DesignByProject[state.v53DesignLoadedProject] = state.designRecords;
+    if (!state.v53DesignByProject[pid]) {
+      if (pid === 'thermal' && !state.v53DesignLoadedProject) {
+        baseDesignInit();
+        state.v53DesignByProject[pid] = state.designRecords;
+      } else state.v53DesignByProject[pid] = [];
+    }
+    state.designRecords = state.v53DesignByProject[pid];
+    state.v53DesignLoadedProject = pid;
+    state.designCategory = '全部';
+    state.designSelected = null;
+    state.designQuery = '';
+    state.designStatusFilter = '全部';
+  }
+  baseDesignInit();
+}
 App.designInit = designInit;
 
 function designStatuses() {
@@ -187,6 +212,19 @@ function designTypes() {
 }
 
 /** 设计文档是否只读（规则见 domain/design.js）。 */
+/** 当前项目类别是否需要该设计文档。 */
+export function isDesignTypeApplicable(type) {
+  return projectDesignDocTypes().indexOf(type) !== -1;
+}
+
+/** 该设计文档的前置文档是否已审核通过。 */
+export function isPriorDesignApproved(type) {
+  return isPriorDesignApprovedRule(type, projectDesignDocTypes(), function () {
+    App.designInit();
+    return state.designRecords;
+  });
+}
+
 export function isDesignLocked(record) {
   return isDesignLockedRule(record, {
     category: state.designCategory,
@@ -227,7 +265,7 @@ function designOption(values, current) {
     .join('');
 }
 
-function designRows() {
+function baseDesignRows() {
   App.designInit();
   return state.designRecords.filter(function (record) {
     var query = state.designQuery.toLowerCase();
@@ -241,6 +279,15 @@ function designRows() {
     return hit && type && status;
   });
 }
+/** 「全部」只汇总当前项目类别适用的设计文档。 */
+function designRows() {
+  var records = baseDesignRows();
+  return state.designCategory === '全部'
+    ? records.filter(function (r) {
+        return isDesignTypeApplicable(r.docType);
+      })
+    : records;
+}
 App.designRows = designRows;
 
 function designRecord(id) {
@@ -252,7 +299,7 @@ function designRecord(id) {
   );
 }
 
-function designCurrentRecord() {
+function baseDesignCurrentRecord() {
   App.designInit();
   if (state.designDrawerMode === 'create') {
     if (!state.designDraft)
@@ -278,6 +325,16 @@ function designCurrentRecord() {
     return state.designDraft;
   }
   return designRecord(state.designSelected);
+}
+/** 在具体分类下新建时，文档类型取当前分类。 */
+function designCurrentRecord() {
+  var record = baseDesignCurrentRecord();
+  if (state.designDrawerMode === 'create' && state.designCategory !== '全部') {
+    record.docType = state.designCategory;
+    if (!record.title || record.title === '新建设计文档') record.title = state.designCategory;
+    record.projectId = state.projectId;
+  }
+  return record;
 }
 App.designCurrentRecord = designCurrentRecord;
 
@@ -413,11 +470,22 @@ function designDrawerBody(record) {
   );
 }
 
-function designDrawerFoot() {
+function baseDesignDrawerFoot() {
   var record = App.designCurrentRecord();
   if (state.designDrawerMode !== 'create' && isDesignLocked(record))
     return '<button class="btn" data-design-drawer-action="close">关闭</button><button class="btn warning" data-design-drawer-action="request-change">发起变更</button>';
   return '<button class="btn" data-design-drawer-action="cancel">取消</button><button class="btn" data-design-drawer-action="save">保存草稿</button><button class="btn primary" data-design-drawer-action="submit">提交评审</button>';
+}
+/** 只读的分类或文档只提供「关闭」。 */
+function designDrawerFoot() {
+  var r = App.designCurrentRecord();
+  if (
+    state.designCategory === '全部' ||
+    !isDesignTypeApplicable(r.docType) ||
+    !isPriorDesignApproved(r.docType)
+  )
+    return '<button class="btn" data-design-drawer-action="close">关闭</button>';
+  return baseDesignDrawerFoot();
 }
 App.designDrawerFoot = designDrawerFoot;
 
@@ -469,7 +537,7 @@ export function submitDesignRecord(record) {
   });
 }
 
-function saveDesign(mode) {
+function baseSaveDesign(mode) {
   collectDesign();
   var record = App.designCurrentRecord();
   if (mode === 'submit') {
@@ -479,6 +547,35 @@ function saveDesign(mode) {
   closeDrawer();
   App.render();
   showToast(mode === 'submit' ? '设计文档已提交评审' : '设计文档草稿已保存');
+}
+/** 新建抽屉保存 / 提交时插入新文档；前置文档未通过审核的分类不能新建。 */
+function saveDesign(mode) {
+  if (state.designDrawerMode !== 'create') return baseSaveDesign(mode);
+  if (
+    state.designCategory === '全部' ||
+    !isDesignTypeApplicable(state.designCategory) ||
+    !isPriorDesignApproved(state.designCategory)
+  ) {
+    showToast('当前分类不能新建：请完成前置设计文档审核', 'warn');
+    return;
+  }
+  collectDesign();
+  var r = App.designCurrentRecord();
+  r.id = 'DSN-NEW-' + Date.now();
+  r.projectId = state.projectId;
+  r.docType = state.designCategory;
+  if (!r.title || r.title === '新建设计文档') r.title = r.docType;
+  if (mode === 'submit' && !submitDesignRecord(r)) return;
+  r.status = mode === 'submit' ? '待评审' : '待开始';
+  state.designRecords.unshift(Object.assign({}, r, { comments: (r.comments || []).slice() }));
+  state.designSelected = r.id;
+  state.designDraft = null;
+  state.designDrawerMode = 'edit';
+  closeDrawer();
+  App.render();
+  showToast(
+    mode === 'submit' ? '已新建' + r.docType + '并提交评审' : '已新建' + r.docType + '草稿',
+  );
 }
 App.saveDesign = saveDesign;
 
@@ -509,7 +606,7 @@ function openDesignChange() {
   );
 }
 
-function renderDesign() {
+function baseRenderDesign() {
   App.designInit();
   var categories = [
     ['全部', '全部设计文档'],
@@ -616,6 +713,49 @@ function renderDesign() {
       '<tr><td colspan="12"><div class="req-empty-state">没有匹配的设计文档，请调整分类或筛选条件。</div></td></tr>') +
     '</tbody></table></div></section></div></div>'
   );
+}
+/** 按项目类别标记不适用的分类，控制「新建」可用性并显示只读原因。 */
+function renderDesign() {
+  App.designInit();
+  var html = baseRenderDesign(),
+    current = state.designCategory,
+    allowed = projectDesignDocTypes();
+  html = html.replace(
+    /(<button class=")([^"]*)(" data-design-page-action="category" data-design-category=")([^"]+)(")/g,
+    function (_, a, classes, b, kind, c) {
+      return (
+        a +
+        classes +
+        (kind !== '全部' && allowed.indexOf(kind) < 0 ? ' v53-doc-inactive' : '') +
+        b +
+        kind +
+        c
+      );
+    },
+  );
+  if (current === '全部' || !isDesignTypeApplicable(current)) {
+    html = html.replace(
+      '<button class="btn primary" data-design-page-action="create">＋ 新建设计文档</button>',
+      '',
+    );
+  } else if (!isPriorDesignApproved(current)) {
+    html = html.replace(
+      'data-design-page-action="create"',
+      'data-design-page-action="create" disabled title="前置文档未审核通过"',
+    );
+  }
+  // 「全部」为只读汇总，按约定不显示提示。
+  var note = '';
+  if (current === '全部') note = '';
+  else if (!isDesignTypeApplicable(current)) note = '当前项目类别不适用此设计文档，页面只读。';
+  else if (!isPriorDesignApproved(current))
+    note = '请先完成前置设计文档审核，通过后可编辑当前文档。';
+  if (note)
+    html = html.replace(
+      '<section class="req-list-panel">',
+      '<section class="req-list-panel"><div class="v53-readonly-hint">' + note + '</div>',
+    );
+  return html;
 }
 App.renderDesign = renderDesign;
 

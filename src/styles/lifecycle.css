@@ -475,3 +475,7 @@ body[data-stage-readonly] #drawer :is(input, textarea, select, [contenteditable=
 .basic-side-stack {
   align-content: start;
 }
+.basic-info-card > .card-head {
+  padding: 0 0 12px;
+  margin-bottom: 14px;
+}

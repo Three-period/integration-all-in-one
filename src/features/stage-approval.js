@@ -398,12 +398,15 @@ function stageChecklist(stage) {
       projectDesignDocTypes()
         .map((t) => {
           const good = !missingDesignReviews([t], state.designRecords).length;
+          const reviewing = pendingOf(state.projectId, 'design').some(
+            (r) => r.deliverable.docType === t,
+          );
           return (
             '<span class="' +
             (good ? 'is-ok' : 'is-pending') +
             '">' +
             esc(t) +
-            (good ? ' · 已通过' : ' · 待审核') +
+            (good ? ' · 已通过' : reviewing ? ' · 审核中' : ' · 待提交') +
             '</span>'
           );
         })

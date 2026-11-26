@@ -169,17 +169,22 @@ export function bindResponsiveNav() {
     const toggle = document.querySelector('.nav-toggle');
     if (toggle) toggle.setAttribute('aria-expanded', String(open));
   }
-  document.addEventListener('click', function (e) {
-    const action = e.target.closest('[data-shell-action]');
-    if (action) {
-      setOpen(
-        action.dataset.shellAction === 'toggle-nav' &&
-          !document.body.classList.contains('nav-open'),
-      );
-      return;
-    }
-    if (e.target.closest('#sidebar [data-nav], #sidebar [data-action]')) setOpen(false);
-  });
+  document.addEventListener(
+    'click',
+    function (e) {
+      const action = e.target.closest('[data-shell-action]');
+      if (action) {
+        setOpen(
+          action.dataset.shellAction === 'toggle-nav' &&
+            !document.body.classList.contains('nav-open'),
+        );
+        return;
+      }
+      // 捕获阶段判断：导航点击会重新渲染侧栏，冒泡到这里时目标已不在侧栏中。
+      if (e.target.closest('#sidebar [data-nav], #sidebar [data-action]')) setOpen(false);
+    },
+    true,
+  );
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') setOpen(false);
   });

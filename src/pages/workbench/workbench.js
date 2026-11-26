@@ -8,6 +8,31 @@ import { currentLayout } from '../../store/layout.js';
 import { state } from '../../store/state.js';
 import { renderApprovalWidget } from '../../features/stage-approval.js';
 
+/**
+ * 桌面 12 列网格按顺序排卡片：放不下时上一张卡片补满本行，最后一张补满末行，
+ * 保证每行左右对齐、没有空缺。返回 [卡片 id, 补满后的列数（不需要补时为 0）]。
+ */
+function fillRows(ids, sizes) {
+  const span = (id) => Number((sizes[id] || 'span-4').replace('span-', ''));
+  const rows = [];
+  let used = 0;
+  ids.forEach((id) => {
+    const n = Math.min(span(id), 12);
+    if (used + n > 12 && rows.length) {
+      const last = rows[rows.length - 1];
+      last[1] = last[2] + (12 - used);
+      used = 0;
+    }
+    rows.push([id, 0, n]);
+    used += n;
+  });
+  if (rows.length && used < 12) {
+    const last = rows[rows.length - 1];
+    last[1] = last[2] + (12 - used);
+  }
+  return rows.map(([id, fill]) => [id, fill]);
+}
+
 export function renderWorkbench() {
   const active = state.view === 'dashboard' ? 'dashboard' : 'dashboard';
   const tabs = `<div class="workbench-tabs"><button class="${active === 'dashboard' ? 'active' : ''}" data-action="workbench-tab" data-tab="dashboard">顶部仪表盘</button><button data-action="workbench-tab" data-tab="tasks">我的任务</button><button data-action="workbench-tab" data-tab="flows">我的流程</button></div>`;
@@ -47,11 +72,13 @@ export function renderWorkbench() {
     '我的研发工作台',
     '聚合个人待办、项目进展、审批流程与研发质量数据。',
     `<button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
-  )}${tabs}<div class="notice"><i>◈</i><span><b>${roles[state.role]}工作台</b> · 角色权限决定可见数据范围，个人布局只能在已授权卡片中调整。当前可见 ${allowed.length} 类卡片。</span></div><div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${layout
-    .filter((id) => allowed.includes(id))
+  )}${tabs}<div class="notice"><i>◈</i><span><b>${roles[state.role]}工作台</b> · 角色权限决定可见数据范围，个人布局只能在已授权卡片中调整。当前可见 ${allowed.length} 类卡片。</span></div><div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
+    layout.filter((id) => allowed.includes(id)),
+    sizes,
+  )
     .map(
-      (id) =>
-        `<article class="card widget ${sizes[id]}" data-widget="${id}" draggable="${state.editingLayout}"><div class="card-head"><span class="card-title">${widgetMeta[id][0]}</span><span><span class="card-note">${widgetMeta[id][1]}</span><span class="widget-grip"> ⋮⋮</span></span></div>${widgets[id]}</article>`,
+      ([id, fill]) =>
+        `<article class="card widget ${sizes[id]}" data-widget="${id}"${fill ? ` data-fill="${fill}"` : ''} draggable="${state.editingLayout}"><div class="card-head"><span class="card-title">${widgetMeta[id][0]}</span><span><span class="card-note">${widgetMeta[id][1]}</span><span class="widget-grip"> ⋮⋮</span></span></div>${widgets[id]}</article>`,
     )
     .join('')}</div></section>`;
 }
