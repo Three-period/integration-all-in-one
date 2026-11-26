@@ -52,16 +52,4 @@ export function initStageGate() {
     },
     true,
   );
-  // The existing five V47 cards were appended after unrelated content and may be hard to find.
-  // Reposition them conspicuously at the top of the project analytics view, preserving data.
-  var oldProjects = App.ops2Projects;
-  App.ops2Projects = function () {
-    var html = oldProjects();
-    var start = html.indexOf('<div class="v47-ops-grid"');
-    if (start < 0) return html;
-    var tail = html.slice(start);
-    var head = html.slice(0, start);
-    // Move original five cards in front of the rest of the project dashboard.
-    return tail + head;
-  };
 }

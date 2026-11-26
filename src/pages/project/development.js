@@ -1,4 +1,5 @@
 /** 开发阶段：开发报告与仓库信息。 */
+import { can } from '../../domain/permissions.js';
 import { getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer } from '../../components/overlays.js';
@@ -197,6 +198,9 @@ function saveDevelopmentReport(mode) {
 }
 
 function renderDevelopment() {
+  if (!can(state.role, 'dev.workspace'))
+    return '<div class="notice warn">开发阶段工作台仅开发工程师和检视工程师可用。</div>';
+  getDevReview().role = state.role === 'reviewer' ? 'reviewer' : 'developer';
   var d = getDevReview(),
     ready = getDevReadiness(),
     r = latestAiRun();

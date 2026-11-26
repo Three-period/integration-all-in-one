@@ -2,89 +2,15 @@
 import { can } from '../domain/permissions.js';
 import { App } from '../core/app.js';
 import { modalForm, openDrawer, openModal } from '../components/overlays.js';
-import { commonHead } from '../components/shell.js';
 import { showToast } from '../components/toast.js';
-import { $, person, tag } from '../core/dom.js';
+import { $, esc, person } from '../core/dom.js';
+import { projects } from '../data/projects.js';
 import { setView } from '../core/navigation.js';
 import { renderReviewOperations } from './review/reviewer-tasks.js';
 import { state } from '../store/state.js';
 
 let informationArchitectureApp;
 let ops3FallbackApp;
-
-function opsFilters() {
-  return `<div class="ops-toolbar"><select class="input" data-ops-filter><option>组织：研发中心</option><option>软件一科</option><option>软件二科</option><option>质量部</option></select><select class="input" data-ops-filter><option>项目类型：全部</option><option>产品开发</option><option>预研项目</option><option>紧急定制</option></select><select class="input" data-ops-filter><option>周期：近 4 周</option><option>本季度</option><option>今年</option></select><select class="input" data-ops-filter><option>负责人：全部</option><option>王凯</option><option>赵敏</option><option>孙宁</option></select><button class="btn" data-action="ops-refresh">↻ 刷新数据</button><button class="btn" data-action="ops-export">导出当前看板</button><span class="mini-note" style="margin-left:auto">数据口径版本 V1.2 · 最近更新 18:00</span></div>`;
-}
-
-function renderOperations(tab) {
-  const tabs = [
-    ['projects', '项目运营看板'],
-    ['people', '人员运营看板'],
-    ['resources', '资源分配看板'],
-  ];
-  let body = '';
-  if (tab === 'projects')
-    body = `${opsFilters()}<div class="grid cols-4"><div class="card metric ops-kpi"><div class="metric-label">总项目数</div><div class="metric-value">24</div><div class="metric-foot">进行中 18 · 已结项 4</div></div><div class="card metric ops-kpi"><div class="metric-label">按时交付率</div><div class="metric-value">86<span class="metric-unit">%</span></div><div class="metric-foot"><span class="up">↑ 5%</span><span>较上季度</span></div></div><div class="card metric ops-kpi"><div class="metric-label">延期风险项目</div><div class="metric-value down">3</div><div class="metric-foot"><span>未来 3 天到期</span><span class="down">1 个高风险</span></div></div><div class="card metric ops-kpi"><div class="metric-label">本月交付</div><div class="metric-value">6</div><div class="metric-foot">通过验收 5 · 待结项 1</div></div></div><div class="grid cols-2" style="margin-top:14px"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">项目健康度矩阵</h3><p class="ops-subtitle">X 轴：里程碑进度得分 · Y 轴：质量得分；点击项目下钻</p></div><span class="mini-note">每小时刷新</span></div><div class="ops-matrix"><button class="ops-point tag green" style="left:70%;top:23%" data-action="ops-open-project" data-project="thermal">智能温控 82</button><button class="ops-point tag blue" style="left:52%;top:42%" data-action="ops-open-project" data-project="cloud">设备云 71</button><button class="ops-point tag orange" style="left:39%;top:60%" data-action="ops-open-project" data-project="algorithm">控制算法 63</button><button class="ops-point tag red" style="left:21%;top:76%" data-action="ops-open-project" data-project="gateway">边缘网关 54</button></div><div class="legend"><span><i style="background:#6fd6a1"></i>健康</span><span><i style="background:#ffd49a"></i>关注</span><span><i style="background:#ff9d9d"></i>异常</span></div></div><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">重点项目关注</h3><p class="ops-subtitle">主管手动标记，实时展示进度、风险与负责人</p></div><span class="mini-note">${(state.opsFocus || ['thermal', 'gateway']).length} 个重点项目</span></div><div class="ops-list">${[
-      ['thermal', '智能温控平台 V2.6', '进度 72% · 负责人 王凯', '高风险', 'orange'],
-      ['gateway', '边缘计算网关适配', '进度 54% · 负责人 陈思', '需介入', 'red'],
-      ['algorithm', '液冷控制算法预研', '进度 38% · 负责人 赵敏', '资源冲突', 'orange'],
-    ]
-      .map(
-        (x) =>
-          `<div class="ops-list-item"><button class="op" data-action="ops-toggle-focus" data-project="${x[0]}" title="标记重点">${(state.opsFocus || ['thermal', 'gateway']).includes(x[0]) ? '★' : '☆'}</button><div class="grow"><strong>${x[1]}</strong><small>${x[2]}</small></div>${tag(x[3], x[4])}<button class="op" data-action="ops-open-project" data-project="${x[0]}">下钻</button></div>`,
-      )
-      .join(
-        '',
-      )}</div></div></div><div class="grid cols-2" style="margin-top:14px"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">延期风险预警</h3><p class="ops-subtitle">延期项目、未来 3 天到期里程碑和关键路径阻塞任务</p></div><span class="tag red">3 项</span></div><div class="ops-list">${[
-      ['边缘计算网关适配', '项目延期 4 天 · 负责人 陈思', '项目调整', 'gateway', 'red'],
-      ['智能温控平台 V2.6', '联调里程碑明日到期 · 王凯', '项目概况', 'thermal', 'orange'],
-      ['液冷控制算法预研', '关键任务被资源冲突阻塞 · 赵敏', '项目调整', 'algorithm', 'orange'],
-    ]
-      .map(
-        (x) =>
-          `<div class="ops-list-item"><i class="mini-avatar" style="background:${x[4] === 'red' ? '#fff1f0' : '#fff7ed'};color:${x[4] === 'red' ? '#d92d20' : '#b54708'}">!</i><div class="grow"><strong>${x[0]}</strong><small>${x[1]}</small></div>${tag(x[2], x[4])}<button class="op" data-action="ops-drill-risk" data-project="${x[3]}">查看</button></div>`,
-      )
-      .join(
-        '',
-      )}</div></div><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">质量趋势图</h3><p class="ops-subtitle">发布通过率、缺陷密度、缺陷闭环率、用例执行率</p></div><select class="input" style="width:80px"><option>按月</option><option>按周</option></select></div><div class="ops-trend"><i style="height:46%"></i><i style="height:57%"></i><i style="height:69%"></i><i style="height:81%"></i><i style="height:72%"></i><i style="height:88%"></i></div><div class="ops-trend-label"><span>3月</span><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span></div><div class="legend"><span><i style="background:#9bbcff"></i>发布通过率</span><span><i style="background:#ffd49a"></i>缺陷闭环率</span></div></div></div><div class="grid cols-2" style="margin-top:14px"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">缺陷闭环监控</h3><p class="ops-subtitle">未关闭的致命/严重缺陷与超过 3 天未处理项</p></div><span class="tag red">4 个严重缺陷</span></div><div class="ops-list"><div class="ops-list-item"><span class="tag red">严重</span><div class="grow"><strong>DFT-0198 · 高并发消息上报丢包</strong><small>已待验证 3 天 · 指派人 孙宁</small></div><button class="op" data-action="ops-notify" data-person="孙宁">提醒负责人</button><button class="op" data-action="ops-open-defect">查看</button></div><div class="ops-list-item"><span class="tag red">致命</span><div class="grow"><strong>DFT-0189 · 设备批量升级失败</strong><small>已打开 1 天 · 指派人 李明</small></div><button class="op" data-action="ops-notify" data-person="李明">提醒负责人</button><button class="op" data-action="ops-open-defect">查看</button></div></div></div><div class="card ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">测试进度总览</h3><p class="ops-subtitle">每行一个项目，支持点击进入项目测试阶段</p></div><span class="mini-note">用例执行率 82%</span></div><div class="table-wrap"><table class="table"><thead><tr><th>项目</th><th>用例总数</th><th>已执行</th><th>通过</th><th>失败</th><th>剩余</th><th>操作</th></tr></thead><tbody>${[
-      ['智能温控', '128', '105', '96', '9', '23', 'thermal'],
-      ['设备云平台', '96', '80', '73', '7', '16', 'cloud'],
-      ['边缘网关', '64', '64', '52', '12', '0', 'gateway'],
-    ]
-      .map(
-        (x) =>
-          `<tr><td class="link">${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td><td class="up">${x[3]}</td><td class="down">${x[4]}</td><td>${x[5]}</td><td><button class="op" data-action="ops-open-project" data-project="${x[6]}">查看项目</button></td></tr>`,
-      )
-      .join('')}</tbody></table></div></div></div>`;
-  if (tab === 'people')
-    body = `${opsFilters()}<div class="grid cols-2"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">人员负载总览</h3><p class="ops-subtitle">未来 4 周任务排期；点击人员查看项目明细、卡点和风险</p></div><span class="mini-note">标准工时 160h</span></div><div class="ops-bars">${[
-      ['赵敏', 112, 'danger', '缺陷阻塞'],
-      ['王凯', 104, 'warn', '需求变更'],
-      ['孙宁', 86, 'ok', '无'],
-      ['李明', 74, 'ok', '无'],
-    ]
-      .map(
-        (x) =>
-          `<div class="ops-bar-row"><span>${person(x[0], x[0][0])}</span><div class="bar"><i style="width:${Math.min(x[1], 120) / 1.2}%;background:${x[2] === 'danger' ? '#f97066' : x[2] === 'warn' ? '#fdb022' : '#6fd6a1'}"></i></div><b class="${x[2] === 'danger' ? 'down' : x[2] === 'warn' ? 'up' : ''}">${x[1]}%</b><button class="op" data-action="ops-open-person" data-person="${x[0]}">明细</button></div>`,
-      )
-      .join(
-        '',
-      )}</div><div class="setting-detail"><b>负载口径</b><span class="ops-subtitle">已分配任务工时 ÷ 未来 4 周标准工时；超过 100% 黄色、超过 120% 红色。</span></div></div><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">人员效能趋势</h3><p class="ops-subtitle">按人员统计任务完成率、平均交付周期和引入缺陷率</p></div><select class="input" style="width:80px"><option>部门</option><option>个人</option></select></div><div class="grid cols-3"><div class="metric"><div class="metric-label">任务完成率</div><div class="metric-value">91<span class="metric-unit">%</span></div><div class="metric-foot">↑ 6% 较上月</div></div><div class="metric"><div class="metric-label">平均交付周期</div><div class="metric-value">4.6<span class="metric-unit">天</span></div><div class="metric-foot">↓ 0.8 天</div></div><div class="metric"><div class="metric-label">引入缺陷率</div><div class="metric-value down">3.2<span class="metric-unit">%</span></div><div class="metric-foot">目标 ≤ 3%</div></div></div><div class="ops-trend" style="margin-top:15px"><i style="height:44%"></i><i style="height:62%"></i><i style="height:58%"></i><i style="height:79%"></i><i style="height:86%"></i><i style="height:94%"></i></div><div class="ops-trend-label"><span>3月</span><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span></div></div></div><div class="card" style="margin-top:14px"><div class="card-head"><div><span class="card-title">部门成员列表</span><span class="card-note">项目参与、工时、卡点和资源空闲度</span></div><button class="btn" data-action="ops-export">导出人员明细</button></div><div class="table-wrap"><table class="table"><thead><tr><th>成员</th><th>部门 / 岗位</th><th>负责项目</th><th>参与项目</th><th>已耗用 / 剩余工时</th><th>卡点与风险</th><th>未来 4 周可分配</th><th>操作</th></tr></thead><tbody>${[
-      ['赵敏', '质量部 / 测试工程师', '1', '2', '86h / 24h', '设备待交付', '18h', 'danger'],
-      ['孙宁', '软件一科 / 后端开发', '2', '1', '124h / 32h', '无', '36h', 'ok'],
-      ['李明', '软件一科 / 后端开发', '1', '2', '78h / 45h', '无', '52h', 'ok'],
-      ['王凯', '软件一科 / 项目经理', '2', '3', '96h / 28h', '需求变更', '12h', 'warn'],
-    ]
-      .map(
-        (x) =>
-          `<tr><td>${person(x[0], x[0][0])}</td><td>${x[1]}</td><td>${x[2]}</td><td>${x[3]}</td><td>${x[4]}</td><td>${x[6] === 'danger' ? tag(x[5], 'red') : x[6] === 'warn' ? tag(x[5], 'orange') : '—'}</td><td class="${x[6] === 'danger' ? 'down' : x[6] === 'warn' ? 'up' : ''}">${x[6] === 'danger' ? '18h' : x[6] === 'warn' ? '12h' : '36h'}</td><td><button class="op" data-action="ops-open-person" data-person="${x[0]}">查看明细</button></td></tr>`,
-      )
-      .join('')}</tbody></table></div></div>`;
-  if (tab === 'resources')
-    body = `${opsFilters()}<div class="grid cols-2"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">部门资源池</h3><p class="ops-subtitle">按技术方向与技能标签分组，展示成员忙闲状态</p></div><button class="btn" data-action="ops-resource-filter">技能筛选</button></div><div class="resource-group"><div class="resource-head"><span>后端开发</span><span class="mini-note">4 人 · 平均 88%</span></div><div><span class="ops-chip">孙宁 · 86%</span><span class="ops-chip warn">李明 · 104%</span><span class="ops-chip">周航 · 74%</span><span class="ops-chip">陈涛 · 82%</span></div></div><div class="resource-group"><div class="resource-head"><span>测试工程</span><span class="mini-note">3 人 · 平均 103%</span></div><div><span class="ops-chip danger">赵敏 · 112%</span><span class="ops-chip warn">陈璐 · 101%</span><span class="ops-chip">刘洋 · 96%</span></div></div><div class="resource-group"><div class="resource-head"><span>产品与设计</span><span class="mini-note">3 人 · 平均 68%</span></div><div><span class="ops-chip">何盈 · 68%</span><span class="ops-chip warn">王凯 · 104%</span></div></div></div><div class="card ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">项目资源占用</h3><p class="ops-subtitle">同一人员被多个项目占用且超负载时自动标红</p></div><span class="tag red">2 个冲突</span></div><div class="table-wrap"><table class="table"><thead><tr><th>项目</th><th>成员数</th><th>占用工时</th><th>负载率</th><th>冲突成员</th><th>操作</th></tr></thead><tbody><tr><td>智能温控平台 V2.6</td><td>8</td><td>486h</td><td>92%</td><td>赵敏</td><td><button class="op" data-action="ops-resource-detail">查看占用</button></td></tr><tr><td>设备云平台 3.0</td><td>6</td><td>318h</td><td class="down">108%</td><td class="down">王凯、李明</td><td><button class="op" data-action="ops-resource-detail">查看冲突</button></td></tr><tr><td>边缘计算网关适配</td><td>5</td><td>224h</td><td>78%</td><td>—</td><td><button class="op" data-action="ops-resource-detail">查看占用</button></td></tr></tbody></table></div></div></div><div class="grid cols-2" style="margin-top:14px"><div class="card card-pad ops-panel"><div class="card-head"><div><h3 class="section-title" style="margin:0">资源需求预测</h3><p class="ops-subtitle">基于待立项项目预估工时，预测未来月份资源缺口</p></div><span class="mini-note">预测窗口：未来 4 个月</span></div><div class="ops-trend"><i style="height:52%"></i><i style="height:76%"></i><i style="height:93%"></i><i style="height:68%"></i></div><div class="ops-trend-label"><span>8月</span><span>9月</span><span>10月</span><span>11月</span></div><div class="legend"><span><i style="background:#9bbcff"></i>可用资源</span><span><i style="background:#ffd49a"></i>预计需求</span></div><div class="notice warn" style="margin-top:13px"><i>!</i><span>10 月预计存在 4 人资源缺口，建议提前发起跨部门调配。</span></div></div><div class="card ops-panel"><div class="card-head"><div><span class="card-title">跨部门调配记录</span><span class="card-note">借调、释放、审批和实际生效时间</span></div><button class="btn primary" data-action="ops-resource-request">发起调配申请</button></div><div class="table-wrap"><table class="table"><thead><tr><th>调配对象</th><th>来源部门</th><th>目标项目</th><th>周期</th><th>申请人</th><th>审批状态</th><th>操作</th></tr></thead><tbody><tr><td>陈璐 · 测试工程师</td><td>软件二科</td><td>智能温控平台</td><td>08/15—09/12</td><td>王凯</td><td>${tag('审批中', 'orange')}</td><td><button class="op" data-action="ops-approve-resource">审批</button></td></tr><tr><td>李明 · 后端开发</td><td>软件一科</td><td>设备云平台</td><td>08/18—09/05</td><td>赵敏</td><td>${tag('已通过', 'green')}</td><td><button class="op" data-action="ops-resource-detail">查看留痕</button></td></tr></tbody></table></div></div></div>`;
-  return `<section class="page">${commonHead('运营看板', tabs.find((x) => x[0] === tab)[1], '主管视角的项目健康度、人员负载、资源占用与调配分析。', '<button class="btn" data-action="ops-export">导出报告</button>')}<div class="tabs">${tabs.map(([k, n]) => `<button class="tab ${tab === k ? 'active' : ''}" data-action="ops-tab" data-tab="${k}">${n}</button>`).join('')}</div>${body}</section>`;
-}
-App.renderOperations = renderOperations;
 
 function ops2Tab() {
   return state.view === 'ops-review'
@@ -97,6 +23,7 @@ function ops2Tab() {
 }
 
 function ops2Tabs() {
+  if (!can(state.role, 'operations.view')) return '';
   return (
     '<div class="ops2-tabs"><button class="ops2-tab ' +
     (ops2Tab() === 'projects' ? 'active' : '') +
@@ -141,7 +68,7 @@ function ops2ProjectButton(id, name, meta) {
   );
 }
 
-function ops2Projects() {
+function ops2ProjectBoard() {
   return (
     '<div class="ops2-toolbar"><span class="ops2-spacer"></span><span class="mini-note">数据更新时间：刚刚</span></div><div class="ops2-grid cols-2"><div class="ops2-card"><div class="ops2-card-head"><strong>项目健康度矩阵</strong><span class="mini-note">点击项目定位异常</span></div><div class="ops2-matrix"><div class="ops2-quadrant good"><strong>高进度 · 高质量</strong>' +
     ops2ProjectButton('thermal', '液冷控制算法', '进度 72% · 质量 94%') +
@@ -153,6 +80,123 @@ function ops2Projects() {
     ops2ProjectButton('algorithm', '智能温控预研', '进度 39% · 质量 62%') +
     '</div></div></div><div class="ops2-card"><div class="ops2-card-head"><strong>重点项目关注</strong><button class="op" data-ops2-action="focus-settings">管理关注项目</button></div><div class="ops2-card-body"><div class="ops2-list"><div class="ops2-list-row"><span class="mini-avatar">液</span><div class="grow"><strong>液冷控制算法预研</strong><small>王凯 · 进度 72% · 更新于刚刚</small></div><span class="tag orange">设备延期</span></div><div class="ops2-list-row"><span class="mini-avatar">云</span><div class="grow"><strong>设备云平台 3.0</strong><small>陈思 · 进度 81% · 更新于 10 分钟前</small></div><span class="tag red">质量风险</span></div><div class="ops2-list-row"><span class="mini-avatar">网</span><div class="grow"><strong>边缘网关适配</strong><small>赵敏 · 进度 48% · 更新于 18 分钟前</small></div><span class="tag blue">正常</span></div></div></div></div></div><div class="ops2-grid cols-2" style="margin-top:12px"><div class="ops2-card"><div class="ops2-card-head"><strong>延期风险预警</strong><span class="tag red">3 项异常</span></div><div class="ops2-card-body"><div class="ops2-alert"><b>整机联调环境交付延期</b><span>关键路径阻塞 · 已滞留 3 天 · 责任人：王凯</span></div><div class="ops2-alert"><b>设备云平台 3.0 · 版本验收即将逾期</b><span>里程碑：测试报告审核 · 剩余 2 天 · 责任人：赵敏</span></div><div class="ops2-alert"><b>边缘网关适配 · 接口联调任务阻塞</b><span>预计影响发布节点 · 责任人：李明</span></div></div></div><div class="ops2-card"><div class="ops2-card-head"><strong>质量趋势图</strong><span class="mini-note">按月 · 自动统计</span></div><div class="ops2-trend"><div class="ops2-trend-col"><i style="height:45%"></i><i class="alt" style="height:62%"></i></div><div class="ops2-trend-col"><i style="height:58%"></i><i class="alt" style="height:68%"></i></div><div class="ops2-trend-col"><i style="height:72%"></i><i class="alt" style="height:76%"></i></div><div class="ops2-trend-col"><i style="height:80%"></i><i class="alt" style="height:86%"></i></div><div class="ops2-trend-col"><i style="height:88%"></i><i class="alt" style="height:92%"></i></div></div><div class="ops2-xlabels"><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span></div><div class="ops2-legend"><span><i></i>发布通过率</span><span><i class="alt"></i>缺陷闭环率</span></div></div></div><div class="ops2-grid cols-2" style="margin-top:12px"><div class="ops2-card"><div class="ops2-card-head"><strong>缺陷闭环监控</strong><span class="tag red">未关闭 12</span></div><div class="ops2-card-body"><div class="ops2-list"><div class="ops2-list-row"><span class="tag red">严重</span><div class="grow"><strong>高并发设备消息上报丢包</strong><small>DFT-202608-0198 · 已超期 3 天 · 孙宁</small></div><button class="op" data-ops2-action="notify" data-ops2-person="孙宁">提醒</button></div><div class="ops2-list-row"><span class="tag orange">一般</span><div class="grow"><strong>断线重连状态同步延迟</strong><small>DFT-202608-0197 · 待处理 · 李明</small></div><button class="op" data-ops2-action="notify" data-ops2-person="李明">提醒</button></div></div></div></div><div class="ops2-card"><div class="ops2-card-head"><strong>测试进度总览</strong><span class="mini-note">按项目汇总</span></div><div class="ops2-table-wrap"><table class="ops2-table"><thead><tr><th>项目</th><th>用例总数</th><th>已执行</th><th>通过</th><th>失败</th><th>剩余</th></tr></thead><tbody><tr><td>液冷控制算法</td><td>128</td><td>105</td><td class="up">96</td><td class="down">9</td><td>23</td></tr><tr><td>设备云平台 3.0</td><td>96</td><td>80</td><td class="up">73</td><td class="down">7</td><td>16</td></tr><tr><td>边缘网关适配</td><td>64</td><td>42</td><td class="up">38</td><td class="down">4</td><td>22</td></tr></tbody></table></div></div></div>'
   );
+}
+
+/** 项目运营看板顶部的五个统计图（阶段分布、进度、趋势、缺陷构成、健康度）。 */
+function ops2ProjectCharts() {
+  var f = Object.entries(projects),
+    counts = {};
+  f.forEach(function (x) {
+    var s = x[1].flowStatus || x[1].status;
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  var charts = '<div class="v47-ops-grid" style="margin-top:16px">';
+  charts +=
+    '<div class="v47-chart-card"><b>① 项目阶段分布 · 柱状图</b>' +
+    ['立项阶段', '需求阶段', '设计阶段', '开发阶段', '测试阶段', '发布阶段', '已发布']
+      .map(function (s) {
+        var n = f.filter(function (x) {
+          return (x[1].flowStatus || '').includes(s);
+        }).length;
+        return (
+          '<div class="v47-bar"><span>' +
+          s +
+          '</span><div><i style="width:' +
+          (n / Math.max(1, f.length)) * 100 +
+          '%"></i></div><strong>' +
+          n +
+          '</strong></div>'
+        );
+      })
+      .join('') +
+    '</div>';
+  charts +=
+    '<div class="v47-chart-card"><b>② 里程碑达成 · 横向柱状图</b>' +
+    f
+      .slice(0, 6)
+      .map(function (x) {
+        var n = x[1].progress || 0;
+        return (
+          '<div class="v47-bar"><span>' +
+          esc(x[1].name.slice(0, 8)) +
+          '</span><div><i style="width:' +
+          n +
+          '%"></i></div><b>' +
+          n +
+          '%</b></div>'
+        );
+      })
+      .join('') +
+    '</div>';
+  charts +=
+    '<div class="v47-chart-card"><b>③ 项目延期趋势 · 折线图（历史 Mock）</b><svg viewBox="0 0 340 125" style="width:100%;max-height:125px;margin-top:8px"><path d="M20 92H330M20 50H330M20 10H330" stroke="#e3eaf4"/><polyline class="v47-line" points="20,55 76,65 132,38 188,52 244,22 310,35"/>' +
+    [20, 76, 132, 188, 244, 310]
+      .map(function (x, i) {
+        return (
+          '<text x="' +
+          x +
+          '" y="119" text-anchor="middle" font-size="10" fill="#667085">' +
+          (i + 5) +
+          '月</text>'
+        );
+      })
+      .join('') +
+    '</svg></div>';
+  charts +=
+    '<div class="v47-chart-card"><b>④ 需求变更结构 · 堆叠柱状图（历史 Mock）</b>' +
+    [
+      ['智能温控', 8, 3, 1],
+      ['设备云', 5, 2, 1],
+      ['边缘网关', 4, 3, 0],
+      ['液冷算法', 6, 1, 1],
+    ]
+      .map(function (x) {
+        var total = x[1] + x[2] + x[3];
+        return (
+          '<div style="padding:10px 0"><small>' +
+          x[0] +
+          ' · ' +
+          total +
+          ' 项</small><div class="v47-stack"><i style="width:' +
+          (x[1] / total) * 100 +
+          '%;background:#3874d5"></i><i style="width:' +
+          (x[2] / total) * 100 +
+          '%;background:#f79009"></i><i style="width:' +
+          (x[3] / total) * 100 +
+          '%;background:#98a2b3"></i></div></div>'
+        );
+      })
+      .join('') +
+    '<small>蓝：新增　橙：变更　灰：取消</small></div>';
+  var risks = f.reduce(function (acc, x) {
+    var status = x[1].health || '健康';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  charts +=
+    '<div class="v47-chart-card"><b>⑤ 项目风险等级 · 分布条形图</b>' +
+    Object.entries(risks)
+      .map(function (x) {
+        return (
+          '<div class="v47-bar"><span>' +
+          esc(x[0]) +
+          '</span><div><i style="width:' +
+          (x[1] / f.length) * 100 +
+          '%;background:' +
+          (x[0] === '风险' ? '#f79009' : '#42ad90') +
+          '"></i></div><b>' +
+          x[1] +
+          '</b></div>'
+        );
+      })
+      .join('') +
+    '</div></div>';
+  return charts;
+}
+
+function ops2Projects() {
+  return ops2ProjectCharts() + ops2ProjectBoard();
 }
 App.ops2Projects = ops2Projects;
 
@@ -200,6 +244,8 @@ function ops3ProjectAnalytics() {
 }
 
 function renderOps2() {
+  if (!can(state.role, 'operations.view'))
+    return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
   var tab = ops2Tab();
   if (tab === 'review' && !can(state.role, 'operations.view')) {
     state.view = 'ops-projects';

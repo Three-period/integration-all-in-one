@@ -7,7 +7,6 @@
  */
 import './styles/base.css';
 import './styles/approval-dashboard.css';
-import './styles/layout-refinements.css';
 import './styles/operations-analytics.css';
 import './styles/reviewer-tasks.css';
 import './styles/asset-gallery.css';
@@ -16,14 +15,14 @@ import './styles/report-stage-gate.css';
 import './styles/lifecycle-flow.css';
 import './styles/design-testing-scope.css';
 import './styles/document-approval.css';
-import './styles/professional-review.css';
-import './styles/role-mapping.css';
 import './styles/review-process.css';
 import './styles/lifecycle.css';
 import './styles/login.css';
+import './styles/responsive.css';
 
 import { currentUser } from './core/auth.js';
 import { enterApp, setBoot, showLogin } from './app/session.js';
+import { App } from './core/app.js';
 
 // Modules that only register extension points on App.
 import './app/render.js';
@@ -38,7 +37,7 @@ import {
   bindRequirementPageEvents,
   bindRequirementListEvents,
 } from './pages/project/requirements.js';
-import { bindNavGroupEvents } from './components/shell.js';
+import { bindNavGroupEvents, bindResponsiveNav } from './components/shell.js';
 import { initAdjustmentCleanup } from './pages/adjustment/adjustment.js';
 import { bindProfileMenu } from './components/profile-menu.js';
 import { bindFlowViewEvents } from './pages/project/planning.js';
@@ -65,20 +64,18 @@ import { initStageApproval } from './features/stage-approval.js';
 import { initLifecycleFlow } from './features/lifecycle-flow.js';
 import { initInlineDocuments } from './features/inline-documents.js';
 import { initStageGate } from './features/stage-gate.js';
-import { initLayoutRefinements } from './features/layout-refinements.js';
 import { initDesignTestingScope } from './features/design-testing-scope.js';
 import { initDocumentApproval } from './features/document-approval.js';
 import { initReadonlyReportDrawers } from './features/readonly-report-drawers.js';
-import { initProfessionalReview } from './features/professional-review.js';
-import { initRoleMapping } from './features/role-mapping.js';
 import { initReviewProcess } from './pages/review/review-process.js';
 
 const bootSequence = [
   bindReadonlyGuard, // 未开始阶段只读保护（需最先注册，先于其他捕获阶段监听）
   bindActionEvents, // V1.3 全局 data-action 事件分发
-  startApp, // 加载布局、绑定全局事件并首次渲染
+  startApp, // 加载布局、绑定全局事件
   bindRequirementDrawerEvents, // 需求抽屉事件
   bindNavGroupEvents, // 侧边栏分组展开/收起
+  bindResponsiveNav, // 平板 / 手机：侧栏抽屉开关
   initAdjustmentCleanup, // 项目调整页移除评审管理入口
   bindProfileMenu, // 个人菜单（个人信息 / 修改密码 / 退出）
   bindFlowViewEvents, // 流程视图节点导航
@@ -106,13 +103,11 @@ const bootSequence = [
   initLifecycleFlow, // V47 统一 Mock 生命周期与角色门禁
   initInlineDocuments, // V47 需求/设计抽屉内联文档
   initStageGate, // V48 阶段门禁与集中审批
-  initLayoutRefinements, // V49 布局整理与阶段目录
   initDesignTestingScope, // V53 设计导航 / 可选测试报告 / 冒烟报告
   initDocumentApproval, // V54 文档驱动的阶段审批
   initReadonlyReportDrawers, // V54.1 报告抽屉只读
-  initProfessionalReview, // V55 专业检视
-  initRoleMapping, // V55.5 角色映射与测试阶段渲染
   initReviewProcess, // V56 检视流程 V5
+  () => App.render(), // 所有模块注册完成后首次渲染
 ];
 
 setBoot(() => bootSequence.forEach((step) => step()));

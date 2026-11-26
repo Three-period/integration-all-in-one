@@ -5,15 +5,11 @@ import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
 import { nowStamp } from './dev-review.js';
 import { logFlowNote } from './lifecycle-flow.js';
-import { getDevRecord, baseRenderTesting, baseSaveTestReport } from './stage-progress.js';
+import { getDevRecord } from './stage-progress.js';
 import { closingCurrent } from '../pages/project/closing.js';
 import { computeReleaseGate } from '../domain/release-gate.js';
 import { isHandoffReady } from '../domain/stages.js';
 import { project, state } from '../store/state.js';
-
-let originalSaveTestReport;
-export let originalRenderTesting;
-let baseClosingDetailBody;
 
 /* V52: unified cross-stage commit anchor and test/release/closing gates */
 
@@ -86,7 +82,7 @@ export function renderVersionBanner() {
   return '';
 }
 
-function renderAnchoredReleaseVersions() {
+export function renderAnchoredReleaseVersions() {
   App.releaseInit();
   var z = getReleaseGate(),
     rr = z.releaseReview,
@@ -126,40 +122,6 @@ function renderAnchoredReleaseVersions() {
 
 /** V52 跨阶段 Commit 锚点与测试/发布/结项门禁 */
 export function initVersionAnchor() {
-  /* Reports are outputs. Bind every saved/submitted report to the immutable handoff Commit. */
-  originalSaveTestReport = baseSaveTestReport;
-  App.saveTestReport = function (submit) {
-    var commit = getHandoffCommit();
-    if (!commit) {
-      showToast('请先完成开发检视准出并移交正式 Commit', 'warn');
-      return;
-    }
-    var r = App.collectTestReport();
-    r.commit = commit;
-    r.version = project().version || getVersionAnchor().handoffVersion || r.version;
-    return originalSaveTestReport(submit);
-  };
-  originalRenderTesting = baseRenderTesting;
-  App.renderTesting = function () {
-    return renderVersionBanner() + originalRenderTesting();
-  };
-  App.renderStepBanner = function () {
-    return renderVersionBanner();
-  };
-  App.renderReleaseVersions = renderAnchoredReleaseVersions;
-  /* Expose the exact published version on the closing application. */
-  baseClosingDetailBody = App.closingDetailBody;
-  App.closingDetailBody = function (item) {
-    var z = getReleaseGate();
-    return (
-      baseClosingDetailBody(item) +
-      '<div class="detail-section"><h4>结项版本校验</h4><div class="kv-grid"><div class="kv"><label>正式发布版本</label><div>' +
-      esc(z.published ? z.published.version : '—') +
-      '</div></div><div class="kv"><label>正式发布 Commit</label><div>' +
-      esc(z.published ? z.published.commit : '—') +
-      '</div></div></div><p class="mini-note">提交结项时自动固化本次正式发布的版本与 Commit，不允许引用其他版本。</p></div>'
-    );
-  };
   /* 正式发布：发布评审通过后执行，绑定同一提测 Commit。 */
   document.addEventListener(
     'click',

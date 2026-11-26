@@ -1,0 +1,190 @@
+/*
+ * 自适应布局（最后加载，覆盖各页面样式）。
+ * 断点：≥1280 桌面（固定侧栏）；768–1279 平板（侧栏改为抽屉，菜单按钮打开）；<768 手机（单列）。
+ */
+
+/* 通用：内容区不再强制最小宽度；表格在自身容器内横向滚动。 */
+.workspace {
+  min-width: 0;
+}
+:where(#appView, #drawer, #modalRoot) div:has(> table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.nav-toggle,
+.nav-mask {
+  display: none;
+}
+
+/* 工作台卡片：同一行等高，边缘对齐。 */
+.dashboard-grid {
+  align-items: stretch;
+}
+.dashboard-grid > .widget {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-grid > .widget > :last-child {
+  flex: 1;
+}
+
+/* 平板与小屏桌面：侧栏改为抽屉 */
+@media (max-width: 1279px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .topbar {
+    grid-column: 1;
+    padding: 0 16px;
+    gap: 12px;
+  }
+  .workspace {
+    grid-column: 1;
+  }
+  .nav-toggle {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .nav-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+  .brand,
+  .sidebar {
+    position: fixed;
+    left: 0;
+    width: 248px;
+    z-index: 36;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .brand {
+    top: 0;
+    height: 60px;
+  }
+  .sidebar {
+    top: 60px;
+    bottom: 0;
+    box-shadow: 12px 0 30px rgba(16, 24, 40, 0.12);
+  }
+  body.nav-open .brand,
+  body.nav-open .sidebar {
+    transform: none;
+  }
+  body.nav-open .nav-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(16, 24, 40, 0.36);
+  }
+  .grid.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .dashboard-grid > .widget,
+  .dashboard-grid > .widget.span-6 {
+    grid-column: span 3;
+  }
+  .dashboard-grid > .widget.span-8,
+  .dashboard-grid > .widget.span-12 {
+    grid-column: span 6;
+  }
+}
+
+/* 手机：单列布局 */
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .crumb {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .global-search {
+    display: none;
+  }
+  .page {
+    padding: 14px 12px 28px;
+  }
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .head-actions {
+    justify-content: flex-start;
+  }
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-grid > .widget,
+  .dashboard-grid > .widget.span-6,
+  .dashboard-grid > .widget.span-8,
+  .dashboard-grid > .widget.span-12 {
+    grid-column: auto;
+  }
+  .project-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .banner-meta {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+  :where(#appView) table {
+    min-width: 640px;
+  }
+  .drawer {
+    width: 100vw;
+    right: -100vw;
+  }
+  .drawer.req-drawer-large {
+    width: 100vw;
+    right: -100vw;
+  }
+  .drawer.show,
+  .drawer.req-drawer-large.show {
+    right: 0;
+  }
+  .modal-mask {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    width: 100vw;
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
+  }
+  .stage-tabs .stage-tab {
+    min-width: 0;
+    padding: 0 10px;
+  }
+}
+
+.top-icon-svg {
+  width: 18px;
+  height: 18px;
+  color: #475467;
+}

@@ -1508,7 +1508,6 @@ export function initReviewProcess() {
     App.openAiReviewDrawer();
   };
   App.reviewerTaskEntries = entries;
-  App.reviewerEntriesWithDemo = entries;
   App.openReviewerTask = function (pid) {
     if (!projects[pid]) return;
     state.projectId = pid;
@@ -1818,5 +1817,4 @@ export function initReviewProcess() {
     true,
   );
   document.title = '一体化产品研发系统 · V56.0 检视流程原型';
-  App.render();
 }

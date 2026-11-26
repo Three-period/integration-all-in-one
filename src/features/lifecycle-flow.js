@@ -16,14 +16,6 @@ import {
 } from '../domain/stages.js';
 import { project, state } from '../store/state.js';
 
-let baseDevSummaryCard;
-let baseRenderDevelopment;
-
-let baseReviewerWorkspace;
-let baseOpsProjects;
-let baseRenderOps;
-let baseOpsTabs;
-
 /* V55.4: the built-in thermal demo starts at development; an explicit Mock reset still starts from planning. */
 
 export function logFlowNote(msg) {
@@ -111,10 +103,29 @@ function renderProjectFormFields(p) {
         );
       })
       .join('') +
+    testPathField('needsSingleTest', '是否需要单板测试', p.needsSingleTest) +
+    testPathField('needsLongTest', '是否需要长运测试', p.needsLongTest) +
     '</div>'
   );
 }
 App.renderProjectFormFields = renderProjectFormFields;
+
+/** 测试路径：是否需要单板 / 长运测试，未选择时默认需要。 */
+function testPathField(key, label, value) {
+  return (
+    '<div class="v47-field"><label>' +
+    label +
+    '</label><select data-v47-field="' +
+    key +
+    '">' +
+    '<option value="是"' +
+    (value !== '否' ? ' selected' : '') +
+    '>是</option>' +
+    '<option value="否"' +
+    (value === '否' ? ' selected' : '') +
+    '>否</option></select></div>'
+  );
+}
 
 function readProjectForm() {
   var p = {};
@@ -219,23 +230,6 @@ export function projectDesignDocTypes() {
 
 /** V47 统一 Mock 生命周期与角色门禁 */
 export function initLifecycleFlow() {
-  baseDevSummaryCard = App.renderDevSummaryCard;
-  App.renderDevSummaryCard = function (title, status, note, type, badge) {
-    if (type === 'repo' && getDevReview().v47NeedsNewCommit) {
-      status = '待提交 · 整改新 Commit';
-      badge = 'warn';
-    }
-    return baseDevSummaryCard(title, status, note, type, badge);
-  };
-  baseRenderDevelopment = App.renderDevelopment;
-  App.renderDevelopment = function () {
-    if (!can(state.role, 'dev.workspace'))
-      return '<div class="notice warn">开发阶段工作台仅开发工程师和检视工程师可用。</div>';
-    var d = getDevReview();
-    d.role = state.role === 'reviewer' ? 'reviewer' : 'developer';
-    return baseRenderDevelopment();
-  };
-
   App.openAiResultsEvidence = function () {
     if (!can(state.role, 'review.perform')) {
       showToast('仅检视工程师可查看 AI 检视资料', 'warn');
@@ -344,146 +338,6 @@ export function initLifecycleFlow() {
       })
       .join('');
     openDrawer('AI 四类检查 · 文件/规则/整改闭环', notice + groups);
-  };
-  baseReviewerWorkspace = App.renderReviewerWorkspace;
-  App.renderReviewerWorkspace = function (d) {
-    var h = baseReviewerWorkspace(d);
-    h = h.replace(
-      /(先保存当前 Commit 的独立抽检结论，再查看 AI 对照结果。)/g,
-      '正式检视阶段即可查看四类 AI 检查；三项必检影响准出，不影响查看。',
-    );
-    h = h.replace(
-      /(<button[^>]*data-v35="show-ai-manual"[^>]*?)\sdisabled(?:\s+title="[^"]*")?/g,
-      '$1',
-    );
-    return h;
-  };
-  baseOpsProjects = App.ops2Projects;
-  App.ops2Projects = function () {
-    var html = baseOpsProjects();
-    var f = Object.entries(projects),
-      counts = {};
-    f.forEach(function (x) {
-      var s = x[1].flowStatus || x[1].status;
-      counts[s] = (counts[s] || 0) + 1;
-    });
-
-    var charts = '<div class="v47-ops-grid" style="margin-top:16px">';
-    charts +=
-      '<div class="v47-chart-card"><b>① 项目阶段分布 · 柱状图</b>' +
-      ['立项阶段', '需求阶段', '设计阶段', '开发阶段', '测试阶段', '发布阶段', '已发布']
-        .map(function (s) {
-          var n = f.filter(function (x) {
-            return (x[1].flowStatus || '').includes(s);
-          }).length;
-          return (
-            '<div class="v47-bar"><span>' +
-            s +
-            '</span><div><i style="width:' +
-            (n / Math.max(1, f.length)) * 100 +
-            '%"></i></div><strong>' +
-            n +
-            '</strong></div>'
-          );
-        })
-        .join('') +
-      '</div>';
-    charts +=
-      '<div class="v47-chart-card"><b>② 里程碑达成 · 横向柱状图</b>' +
-      f
-        .slice(0, 6)
-        .map(function (x) {
-          var n = x[1].progress || 0;
-          return (
-            '<div class="v47-bar"><span>' +
-            esc(x[1].name.slice(0, 8)) +
-            '</span><div><i style="width:' +
-            n +
-            '%"></i></div><b>' +
-            n +
-            '%</b></div>'
-          );
-        })
-        .join('') +
-      '</div>';
-    charts +=
-      '<div class="v47-chart-card"><b>③ 项目延期趋势 · 折线图（历史 Mock）</b><svg viewBox="0 0 340 125" style="width:100%;max-height:125px;margin-top:8px"><path d="M20 92H330M20 50H330M20 10H330" stroke="#e3eaf4"/><polyline class="v47-line" points="20,55 76,65 132,38 188,52 244,22 310,35"/>' +
-      [20, 76, 132, 188, 244, 310]
-        .map(function (x, i) {
-          return (
-            '<text x="' +
-            x +
-            '" y="119" text-anchor="middle" font-size="10" fill="#667085">' +
-            (i + 5) +
-            '月</text>'
-          );
-        })
-        .join('') +
-      '</svg></div>';
-    charts +=
-      '<div class="v47-chart-card"><b>④ 需求变更结构 · 堆叠柱状图（历史 Mock）</b>' +
-      [
-        ['智能温控', 8, 3, 1],
-        ['设备云', 5, 2, 1],
-        ['边缘网关', 4, 3, 0],
-        ['液冷算法', 6, 1, 1],
-      ]
-        .map(function (x) {
-          var total = x[1] + x[2] + x[3];
-          return (
-            '<div style="padding:10px 0"><small>' +
-            x[0] +
-            ' · ' +
-            total +
-            ' 项</small><div class="v47-stack"><i style="width:' +
-            (x[1] / total) * 100 +
-            '%;background:#3874d5"></i><i style="width:' +
-            (x[2] / total) * 100 +
-            '%;background:#f79009"></i><i style="width:' +
-            (x[3] / total) * 100 +
-            '%;background:#98a2b3"></i></div></div>'
-          );
-        })
-        .join('') +
-      '<small>蓝：新增　橙：变更　灰：取消</small></div>';
-    var risks = f.reduce(function (acc, x) {
-      var status = x[1].health || '健康';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
-    charts +=
-      '<div class="v47-chart-card"><b>⑤ 项目风险等级 · 分布条形图</b>' +
-      Object.entries(risks)
-        .map(function (x) {
-          return (
-            '<div class="v47-bar"><span>' +
-            esc(x[0]) +
-            '</span><div><i style="width:' +
-            (x[1] / f.length) * 100 +
-            '%;background:' +
-            (x[0] === '风险' ? '#f79009' : '#42ad90') +
-            '"></i></div><b>' +
-            x[1] +
-            '</b></div>'
-          );
-        })
-        .join('') +
-      '</div></div>';
-    return html + charts;
-  };
-  baseRenderOps = App.renderOps2;
-  App.renderOps2 = function () {
-    if (!can(state.role, 'operations.view')) {
-      return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
-    }
-    return baseRenderOps();
-  };
-  App.renderOperations = function () {
-    return App.renderOps2();
-  };
-  baseOpsTabs = App.ops2Tabs;
-  App.ops2Tabs = function () {
-    return can(state.role, 'operations.view') ? baseOpsTabs() : '';
   };
   document.addEventListener(
     'click',

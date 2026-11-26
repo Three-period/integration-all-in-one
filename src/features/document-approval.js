@@ -4,12 +4,7 @@ import { closeDrawer, openDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
-import {
-  originalRenderTesting,
-  getHandoffCommit,
-  getReleaseGate,
-  renderVersionBanner,
-} from './version-anchor.js';
+import { getHandoffCommit, getReleaseGate } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
 /** V54 文档驱动的阶段审批 */
@@ -183,11 +178,6 @@ export function initDocumentApproval() {
     );
   }
   App.renderTestingReport = renderReportList;
-  // Remove V52.1's phase-approval card from the testing page. The flow view
-  // becomes the only place for simulated test-phase approval.
-  App.renderTesting = function () {
-    return renderVersionBanner() + originalRenderTesting();
-  };
   function renderReportDrawer(kind, row, mode) {
     var enabled = isReportKindEnabled(kind);
     state.testingSection = kind;
@@ -398,5 +388,4 @@ export function initDocumentApproval() {
     '.v54-report-drawer .v54-drawer-meta label{font-size:12px;font-weight:600;color:#475467;display:flex;flex-direction:column;gap:6px}' +
     '@media(max-width:700px){.v54-report-drawer .v54-drawer-meta{grid-template-columns:1fr}}';
   document.head.appendChild(css);
-  App.render();
 }

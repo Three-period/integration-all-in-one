@@ -169,5 +169,4 @@ export function initInlineDocuments() {
     },
     true,
   );
-  App.render();
 }

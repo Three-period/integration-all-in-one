@@ -1,11 +1,29 @@
 /** 测试阶段：用例、测试报告与缺陷。 */
+import { isTestKindEnabled } from '../../domain/testing.js';
+import { renderVersionBanner } from '../../features/version-anchor.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { $, esc, tag } from '../../core/dom.js';
 import { project, state } from '../../store/state.js';
 
+/** 测试阶段数据按项目隔离：切换项目时重置用例、缺陷与筛选条件。 */
 function testingInit() {
+  if (state.v38TestProject !== state.projectId) {
+    state.v38TestProject = state.projectId;
+    state.testingCases = null;
+    state.testingDefects = null;
+    state.testingQuery = '';
+    state.testingDefectQuery = '';
+    state.testingSection = 'cases';
+  }
+  seedTestingData();
+  state.testingDefects.forEach(function (d) {
+    d.project = project().name;
+  });
+}
+
+function seedTestingData() {
   if (!state.testingSection) state.testingSection = 'cases';
   if (!state.testingQuery) state.testingQuery = '';
   if (!state.testingStatusFilter) state.testingStatusFilter = '全部';
@@ -147,6 +165,7 @@ App.testingInit = testingInit;
 function testingSections() {
   return [
     ['cases', '用例管理'],
+    ['smoke', '冒烟测试报告'],
     ['single', '单板测试报告'],
     ['long', '长运测试报告'],
     ['system', '整机测试报告'],
@@ -191,7 +210,11 @@ function testingSubnav() {
           (state.testingSection === item[0] ? 'active' : '') +
           '" data-testing-page-action="section" data-testing-section="' +
           item[0] +
-          '">' +
+          '"' +
+          (isTestKindEnabled(project(), item[0])
+            ? ''
+            : ' data-v53-inactive="1" title="当前项目未启用此项测试"') +
+          '>' +
           item[1] +
           '</button>'
         );
@@ -481,6 +504,7 @@ App.renderTestingCases = renderTestingCases;
 
 function testingReportInfo(section) {
   var map = {
+    smoke: ['冒烟测试报告', '记录测试阶段冒烟测试结果与风险说明'],
     single: ['单板测试报告', '记录单板级功能与接口测试结果'],
     long: ['长运测试报告', '记录长时间运行、稳定性与资源占用测试结果'],
     system: ['整机测试报告', '记录整机联调、安装和验收测试结果'],
@@ -494,10 +518,11 @@ function testingDefectRows() {
   var query = (state.testingDefectQuery || '').toLowerCase();
   return state.testingDefects.filter(function (item) {
     return (
-      !query ||
-      (item.id + ' ' + item.name + ' ' + item.solver + ' ' + item.project)
-        .toLowerCase()
-        .indexOf(query) > -1
+      item.project === project().name &&
+      (!query ||
+        (item.id + ' ' + item.name + ' ' + item.solver + ' ' + item.project)
+          .toLowerCase()
+          .indexOf(query) > -1)
     );
   });
 }
@@ -748,13 +773,22 @@ export function renderTestingDefects() {
 
 function renderTesting() {
   App.testingInit();
+  var section = state.testingSection || 'cases';
+  if (
+    !App.testingSections().some(function (item) {
+      return item[0] === section;
+    })
+  )
+    section = 'cases';
+  state.testingSection = section;
   var content =
-    state.testingSection === 'cases'
+    section === 'cases'
       ? App.renderTestingCases()
-      : state.testingSection === 'defects'
+      : section === 'defects'
         ? renderTestingDefects()
-        : App.renderTestingReport(state.testingSection);
+        : App.renderTestingReport(section);
   return (
+    renderVersionBanner() +
     '<div class="testing-reference-page"><div class="testing-stage-layout">' +
     App.testingSubnav() +
     '<main class="testing-main">' +
@@ -763,35 +797,6 @@ function renderTesting() {
   );
 }
 App.renderTesting = renderTesting;
-
-function renderTestingReport(section) {
-  var info = App.testingReportInfo(section),
-    r = App.getTestReport(section);
-  return (
-    '<div class="testing-report-panel"><div class="testing-report-head"><div><h3>' +
-    info[0] +
-    '</h3><p>' +
-    info[1] +
-    ' · ' +
-    esc(r.status) +
-    ' · 演示数据</p></div><div class="testing-report-actions"><button class="btn primary" data-v37-report-action="new" data-section="' +
-    section +
-    '">＋ 新建报告</button><button class="btn" data-v37-report-action="save">保存草稿</button><button class="btn" data-v37-report-action="submit">提交评审</button></div></div>' +
-    App.renderTestReportBody(section) +
-    '</div>'
-  );
-}
-App.renderTestingReport = renderTestingReport;
-
-export function openTestingReportDrawer(section) {
-  state.testingSection = section;
-  state.v37ReportTab = 'detail';
-  openDrawer(
-    App.testingReportInfo(section)[0] + ' · 报告编辑',
-    App.renderTestReportBody(section, 'detail'),
-    '<button class="btn" data-v37-report-action="close">关闭</button><button class="btn" data-v37-report-action="save">保存草稿</button><button class="btn primary" data-v37-report-action="submit">提交评审</button>',
-  );
-}
 
 /** 测试阶段交互 */
 export function bindTestingEvents() {
@@ -840,18 +845,6 @@ export function bindTestingEvents() {
       state.testingStatusFilter = '全部';
       state.testingPriorityFilter = '全部';
       App.render();
-      return;
-    }
-    if (action === 'new-report') {
-      openTestingReportDrawer(el.dataset.testingReport || 'single');
-      return;
-    }
-    if (action === 'save-report') {
-      showToast('请先打开报告并填写模板');
-      return;
-    }
-    if (action === 'submit-report') {
-      showToast('请先完成报告填写');
       return;
     }
     if (action === 'modal-cancel') {

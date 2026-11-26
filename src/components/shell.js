@@ -25,6 +25,7 @@ function crumb() {
     'ops-people': '运营看板 / 人员运营',
     'ops-resources': '运营看板 / 资源分配',
     'ops-review': '运营看板 / AI 检视',
+    'asset-gallery': '业务资产管理 / 资产画廊',
   };
   return map[state.view] || '一体化产品研发系统';
 }
@@ -136,6 +137,9 @@ function renderSidebar() {
     '<div class="nav-title">研发空间</div>' +
     navItem('项目集', '▦', 'portfolio', v === 'portfolio') +
     navGroup('项目管理', '▤', 'project', projectActive, projectChildren) +
+    '<div class="asset-sidebar-entry"><div class="nav-title">业务资产</div>' +
+    navItem('业务资产管理', '▣', 'asset-gallery', v === 'asset-gallery') +
+    '</div>' +
     // 运营看板仅部门主管可见。
     (can(state.role, 'operations.view')
       ? '<div class="nav-title">运营管理</div>' +
@@ -155,5 +159,28 @@ export function bindNavGroupEvents() {
     var key = group.dataset.navGroup;
     state.navGroups[key] = state.navGroups[key] !== true;
     App.renderSidebar();
+  });
+}
+
+/** 平板 / 手机：菜单按钮打开侧栏抽屉；点击遮罩或选择导航项后关闭。 */
+export function bindResponsiveNav() {
+  function setOpen(open) {
+    document.body.classList.toggle('nav-open', open);
+    const toggle = document.querySelector('.nav-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  }
+  document.addEventListener('click', function (e) {
+    const action = e.target.closest('[data-shell-action]');
+    if (action) {
+      setOpen(
+        action.dataset.shellAction === 'toggle-nav' &&
+          !document.body.classList.contains('nav-open'),
+      );
+      return;
+    }
+    if (e.target.closest('#sidebar [data-nav], #sidebar [data-action]')) setOpen(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') setOpen(false);
   });
 }

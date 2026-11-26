@@ -1,16 +1,10 @@
 /** 业务资产管理页（V42）。 */
-import { App } from '../core/app.js';
 import { openDrawer } from '../components/overlays.js';
-import { commonHead, navItem } from '../components/shell.js';
-import { $, esc } from '../core/dom.js';
+import { commonHead } from '../components/shell.js';
+import { esc } from '../core/dom.js';
 import { assetGalleryData } from '../data/asset-gallery.js';
-import { state } from '../store/state.js';
 
-let assetOriginalSidebar;
-let assetOriginalCrumb;
-let assetOriginalRender;
-
-function renderAssetGallery() {
+export function renderAssetGallery() {
   return (
     '<section class="page asset-gallery-page">' +
     commonHead(
@@ -87,33 +81,6 @@ function openAssetDetail(groupId, itemId) {
 
 /** V42 业务资产管理 */
 export function initAssetGallery() {
-  assetOriginalSidebar = App.renderSidebar;
-  App.renderSidebar = function () {
-    assetOriginalSidebar();
-    var sidebar = $('#sidebar');
-    var before = [...sidebar.querySelectorAll('.nav-title')].find(function (e) {
-      return e.textContent.trim() === '运营管理';
-    });
-    if (!before) return;
-    var entry = document.createElement('div');
-    entry.className = 'asset-sidebar-entry';
-    entry.innerHTML =
-      '<div class="nav-title">业务资产</div>' +
-      navItem('业务资产管理', '▣', 'asset-gallery', state.view === 'asset-gallery');
-    sidebar.insertBefore(entry, before);
-  };
-  assetOriginalCrumb = App.crumb;
-  App.crumb = function () {
-    return state.view === 'asset-gallery' ? '业务资产管理 / 资产画廊' : assetOriginalCrumb();
-  };
-  assetOriginalRender = App.render;
-  App.render = function () {
-    if (state.view !== 'asset-gallery') return assetOriginalRender();
-    App.renderSidebar();
-    $('#crumb').innerHTML = '业务资产管理 / <strong>资产画廊</strong>';
-    $('#appView').innerHTML = renderAssetGallery();
-    $('.workspace').scrollTop = 0;
-  };
   document.addEventListener('click', function (event) {
     var tile = event.target.closest('[data-asset-group][data-asset-id]');
     if (!tile) return;
@@ -121,5 +88,4 @@ export function initAssetGallery() {
     event.stopPropagation();
     openAssetDetail(tile.dataset.assetGroup, tile.dataset.assetId);
   });
-  App.render();
 }

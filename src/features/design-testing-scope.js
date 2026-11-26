@@ -4,7 +4,10 @@ import { App } from '../core/app.js';
 import { closeDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { projectDesignDocTypes } from './lifecycle-flow.js';
-import { isPriorDesignApproved as isPriorDesignApprovedRule } from '../domain/design.js';
+import {
+  FINAL_DESIGN_STATUSES,
+  isPriorDesignApproved as isPriorDesignApprovedRule,
+} from '../domain/design.js';
 import { isTestKindEnabled as isTestKindEnabledRule } from '../domain/testing.js';
 import { collectDesign, isDesignLocked } from '../pages/project/design.js';
 import { testingCaseRows } from '../pages/project/testing.js';
@@ -153,8 +156,9 @@ export function initDesignTestingScope() {
         'data-design-page-action="create" disabled title="前置文档未审核通过"',
       );
     }
+    // 「全部」为只读汇总，按约定不显示提示。
     var note = '';
-    if (current === '全部') note = '全部设计文档只读汇总；请进入具体文档分类新建。';
+    if (current === '全部') note = '';
     else if (!isDesignTypeApplicable(current)) note = '当前项目类别不适用此设计文档，页面只读。';
     else if (!isPriorDesignApproved(current))
       note = '请先完成前置设计文档审核，通过后可编辑当前文档。';
@@ -168,7 +172,19 @@ export function initDesignTestingScope() {
   document.addEventListener(
     'change',
     function (e) {
-      if (!e.target.closest('[data-design-inline-field]')) return;
+      var field = e.target.closest('[data-design-inline-field]');
+      if (!field) return;
+      // 评审结果只能由审核人在设计文档审核中给出。
+      if (
+        field.dataset.designInlineField === 'status' &&
+        FINAL_DESIGN_STATUSES.includes(field.value)
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        App.render();
+        showToast('评审结果需由审核人审核给出，请在文档详情中提交审核', 'warn');
+        return;
+      }
       if (
         state.designCategory === '全部' ||
         !isDesignTypeApplicable(state.designCategory) ||
@@ -220,54 +236,6 @@ export function initDesignTestingScope() {
   function isTestKindEnabled(kind) {
     return isTestKindEnabledRule(project(), kind);
   }
-  var baseForm = App.renderProjectFormFields;
-  App.renderProjectFormFields = function (p, mode) {
-    var html = baseForm(p, mode);
-    function option(key, label, value) {
-      return (
-        '<div class="v47-field"><label>' +
-        label +
-        '</label><select data-v47-field="' +
-        key +
-        '">' +
-        '<option value="是"' +
-        (value !== '否' ? ' selected' : '') +
-        '>是</option>' +
-        '<option value="否"' +
-        (value === '否' ? ' selected' : '') +
-        '>否</option></select></div>'
-      );
-    }
-    return html.replace(
-      /<\/div>$/,
-      option('needsSingleTest', '是否需要单板测试', p.needsSingleTest) +
-        option('needsLongTest', '是否需要长运测试', p.needsLongTest) +
-        '</div>',
-    );
-  };
-  var baseSections = App.testingSections;
-  App.testingSections = function () {
-    var a = baseSections();
-    return [a[0], ['smoke', '冒烟测试报告']].concat(a.slice(1));
-  };
-  var baseInfo = App.testingReportInfo;
-  App.testingReportInfo = function (section) {
-    return section === 'smoke'
-      ? ['冒烟测试报告', '记录测试阶段冒烟测试结果与风险说明']
-      : baseInfo(section);
-  };
-  var baseSubnav = App.testingSubnav;
-  App.testingSubnav = function () {
-    var html = baseSubnav();
-    ['single', 'long'].forEach(function (k) {
-      if (!isTestKindEnabled(k))
-        html = html.replace(
-          'data-testing-section="' + k + '"',
-          'data-testing-section="' + k + '" data-v53-inactive="1" title="当前项目未启用此项测试"',
-        );
-    });
-    return html;
-  };
   var baseReportBody = App.renderTestReportBody;
   App.renderTestReportBody = function (section, tab) {
     var html = baseReportBody(section, tab);
@@ -275,19 +243,6 @@ export function initDesignTestingScope() {
       html = html
         .replace(/<input\b/g, '<input disabled')
         .replace(/<textarea\b/g, '<textarea disabled');
-    return html;
-  };
-  var baseReport = App.renderTestingReport;
-  App.renderTestingReport = function (section) {
-    var html = baseReport(section);
-    if (!isTestKindEnabled(section)) {
-      html =
-        '<div class="v53-report-readonly"><div class="v53-readonly-hint">当前项目不需要' +
-        (section === 'single' ? '单板' : '长运') +
-        '测试，报告仅供查看。</div>' +
-        html.replace(/<button(?=[^>]*data-v37-report-action)/g, '<button disabled') +
-        '</div>';
-    }
     return html;
   };
   document.addEventListener(
@@ -396,5 +351,4 @@ export function initDesignTestingScope() {
     '.v53-select-label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;font-weight:500}' +
     '.v53-select-label input{accent-color:#165dff}';
   document.head.appendChild(style);
-  App.render();
 }

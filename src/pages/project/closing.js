@@ -1,4 +1,5 @@
 /** 结项阶段：结项申请列表、详情抽屉与结项评审。 */
+import { getReleaseGate, renderVersionBanner } from '../../features/version-anchor.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -104,7 +105,7 @@ function closingField(label, name, value, kind, wide) {
   );
 }
 
-function closingDetailBody(item) {
+function closingDetailFields(item) {
   return (
     '<div class="req-form-heading"><div><strong>' +
     esc(item.name) +
@@ -128,6 +129,18 @@ function closingDetailBody(item) {
       ? '项目交付物已完成归档，可查看复盘报告。'
       : '请补充实际完成时间、交付物清单，并完成相关审批后提交结项。') +
     '</span></div></div>'
+  );
+}
+/** 结项详情：申请字段与结项版本校验（结项时固化正式发布的版本与 Commit）。 */
+function closingDetailBody(item) {
+  var z = getReleaseGate();
+  return (
+    closingDetailFields(item) +
+    '<div class="detail-section"><h4>结项版本校验</h4><div class="kv-grid"><div class="kv"><label>正式发布版本</label><div>' +
+    esc(z.published ? z.published.version : '—') +
+    '</div></div><div class="kv"><label>正式发布 Commit</label><div>' +
+    esc(z.published ? z.published.commit : '—') +
+    '</div></div></div><p class="mini-note">提交结项时自动固化本次正式发布的版本与 Commit，不允许引用其他版本。</p></div>'
   );
 }
 App.closingDetailBody = closingDetailBody;
@@ -233,28 +246,11 @@ function renderClosingList() {
   );
 }
 
-function renderClosingReview() {
-  var d = state.releaseReviewDraft;
-  return (
-    '<section class="release-panel"><div class="release-panel-head"><div><h3>项目复盘</h3><p>在线填写复盘文档，沉淀项目经验、问题与改进措施。当前状态：' +
-    esc(d.status || '草稿') +
-    '</p></div><div class="release-actions"><button class="btn" data-release-page-action="review-save">保存草稿</button><button class="btn primary" data-release-page-action="review-submit">提交复盘</button></div></div><div class="release-review"><div class="release-review-editor"><div class="release-review-title"><span>项目复盘报告</span><span class="mini-note">在线文档 · 支持评论与版本留痕</span></div><div class="release-review-body"><div class="req-form-grid">' +
-    closingField('复盘项目', 'reviewProject', project().name, 'text', false) +
-    closingField('复盘负责人', 'reviewOwner', project().owner, 'text', false) +
-    closingField('项目总结', 'summary', d.summary, 'area', true) +
-    closingField('目标与成果', 'achievements', d.achievements, 'area', true) +
-    closingField('问题与风险回顾', 'issues', d.issues, 'area', true) +
-    closingField('经验沉淀', 'lessons', d.lessons, 'area', true) +
-    closingField('后续改进措施', 'actions', d.actions, 'area', true) +
-    '</div><div class="release-review-actions"><button class="btn" data-release-page-action="review-save">保存草稿</button><button class="btn primary" data-release-page-action="review-submit">提交复盘</button></div></div></div></div></section>'
-  );
-}
-App.renderClosingReview = renderClosingReview;
-
 function renderClosing() {
   closingInit();
   var body = state.releaseSection === 'review' ? App.renderClosingReview() : renderClosingList();
   return (
+    renderVersionBanner() +
     '<div class="release-reference-page"><div class="release-stage-layout">' +
     closingSubnav() +
     '<main class="release-main">' +
@@ -264,7 +260,7 @@ function renderClosing() {
 }
 App.renderClosing = renderClosing;
 
-/** 发布阶段交互 */
+/** 结项阶段交互 */
 export function bindClosingEvents() {
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-release-page-action]');

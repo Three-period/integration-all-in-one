@@ -1,4 +1,8 @@
 /** 发布阶段：版本发布表单、紧急临时下发与文档归档。 */
+import {
+  renderAnchoredReleaseVersions as renderReleaseVersions,
+  renderVersionBanner,
+} from '../../features/version-anchor.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -6,7 +10,19 @@ import { esc, tag } from '../../core/dom.js';
 import { testingOption } from './testing.js';
 import { project, state } from '../../store/state.js';
 
+/** 发布阶段数据按项目隔离：切换项目时重置表单、归档记录与紧急下发状态。 */
 function releaseInit() {
+  if (state.v38ClosingProject !== state.projectId) {
+    state.v38ClosingProject = state.projectId;
+    state.closingForms = null;
+    state.closingArchiveRecords = null;
+    state.closingEmergencyStatus = '待审批';
+    state.closingSection = 'emergency';
+  }
+  seedReleaseData();
+}
+
+function seedReleaseData() {
   if (!state.closingSection) state.closingSection = 'emergency';
   if (!state.closingEmergencyStatus) state.closingEmergencyStatus = '待审批';
   if (!state.closingForms)
@@ -90,7 +106,9 @@ function releaseSubnav() {
     (state.closingSection === 'pcn' ? 'active' : '') +
     '" data-closing-page-action="section" data-closing-section="pcn">PCN 表单</button><button class="' +
     (state.closingSection === 'archive' ? 'active' : '') +
-    '" data-closing-page-action="section" data-closing-section="archive">文档归档</button></aside>'
+    '" data-closing-page-action="section" data-closing-section="archive">文档归档</button><button class="' +
+    (state.closingSection === 'versions' ? 'active' : '') +
+    '" data-closing-page-action="section" data-closing-section="versions">版本发布</button></aside>'
   );
 }
 App.releaseSubnav = releaseSubnav;
@@ -236,12 +254,24 @@ function releaseEmergencyForm() {
       true,
       false,
     ) +
-    '</div><div class="closing-form-section"><h4>审批说明</h4><div class="notice warn"><i>!</i><span>紧急下发属于高风险操作，必须完成审批后才可执行。</span></div></div><div class="closing-form-actions"><button class="btn" data-closing-page-action="section" data-closing-section="emergency">取消</button><button class="btn" data-closing-page-action="save-emergency">保存草稿</button><button class="btn primary" data-closing-page-action="submit-emergency">提交审批</button><button class="btn warning" data-closing-page-action="dispatch-emergency" ' +
+    '</div><div class="closing-form-section"><h4>审批说明</h4><div class="notice warn"><i>!</i><span>紧急下发属于高风险操作，必须完成审批后才可执行。</span></div></div>' +
+    renderEmergencyReview() +
+    '<div class="closing-form-actions"><button class="btn" data-closing-page-action="section" data-closing-section="emergency">取消</button><button class="btn" data-closing-page-action="save-emergency">保存草稿</button><button class="btn primary" data-closing-page-action="submit-emergency">提交审批</button><button class="btn warning" data-closing-page-action="dispatch-emergency" ' +
     (approved ? '' : 'disabled') +
     '>紧急下发</button></div></div></section>'
   );
 }
 App.releaseEmergencyForm = releaseEmergencyForm;
+
+function renderEmergencyReview() {
+  return (
+    '<div class="closing-form-section"><h4>模拟审批操作（演示）</h4><p class="mini-note">模拟审批记录，不引入真实权限模型。仅审批中可处理。</p><div class="v35-row"><button class="btn primary" data-v37-emergency="approve" ' +
+    (state.closingEmergencyStatus === '审批中' ? '' : 'disabled') +
+    '>模拟审批通过</button><button class="btn danger" data-v37-emergency="reject" ' +
+    (state.closingEmergencyStatus === '审批中' ? '' : 'disabled') +
+    '>模拟审批驳回</button></div></div>'
+  );
+}
 
 function releaseArchivePage() {
   return (
@@ -274,16 +304,19 @@ function releaseArchivePage() {
 function renderRelease() {
   App.releaseInit();
   var body =
-    state.closingSection === 'ecn'
-      ? releaseFormPage('ecn')
-      : state.closingSection === 'pcn'
-        ? releaseFormPage('pcn')
-        : state.closingSection === 'archive'
-          ? releaseArchivePage()
-          : state.closingSection === 'emergency-form'
-            ? App.releaseEmergencyForm()
-            : releaseEmergencyHome();
+    state.closingSection === 'versions'
+      ? renderReleaseVersions()
+      : state.closingSection === 'ecn'
+        ? releaseFormPage('ecn')
+        : state.closingSection === 'pcn'
+          ? releaseFormPage('pcn')
+          : state.closingSection === 'archive'
+            ? releaseArchivePage()
+            : state.closingSection === 'emergency-form'
+              ? App.releaseEmergencyForm()
+              : releaseEmergencyHome();
   return (
+    renderVersionBanner() +
     '<div class="closing-reference-page"><div class="closing-stage-layout">' +
     App.releaseSubnav() +
     '<main class="closing-main">' +
@@ -293,8 +326,21 @@ function renderRelease() {
 }
 App.renderRelease = renderRelease;
 
-/** 结项阶段交互 */
+/** 发布阶段交互 */
 export function bindReleaseEvents() {
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-v37-emergency]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (state.closingEmergencyStatus !== '审批中') {
+      showToast('请先提交紧急发布审批', 'warn');
+      return;
+    }
+    state.closingEmergencyStatus = b.dataset.v37Emergency === 'approve' ? '已通过' : '已拒绝';
+    App.render();
+    showToast('模拟审批结果：' + state.closingEmergencyStatus);
+  });
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-closing-page-action]');
     if (!el) return;

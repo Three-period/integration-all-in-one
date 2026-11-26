@@ -1,10 +1,8 @@
 /** 检视证据抽屉与分类资产列表（V43）。 */
 import { getDevReview } from '../../store/lifecycle.js';
-import { App } from '../../core/app.js';
 import { openDrawer } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
 import { esc } from '../../core/dom.js';
-import { latestAiRun } from '../../features/dev-review.js';
 import { project } from '../../store/state.js';
 
 /* V43: Reviewer evidence drawers + categorized asset lists, isolated incremental patch */
@@ -83,51 +81,6 @@ function openDesignEvidence() {
     '</div>';
   openDrawer('设计依据 · 文档目录', html);
 }
-
-function openAiResultsEvidence() {
-  var d = getDevReview(),
-    record = d.manual.some(function (m) {
-      return m.kind === '独立抽检' && m.commit === d.commit;
-    });
-  if (!record) {
-    showToast('请先保存当前 Commit 的独立抽检结论', 'warn');
-    return;
-  }
-  var r = latestAiRun();
-  var html =
-    '<div class="notice"><i>◈</i><span>AI 四类检查为 Mock 数据；独立抽检结论已记录后才允许查看。结果仅用于对照，不代替人工判断。</span></div>' +
-    '<div class="kv-grid"><div class="kv"><label>当前 Commit</label><div>' +
-    esc(d.commit || '—') +
-    '</div></div><div class="kv"><label>AI 检视批次</label><div>' +
-    esc(r ? r.id : '暂无批次') +
-    '</div></div><div class="kv"><label>执行状态</label><div>' +
-    esc(r ? r.result : '未执行') +
-    '</div></div></div>' +
-    (r && r.checks && r.checks.length
-      ? '<div class="v43-ai-results">' +
-        r.checks
-          .map(function (c, i) {
-            var pass = c.result === '通过';
-            return (
-              '<article class="v43-ai-check"><div class="v43-ai-check-head"><strong>' +
-              (i + 1) +
-              '. ' +
-              esc(c.name) +
-              '</strong><span class="tag ' +
-              (pass ? 'green' : 'orange') +
-              '">' +
-              esc(c.result) +
-              '</span></div><p>' +
-              esc(c.detail || '暂无详情') +
-              '</p></article>'
-            );
-          })
-          .join('') +
-        '</div>'
-      : '<div class="notice warn">当前 Commit 尚无可对照的 AI 检视批次，请先返回开发工作台完成 AI 检视。</div>');
-  openDrawer('AI 四类检查 · 对照结果', html);
-}
-App.openAiResultsEvidence = openAiResultsEvidence;
 
 /** V43 检视证据抽屉 */
 export function initReviewEvidence() {

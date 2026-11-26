@@ -1,4 +1,5 @@
 /** 根渲染：按 state.view 渲染当前页面、侧边栏与面包屑。 */
+import { renderAssetGallery } from '../pages/assets.js';
 import { App } from '../core/app.js';
 import { bindPageEvents } from './events.js';
 import { $ } from '../core/dom.js';
@@ -34,10 +35,11 @@ function render() {
     'project-overview': renderProjectOverview,
     'project-lifecycle': App.renderLifecycle,
     'project-adjustment': renderAdjustment,
-    'ops-projects': () => App.renderOperations('projects'),
-    'ops-people': () => App.renderOperations('people'),
-    'ops-resources': () => App.renderOperations('resources'),
-    'ops-review': () => App.renderOperations('projects'),
+    'ops-projects': App.renderOps2,
+    'ops-people': App.renderOps2,
+    'ops-resources': App.renderOps2,
+    'ops-review': App.renderOps2,
+    'asset-gallery': renderAssetGallery,
   }[view]();
   $('#appView').innerHTML = html;
   bindPageEvents();

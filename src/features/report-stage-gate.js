@@ -197,31 +197,6 @@ export function initReportStageGate() {
     if (root) saveRich(root);
     return r;
   };
-  // V37 handler saves and updates history; keep its original workflow intact.
-  const originalCollect = App.collectTestReport;
-  App.saveTestReport = function (submit) {
-    if ((state.v37ReportTab || 'detail') !== 'detail') {
-      showToast('请返回详细信息编辑正文', 'warn');
-      return;
-    }
-    const r = originalCollect();
-    if (submit && !r.conclusion.trim()) {
-      showToast('请先填写测试报告正文', 'warn');
-      return;
-    }
-    r.status = submit ? '待评审' : '草稿';
-    r.history.push({
-      name: r.name,
-      version: r.version,
-      owner: r.owner,
-      conclusion: r.conclusion,
-      richHtml: r.richHtml,
-      status: r.status,
-      at: new Date().toLocaleString('zh-CN', { hour12: false }),
-    });
-    App.render();
-    showToast(submit ? '报告已提交评审（Mock）' : '富文本报告已保存（Mock）');
-  };
   // Existing retrospective save/submit event remains; allow it to read rich text through its existing 'summary' field.
 
   App.renderClosingReview = function () {
