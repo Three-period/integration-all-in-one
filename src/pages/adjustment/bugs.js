@@ -49,7 +49,7 @@ function bugInit() {
   state.bugMode = 'edit';
   state.bugSelected = 'DFT-202608-0198';
   state.bugDraft = null;
-  state.bugRecords = [
+  state.bugRecords ??= [
     {
       id: 'DFT-202608-0198',
       name: '高并发设备消息上报丢包',

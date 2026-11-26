@@ -1,6 +1,6 @@
 /** 检视流程 V5（V56）：开发与 AI 检视的作用域 Mock 工作流。 */
 import { can } from '../../domain/permissions.js';
-import { devReviewStore, getDevReview } from '../../store/lifecycle.js';
+import { createReviewModel, devReviewStore, getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer } from '../../components/overlays.js';
 import { commonHead } from '../../components/shell.js';
@@ -73,23 +73,7 @@ function unique(list) {
 
 function model(d) {
   if (!d.reviewV5) {
-    d.reviewV5 = {
-      process: null,
-      tasks: [],
-      meetings: [],
-      feedback: [],
-      verdicts: [],
-      selected: [],
-      selectedTaskId: '',
-      view: 'todos',
-      filter: '全部',
-      query: '',
-      batchDraft: {},
-      manualDraft: {},
-      candidateDraft: null,
-      meetingDraft: {},
-      counter: 0,
-    };
+    d.reviewV5 = createReviewModel();
   }
   var m = d.reviewV5;
   if (m.process) m.process.currentCommit = d.commit;

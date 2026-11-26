@@ -1,19 +1,19 @@
 /** 生命周期业务数据：按项目 id 隔离的开发检视、阶段流转、文档与版本锚点记录。 */
-import { project, state } from './state.js';
+import { projects } from '../data/projects.js';
+import { state } from './state.js';
 
 /** 开发与 AI 检视：冒烟、自测、Commit、AI 检视批次、问题、人工检视与提测。 */
 export const devReviewStore = Object.create(null);
 
 /** 当前项目的开发检视记录，首次访问时创建默认数据。 */
-export function getDevReview() {
-  var id = state.projectId || 'thermal';
+export function getDevReview(id = state.projectId || 'thermal') {
   if (!devReviewStore[id])
     devReviewStore[id] = {
       task: 'TASK-142',
       developer: '孙宁',
       role: 'developer',
       tab: 'dev',
-      repo: project().repo,
+      repo: projects[id]?.repo,
       branch: 'release/v2.6',
       commit: '',
       commits: [],
@@ -100,3 +100,28 @@ export const onlineDocs = Object.create(null);
 
 /** 阶段审批记录（所有项目共用一个列表，按 projectId 区分），规则见 domain/approvals.js。 */
 export const approvalRequests = [];
+
+export function documentId(prefix) {
+  const random = crypto.getRandomValues(new Uint32Array(2));
+  return prefix + '-' + Array.from(random, (n) => n.toString(16).padStart(8, '0')).join('');
+}
+
+export function createReviewModel() {
+  return {
+    process: null,
+    tasks: [],
+    meetings: [],
+    feedback: [],
+    verdicts: [],
+    selected: [],
+    selectedTaskId: '',
+    view: 'todos',
+    filter: '全部',
+    query: '',
+    batchDraft: {},
+    manualDraft: {},
+    candidateDraft: null,
+    meetingDraft: {},
+    counter: 0,
+  };
+}

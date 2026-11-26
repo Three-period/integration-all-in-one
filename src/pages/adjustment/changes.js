@@ -43,7 +43,7 @@ function changeInit() {
   state.changeMode = 'edit';
   state.changeSelected = 'CHG-202608-004';
   state.changeDraft = null;
-  state.changeRecords = [
+  state.changeRecords ??= [
     {
       id: 'CHG-202608-004',
       name: '补充并发量指标',

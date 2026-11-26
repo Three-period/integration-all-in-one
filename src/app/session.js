@@ -1,7 +1,7 @@
 /**
  * 登录会话：登录后按账号设置角色、进入的界面和右上角个人信息；退出后回到登录页。
  *
- * 登录 / 退出不刷新页面，模拟数据在当前标签页内保留，便于用不同账号走完跨角色流程。
+ * 登录身份和浏览位置属于当前标签页，项目业务记录通过共享存储同步。
  */
 import { landingFor, ROLE_LABELS } from '../domain/permissions.js';
 import { App } from '../core/app.js';

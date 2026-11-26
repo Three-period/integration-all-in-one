@@ -1,4 +1,5 @@
 /** 设计阶段：设计文档列表、详情抽屉与变更。 */
+import { documentId } from '../../store/lifecycle.js';
 import { submitStageApproval } from '../../features/stage-approval.js';
 import {
   isDesignLocked as isDesignLockedRule,
@@ -182,17 +183,8 @@ function baseDesignInit() {
 /** 设计文档按项目隔离：切换项目时保存当前项目文档并载入目标项目文档（仅内置项目带示例数据）。 */
 function designInit() {
   var pid = state.projectId;
-  if (!state.v53DesignByProject) state.v53DesignByProject = Object.create(null);
   if (state.v53DesignLoadedProject !== pid) {
-    if (state.v53DesignLoadedProject && state.designRecords)
-      state.v53DesignByProject[state.v53DesignLoadedProject] = state.designRecords;
-    if (!state.v53DesignByProject[pid]) {
-      if (pid === 'thermal' && !state.v53DesignLoadedProject) {
-        baseDesignInit();
-        state.v53DesignByProject[pid] = state.designRecords;
-      } else state.v53DesignByProject[pid] = [];
-    }
-    state.designRecords = state.v53DesignByProject[pid];
+    if (pid !== 'thermal') state.designRecords ??= [];
     state.v53DesignLoadedProject = pid;
     state.designCategory = '全部';
     state.designSelected = null;
@@ -304,7 +296,7 @@ function baseDesignCurrentRecord() {
   if (state.designDrawerMode === 'create') {
     if (!state.designDraft)
       state.designDraft = {
-        id: 'NEW-DESIGN',
+        id: documentId('DSN-NEW'),
         docType: '软件规格书',
         title: '新建设计文档',
         version: 'V1.0.0',
@@ -510,6 +502,7 @@ function openDesignDrawer(id, mode) {
   state.designReqExpanded = false;
   if (state.designDrawerMode === 'create') state.designDraft = null;
   var record = App.designCurrentRecord();
+  state.designSelected = record.id;
   openDrawer(
     (state.designDrawerMode === 'create' ? '新建设计文档 · ' : '设计文档 · ') + record.title,
     designDrawerBody(record),
@@ -561,7 +554,6 @@ function saveDesign(mode) {
   }
   collectDesign();
   var r = App.designCurrentRecord();
-  r.id = 'DSN-NEW-' + Date.now();
   r.projectId = state.projectId;
   r.docType = state.designCategory;
   if (!r.title || r.title === '新建设计文档') r.title = r.docType;

@@ -43,7 +43,7 @@ function riskInit() {
   state.riskMode = 'edit';
   state.riskSelected = 'RSK-202608-001';
   state.riskDraft = null;
-  state.riskRecords = [
+  state.riskRecords ??= [
     {
       id: 'RSK-202608-001',
       name: '整机联调环境交付延期',

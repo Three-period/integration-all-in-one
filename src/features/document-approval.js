@@ -12,6 +12,8 @@ export function initDocumentApproval() {
   /* V54.0: unify document-driven stage approval and report-list workflow.
    * No changes to V52 Commit lineage, R3 approval or I–IV branch mapping. */
 
+  const selectedReports = new Map();
+  const selectionKey = kind => state.projectId + '/' + kind;
   var REPORT_KINDS = ['smoke', 'single', 'long', 'system'];
   var REPORT_NAMES = {
     smoke: '冒烟测试报告',
@@ -38,7 +40,7 @@ export function initDocumentApproval() {
     if (!state.v54Reports[pid]) state.v54Reports[pid] = Object.create(null);
     var bucket = state.v54Reports[pid][kind];
     if (!bucket) {
-      bucket = { rows: [], selectedId: '' };
+      bucket = { rows: [] };
       state.v54Reports[pid][kind] = bucket;
       var old = state.v37Reports && state.v37Reports[pid] && state.v37Reports[pid][kind];
       if (old && (old.status !== '草稿' || old.conclusion || (old.history && old.history.length))) {
@@ -48,7 +50,7 @@ export function initDocumentApproval() {
         );
         if (!Array.isArray(copy.history)) copy.history = [];
         bucket.rows.push(copy);
-        bucket.selectedId = copy.id;
+        selectedReports.set(selectionKey(kind), copy.id);
       }
     }
     return bucket;
@@ -59,7 +61,7 @@ export function initDocumentApproval() {
     if (state.v54Draft && state.v54Draft.kind === kind) return state.v54Draft.row;
     return (
       b.rows.find(function (r) {
-        return r.id === b.selectedId;
+        return r.id === selectedReports.get(selectionKey(kind));
       }) ||
       b.rows[0] ||
       oldRecord(kind)
@@ -228,7 +230,7 @@ export function initDocumentApproval() {
       });
     if (!row) return;
     state.v54Draft = null;
-    b.selectedId = id;
+    selectedReports.set(selectionKey(kind), id);
     renderReportDrawer(
       kind,
       row,
@@ -315,7 +317,7 @@ export function initDocumentApproval() {
     var bucket = reportBucket(kind);
     if (state.v54Draft && state.v54Draft.kind === kind) {
       bucket.rows.unshift(row);
-      bucket.selectedId = row.id;
+      selectedReports.set(selectionKey(kind), row.id);
       state.v54Draft = null;
     }
     closeDrawer();

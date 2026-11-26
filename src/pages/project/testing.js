@@ -11,8 +11,6 @@ import { project, state } from '../../store/state.js';
 function testingInit() {
   if (state.v38TestProject !== state.projectId) {
     state.v38TestProject = state.projectId;
-    state.testingCases = null;
-    state.testingDefects = null;
     state.testingQuery = '';
     state.testingDefectQuery = '';
     state.testingSection = 'cases';

@@ -54,7 +54,13 @@ export async function openPage(url) {
     }
   });
   const settle = () =>
-    page.evaluate(() => new Promise((r) => setTimeout(() => setTimeout(r, 0), 0)));
+    page.evaluate(async () => {
+      await navigator.locks?.request(
+        'rd-platform:workflow:v1:' + new URL('.', document.baseURI).pathname,
+        () => {},
+      );
+      await new Promise((r) => setTimeout(() => setTimeout(r, 0), 0));
+    });
   const fresh = async () => {
     await page.goto(url, { waitUntil: 'load' });
     await page.evaluate(() => {

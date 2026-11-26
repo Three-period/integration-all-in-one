@@ -122,7 +122,6 @@ function enhanceDocFields() {
         editor.innerHTML = doc.html;
         el.value = editor.innerText;
         editor.addEventListener('input', function () {
-          doc.html = editor.innerHTML;
           el.value = editor.innerText;
         });
         renderDocComments(box);
@@ -150,7 +149,6 @@ export function initDocEditor() {
     if (['bold', 'italic', 'insertUnorderedList'].includes(cmd)) {
       editor.focus();
       document.execCommand(cmd, false, null);
-      doc.html = editor.innerHTML;
       var source = box.previousElementSibling;
       if (source) source.value = editor.innerText;
       return;

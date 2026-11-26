@@ -14,9 +14,6 @@ import { project, state } from '../../store/state.js';
 function releaseInit() {
   if (state.v38ClosingProject !== state.projectId) {
     state.v38ClosingProject = state.projectId;
-    state.closingForms = null;
-    state.closingArchiveRecords = null;
-    state.closingEmergencyStatus = '待审批';
     state.closingSection = 'emergency';
   }
   seedReleaseData();

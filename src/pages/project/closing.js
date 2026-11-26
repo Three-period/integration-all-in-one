@@ -13,7 +13,7 @@ function closingInit() {
   if (!state.releaseFilterOpen) state.releaseFilterOpen = false;
   if (state.releaseProjectId !== state.projectId) {
     state.releaseProjectId = state.projectId;
-    state.releaseProjects = [
+    state.releaseProjects ??= [
       {
         id: 'REL-' + project().code,
         name: project().name,
@@ -27,7 +27,7 @@ function closingInit() {
       },
     ];
     state.releaseSelected = state.releaseProjects[0].id;
-    state.releaseReviewDraft = {
+    state.releaseReviewDraft ??= {
       summary: '',
       achievements: '',
       issues: '',

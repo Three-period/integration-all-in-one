@@ -1,4 +1,5 @@
 /** 需求阶段：需求列表、筛选、详情与抽屉。 */
+import { documentId } from '../../store/lifecycle.js';
 import { submitStageApproval } from '../../features/stage-approval.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, modalForm, openDrawer, openModal } from '../../components/overlays.js';
@@ -112,6 +113,7 @@ function submitRequirement(record) {
 
 export function reqRecord(id) {
   reqInit();
+  if (state.reqDraftRecord?.id === id) return state.reqDraftRecord;
   return (
     state.reqRecords.find(function (r) {
       return r.id === id;
@@ -508,6 +510,10 @@ App.renderRequirements = renderRequirements;
 
 function openRequirementDrawer(id, mode) {
   reqInit();
+  if (mode === 'create' && id === '1000xxx') {
+    state.reqDraftRecord = { ...reqRecord('1000xxx'), id: documentId('REQ'), comments: [] };
+    id = state.reqDraftRecord.id;
+  }
   state.reqSelected = id || '1000xxx';
   state.reqDrawerMode = mode || 'edit';
   var r = reqRecord(state.reqSelected);
@@ -582,7 +588,12 @@ export function bindRequirementDrawerEvents() {
     if (action === 'save' || action === 'submit') {
       collectRequirement();
       var isSubmit = action === 'submit';
-      if (isSubmit && !submitRequirement(reqRecord(state.reqSelected))) return;
+      const record = reqRecord(state.reqSelected);
+      if (isSubmit && !submitRequirement(record)) return;
+      if (record === state.reqDraftRecord) {
+        state.reqRecords.unshift(record);
+        state.reqDraftRecord = null;
+      }
       closeDrawer();
       App.render();
       showToast(isSubmit ? '需求已提交，进入评审准备' : '需求草稿已保存');

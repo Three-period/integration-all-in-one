@@ -210,7 +210,7 @@ export const scenarios = [
   },
 ];
 
-function runStep(s) {
+export function runStep(s) {
   const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
   const fire = (e, type) => e.dispatchEvent(new Event(type, { bubbles: true }));
   if (s.check) return document.querySelector(s.check) ? 'ok' : 'CHECK FAILED ' + s.check;
