@@ -8,6 +8,7 @@ import { App } from '../../core/app.js';
 import { showToast } from '../../components/toast.js';
 import { isStageEditable, stageState } from '../../domain/stages.js';
 import { isStageDone } from '../../features/lifecycle-flow.js';
+import { testingFeedback } from '../../features/test-feedback.js';
 import { renderApprovalBar } from '../../features/stage-approval.js';
 import { renderProjectShell } from './shell.js';
 import { state } from '../../store/state.js';
@@ -70,7 +71,11 @@ function renderLifecycle() {
   const stage = state.lifecycleStage;
   const editable = isCurrentStageEditable();
   document.body.toggleAttribute('data-stage-readonly', !editable);
-  const body = renderApprovalBar(stage) + RENDERERS[stage]();
+  const content = RENDERERS[stage]();
+  const body =
+    (stage === 'testing' ? testingFeedback(state.testingSection) : '') +
+    renderApprovalBar(stage) +
+    content;
   const block = editable
     ? '<div class="stage-block">' + body + '</div>'
     : '<div class="stage-readonly-note" role="status">该阶段尚未开始，当前仅可查看。上一阶段完成后开放操作。</div><div class="stage-block" data-readonly="true">' +

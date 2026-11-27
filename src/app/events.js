@@ -113,6 +113,14 @@ export function bindGlobal() {
         renderCustomizer();
         showToast('已恢复当前角色默认布局');
         break;
+      case 'open-repair':
+        if (state.role !== 'developer' || !projects[el.dataset.project]) return;
+        state.projectId = el.dataset.project;
+        state.developmentView = 'developer';
+        state.lifecycleStage = 'development';
+        state.projectSection = 'lifecycle';
+        setView('project-lifecycle');
+        break;
       case 'open-project':
         if (!projects[el.dataset.project]) return;
         state.projectId = el.dataset.project;

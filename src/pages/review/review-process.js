@@ -181,7 +181,6 @@ function createReview(d) {
   if (!p.firstFormalTaskId) p.firstFormalTaskId = taskId;
   m.tasks.push(task);
   m.selectedTaskId = taskId;
-  m.view = 'todos';
   m.selected = [];
   check.issues.forEach(function (i) {
     i.humanTaskId = taskId;
@@ -254,7 +253,7 @@ function evidencePanel(d) {
   );
 }
 
-function todoPage(d, m) {
+function roundsPanel(d, m) {
   var terms = m.query.trim().toLowerCase(),
     tasks = m.tasks
       .filter(function (t) {
@@ -306,13 +305,13 @@ function todoPage(d, m) {
         '</small></td><td><button class="btn" data-v5="choose-task" data-task="' +
         h(t.taskId) +
         '">' +
-        (t.status === '已完成' ? '查看记录' : '进入专业检视') +
+        (chosenTask(m)?.taskId === t.taskId ? '当前轮次' : '查看轮次') +
         '</button></td></tr>'
       );
     })
     .join('');
   return devPanel(
-    '检视待办 · 人工介入轮次',
+    '检视人工介入轮次',
     control +
       '<div class="table-wrap"><table class="v5-table"><thead><tr><th>待办</th><th>过程</th><th>轮次</th><th>Commit / AI</th><th>裁定数</th><th>状态</th><th>发起人 / 时间</th><th>操作</th></tr></thead><tbody>' +
       (rows ||
@@ -492,6 +491,7 @@ function professionalPage(d, m) {
   var left = issueCard(d, m, t) + manualCard(d, m, t) + feedbackCard(d, m, t);
   return (
     exitPanel(d, m) +
+    roundsPanel(d, m) +
     '<div class="v5-columns"><section class="v5-left">' +
     left +
     '</section><aside class="v5-right">' +
@@ -501,19 +501,7 @@ function professionalPage(d, m) {
 }
 
 function reviewerPage(d) {
-  var m = model(d);
-  if (!m.view) m.view = 'todos';
-  return (
-    '<div class="v5-root"><div class="v5-tabs">' +
-    '<button class="' +
-    (m.view === 'todos' ? 'active' : '') +
-    '" data-v5="view-todos">检视待办</button>' +
-    '<button class="' +
-    (m.view === 'professional' ? 'active' : '') +
-    '" data-v5="view-professional">专业检视</button></div>' +
-    (m.view === 'todos' ? todoPage(d, m) : professionalPage(d, m)) +
-    '</div>'
-  );
+  return '<div class="v5-root">' + professionalPage(d, model(d)) + '</div>';
 }
 
 function openBatchFeedback(d, m) {
@@ -1476,7 +1464,6 @@ export function initReviewProcess() {
     var d = data(),
       m = model(d);
     m.selectedTaskId = (m.tasks[m.tasks.length - 1] || {}).taskId || '';
-    m.view = 'professional';
     state.projectSection = 'lifecycle';
     state.lifecycleStage = 'development';
     setView('project-lifecycle');
@@ -1572,20 +1559,8 @@ export function initReviewProcess() {
         closeDrawer();
         return;
       }
-      if (action === 'view-todos') {
-        m.view = 'todos';
-        m.selected = [];
-        App.render();
-        return;
-      }
-      if (action === 'view-professional') {
-        m.view = 'professional';
-        App.render();
-        return;
-      }
       if (action === 'choose-task') {
         m.selectedTaskId = b.dataset.task;
-        m.view = 'professional';
         m.selected = [];
         App.render();
         return;
@@ -1598,7 +1573,6 @@ export function initReviewProcess() {
         d = data();
         m = model(d);
         m.selectedTaskId = b.dataset.task;
-        m.view = 'professional';
         state.projectSection = 'lifecycle';
         state.lifecycleStage = 'development';
         setView('project-lifecycle');

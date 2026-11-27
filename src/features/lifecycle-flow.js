@@ -4,6 +4,7 @@ import { App } from '../core/app.js';
 import { openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { esc } from '../core/dom.js';
+import { ACCOUNTS } from '../data/accounts.js';
 import { projects } from '../data/projects.js';
 import { latestAiRun } from './dev-review.js';
 import { getReleaseGate } from './version-anchor.js';
@@ -140,7 +141,7 @@ function openProjectModal() {
     '新建项目 · 项目基础信息',
     App.renderProjectFormFields(
       {
-        creator: '何盈',
+        creator: state.user.name,
         flowStatus: '立项阶段',
         createdAt: new Date().toISOString().slice(0, 10),
       },
@@ -188,8 +189,8 @@ function createProject() {
     {
       code: code,
       type: '产品开发',
-      owner: '何盈',
-      ownerDetail: '何盈 / Mock',
+      owner: p.creator,
+      ownerDetail: p.creator,
       start: p.createdAt,
       end: '2027-03-31',
       status: '待立项',
@@ -205,6 +206,11 @@ function createProject() {
     docs: {},
     history: [],
     created: true,
+    creationNotice: {
+      recipient: ACCOUNTS.find((account) => account.role === 'developer').username,
+      creator: state.user.name,
+      at: new Date().toISOString(),
+    },
     version: p.version || 'V1.0',
     designType: 'II',
   };

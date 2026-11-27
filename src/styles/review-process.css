@@ -27,7 +27,7 @@
 }
 .v5-columns {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
   gap: 15px;
   align-items: start;
 }
@@ -174,4 +174,9 @@
   .v5-table {
     font-size: 10px;
   }
+}
+
+.v5-evidence,
+#drawerBody a[data-commit-link] {
+  overflow-wrap: anywhere;
 }

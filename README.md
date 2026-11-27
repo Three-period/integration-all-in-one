@@ -30,9 +30,9 @@ pnpm test:regression -- --functional --url http://localhost:3000/   # 直接用�
 | --- | --- | --- |
 | pm | 产品经理 | 个人工作台 |
 | pjm | 项目经理 | 个人工作台 |
-| dev | 开发工程师 | 开发阶段 |
-| qa | 测试工程师 | 测试阶段 |
-| reviewer | 检视工程师 | 开发阶段（检视工作台） |
+| dev | 开发工程师 | 个人工作台 |
+| qa | 测试工程师 | 个人工作台 |
+| reviewer | 检视工程师 | 个人工作台 |
 | director / rdlead / testlead / qalead | 研发总监 / 研发主管 / 测试主管 / 质量主管 | 个人工作台（审批中心，可查看运营看板） |
 
 鉴权通过 `src/core/auth.js` 的 `login / logout / currentUser` 访问；接入平台统一登录时实现同样三个方法并调用 `setAuthProvider` 即可。

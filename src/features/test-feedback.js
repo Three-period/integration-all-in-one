@@ -119,6 +119,23 @@ export function openFeedbackDetail(row) {
     row.projectId,
   );
 }
+function commitAddress(address, commit) {
+  if (!address || !commit) return '';
+  try {
+    const url = new URL(/^[\w.-]+\//.test(address) ? 'https://' + address : address);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const repoPath = url.pathname
+      .split('/-/')[0]
+      .replace(/\/+$/, '')
+      .replace(/\.git$/, '');
+    if (!repoPath || repoPath === '/') return '';
+    url.pathname = repoPath + '/-/commit/' + encodeURIComponent(commit);
+    url.search = url.hash = '';
+    return url.href;
+  } catch {
+    return '';
+  }
+}
 function repoLink(address) {
   if (!address) return '未记录';
   try {
@@ -166,12 +183,23 @@ function openVersion(d, commit) {
   const record = d.commits.find((c) => c.commit === commit);
   if (!record) return;
   const active = commit === d.commit;
+  const address = record.repo ?? (active ? d.repo : '');
+  const link = commitAddress(address, commit);
   const approval =
     (active && d.approval) || d.reviewArchives?.find((x) => x.commit === commit)?.approval;
   openDrawer(
     'GitLab 版本 · ' + commit,
     '<p>仓库地址　' +
-      repoLink(record.repo ?? (active ? d.repo : '')) +
+      repoLink(address) +
+      '</p>' +
+      '<p>GitLab 提交链接　' +
+      (link
+        ? '<a data-commit-link href="' +
+          esc(link) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          esc(link) +
+          '</a>'
+        : '未记录有效仓库地址') +
       '</p>' +
       line('分支', record.branch ?? (active ? d.branch : '未记录')) +
       line('开发提交', record.owner + ' · ' + record.at) +
@@ -197,19 +225,31 @@ function openVersion(d, commit) {
   );
 }
 
-export function testingFeedback(kind) {
+export function testingFeedback(section) {
   const gate = getReleaseGate();
-  const canReturn =
-    !!gate.commit &&
-    !gate.testPass &&
-    state.role === 'tester' &&
-    isTestKindEnabled(project(), kind);
+  const kind = Object.hasOwn(kinds, section) ? section : '';
+  const reason = !gate.commit
+    ? '等待检视准出并移交测试版本'
+    : gate.testPass
+      ? '本版本测试审核已通过'
+      : kind && !isTestKindEnabled(project(), kind)
+        ? '项目未启用该测试环节'
+        : '';
+  const tester = state.role === 'tester';
+  const canReturn = tester && !reason;
   const context = { kind, commit: gate.commit, project: state.projectId };
-  const rows = projectFeedback().filter((row) => row.testFeedback.kind === kind);
-  if (!canReturn && !rows.length) return '';
+  const rows = projectFeedback().filter((row) => !kind || row.testFeedback.kind === kind);
+  if (!tester && !rows.length) return '';
   return (
-    '<div class="testing-feedback">' +
-    (canReturn ? button('open-return', '退回开发整改', context) : '') +
+    '<section class="card card-pad testing-feedback"><div class="testing-report-head"><h3>测试反馈</h3>' +
+    (canReturn
+      ? button('open-return', '退回开发整改', context)
+      : tester
+        ? '<div><span class="mini-note">' +
+          esc(reason) +
+          '</span> <button class="btn" disabled>退回开发整改</button></div>'
+        : '') +
+    '</div>' +
     rows
       .map((row) => {
         const verify =
@@ -217,13 +257,21 @@ export function testingFeedback(kind) {
         return (
           defectRow(row) +
           (verify
-            ? button('close-verified', '回归通过并关闭', { ...context, id: row.id }) +
-              button('open-return', '回归未通过', { ...context, id: row.id })
+            ? button('close-verified', '回归通过并关闭', {
+                ...context,
+                kind: row.testFeedback.kind,
+                id: row.id,
+              }) +
+              button('open-return', '回归未通过', {
+                ...context,
+                kind: row.testFeedback.kind,
+                id: row.id,
+              })
             : '')
         );
       })
       .join('') +
-    '</div>'
+    '</section>'
   );
 }
 
@@ -232,14 +280,12 @@ export function bindRepairCommit(d, record) {
   for (const row of fixes) {
     row.status = '待检视';
     row.updated = record.at;
-    row.testFeedback.rounds
-      .at(-1)
-      .repairs.push({
-        commit: record.commit,
-        summary: record.fixSummary,
-        owner: record.owner,
-        at: record.at,
-      });
+    row.testFeedback.rounds.at(-1).repairs.push({
+      commit: record.commit,
+      summary: record.fixSummary,
+      owner: record.owner,
+      at: record.at,
+    });
   }
   record.defectIds = fixes.map((row) => row.id);
   d.commits.push(record);
@@ -298,7 +344,12 @@ export function initTestFeedback() {
   document.addEventListener('click', (event) => {
     const el = event.target.closest('[data-feedback]');
     if (!el) return;
-    const { feedback: action, id, kind, commit, project: pid } = el.dataset;
+    const { feedback: action, id, commit, project: pid } = el.dataset;
+    const kind =
+      el.dataset.kind ||
+      (action === 'submit'
+        ? document.querySelector('#modalRoot.show [data-return-kind]')?.value
+        : '');
     const row = id ? projectFeedback().find((item) => item.id === id) : null;
     if (action === 'view-defect') {
       if (row) openFeedbackDetail(row);
@@ -307,11 +358,16 @@ export function initTestFeedback() {
     const d = getDevReview();
     if (action === 'view-version') return openVersion(d, commit);
     const gate = getReleaseGate();
+    if (action === 'submit' && !kind) {
+      showToast('请选择发现问题的测试环节', 'warn');
+      return;
+    }
     if (
       state.role !== 'tester' ||
       pid !== state.projectId ||
-      !kinds[kind] ||
-      !isTestKindEnabled(project(), kind) ||
+      (kind
+        ? !Object.hasOwn(kinds, kind) || !isTestKindEnabled(project(), kind)
+        : action !== 'open-return') ||
       !commit ||
       gate.commit !== commit ||
       gate.testPass ||
@@ -330,7 +386,15 @@ export function initTestFeedback() {
         '<div data-owner-project="' +
         esc(pid) +
         '">' +
-        line('测试环节', kinds[kind] + ' · ' + commit) +
+        line('提测 Commit', commit) +
+        (kind
+          ? line('测试环节', kinds[kind])
+          : '<label class="field">测试环节 *<select data-return-kind required><option value="">请选择</option>' +
+            Object.entries(kinds)
+              .filter(([key]) => isTestKindEnabled(project(), key))
+              .map(([key, label]) => '<option value="' + key + '">' + label + '</option>')
+              .join('') +
+            '</select></label>') +
         Object.entries(fields)
           .map(
             ([key, label]) =>

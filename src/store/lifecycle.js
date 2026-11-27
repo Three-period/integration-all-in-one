@@ -115,7 +115,6 @@ export function createReviewModel() {
     verdicts: [],
     selected: [],
     selectedTaskId: '',
-    view: 'todos',
     filter: '全部',
     query: '',
     batchDraft: {},

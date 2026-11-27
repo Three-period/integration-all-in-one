@@ -3,7 +3,7 @@
  *
  * 登录身份和浏览位置属于当前标签页，项目业务记录通过共享存储同步。
  */
-import { landingFor, ROLE_LABELS } from '../domain/permissions.js';
+import { ROLE_LABELS } from '../domain/permissions.js';
 import { App } from '../core/app.js';
 import { esc } from '../core/dom.js';
 import { logout } from '../core/auth.js';
@@ -30,12 +30,9 @@ function applySession(user) {
   state.developmentView = user.role === 'reviewer' ? 'reviewer' : 'developer';
   state.customizerOpen = false;
   state.editingLayout = false;
-  const landing = landingFor(user.role);
-  state.view = landing.view;
-  if (landing.stage) {
-    state.lifecycleStage = landing.stage;
-    state.projectSection = 'lifecycle';
-  }
+  state.view = 'dashboard';
+  state.lifecycleStage = 'planning';
+  state.projectSection = 'overview';
   reconcileProjectSelection();
   const initial = esc(user.name.slice(0, 1));
   document.querySelectorAll('.top-avatar, .profile-avatar').forEach((el) => {

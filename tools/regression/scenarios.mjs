@@ -18,6 +18,7 @@ const decideFirst = (decision, comment, toast) => [
 
 const developerSubmitsForReview = (aiMode, smokeResult = '通过') => [
   login('dev'),
+  nav('project-lifecycle'),
   stage('development'),
   { sel: '[data-v35=open][data-kind=smoke]' },
   { select: { '#v35SmokeResult': smokeResult } },
@@ -36,6 +37,7 @@ const developerSubmitsForReview = (aiMode, smokeResult = '通过') => [
 
 const reviewerApproves = [
   login('reviewer'),
+  nav('project-lifecycle'),
   stage('development'),
   { sel: '[data-v5=choose-task]' },
   { sel: '[data-v5=manual-open]' },
@@ -46,6 +48,7 @@ const reviewerApproves = [
 
 const testerSubmitsReports = [
   login('qa'),
+  nav('project-lifecycle'),
   stage('testing'),
   ...['smoke', 'single', 'long', 'system'].flatMap((kind) => [
     { sel: `[data-testing-section=${kind}]` },
@@ -85,8 +88,15 @@ export const scenarios = [
         { sel: '[data-testing-section=' + kind + ']' },
         { check: '[data-feedback=open-return][data-kind=' + kind + ']' },
       ]),
+      { sel: '[data-testing-section=cases]' },
       ...['首轮', '次轮'].flatMap((round, index) => [
         { sel: index ? '[data-feedback=open-return][data-id]' : '[data-feedback=open-return]' },
+        ...(!index
+          ? [
+              { sel: '[data-feedback=submit]', toast: '请选择发现问题的测试环节' },
+              { select: { '[data-return-kind]': 'system' } },
+            ]
+          : []),
         { sel: '[data-feedback=submit]', toast: '请填写问题现象' },
         {
           fill: {
@@ -98,8 +108,8 @@ export const scenarios = [
         { sel: '[data-feedback=submit]', toast: '已退回开发整改' },
         { check: '[data-stage=development].is-current' },
         login('reviewer'),
+        nav('project-lifecycle'),
         stage('development'),
-        { sel: '[data-v5=view-professional]' },
         { sel: '[data-feedback=view-defect]' },
         { check: '#drawer.show' },
         { sel: '[data-action=close-drawer]' },
@@ -120,10 +130,11 @@ export const scenarios = [
         { sel: '[data-v5=dev-submit]' },
         { sel: '[data-action=close-drawer]' },
         login('reviewer'),
+        nav('project-lifecycle'),
         stage('development'),
-        { sel: '[data-v5=view-todos]' },
-        ...reviewerApproves.slice(2),
+        ...reviewerApproves.slice(3),
         login('qa'),
+        nav('project-lifecycle'),
         stage('testing'),
         { sel: '[data-testing-section=system]' },
         { check: '[data-feedback=close-verified]' },
@@ -133,11 +144,11 @@ export const scenarios = [
       nav('project-lifecycle'),
       stage('development'),
       { sel: '[data-workspace=view-reviewer]' },
-      { sel: '[data-v5=view-professional]' },
       { check: '[data-v5=approve][disabled]' },
       { sel: '[data-v5=ai-details]' },
       { sel: '[data-action=close-drawer]' },
       { sel: '[data-feedback=view-version]', nth: 2 },
+      { check: '#drawer a[data-commit-link][href*="/-/commit/"]' },
       { sel: '[data-action=close-drawer]' },
       { sel: '[data-workspace=view-developer]' },
       { sel: '[data-v35=open][data-kind=repo]' },
@@ -165,6 +176,7 @@ export const scenarios = [
       { fill: { '[data-approval-comment]': '整机报告缺少异常场景' } },
       { sel: '[data-approval-action=confirm]', toast: '测试审核已退回' },
       login('qa'),
+      nav('project-lifecycle'),
       stage('testing'),
       { sel: '[data-approval-action=submit][data-stage=testing]', toast: '已提交测试审核' },
       login('qalead'),
@@ -203,6 +215,7 @@ export const scenarios = [
       { sel: '[data-v5=dev-submit]' },
       { sel: '[data-action=close-drawer]' },
       login('reviewer'),
+      nav('project-lifecycle'),
       stage('development'),
       { sel: '[data-v5=choose-task]' },
       { sel: '#appView input[type=checkbox]', nth: 0 },
@@ -251,6 +264,20 @@ export const scenarios = [
         { sel: `[data-design-category=${type}]` },
         { sel: '[data-design-page-action=create]' },
         { sel: '[data-design-drawer-action=submit]', toast: '已提交设计文档审核' },
+        { absent: '[data-design-inline-field=status]' },
+        ...(type === '软件规格书'
+          ? [
+              login('director'),
+              ...decideFirst('reject', '补充设计依据', '设计文档审核已退回'),
+              login('pm'),
+              nav('project-lifecycle'),
+              stage('design'),
+              { sel: '[data-design-category=软件规格书]' },
+              { check: '.design-table .tag.red' },
+              { sel: '.design-table button.design-document-link' },
+              { sel: '[data-design-drawer-action=submit]', toast: '已提交设计文档审核' },
+            ]
+          : []),
         login('director'),
         ...decideFirst('approve', '', '设计文档审核已通过'),
       ]),
@@ -284,6 +311,7 @@ export const scenarios = [
 export function runStep(s) {
   const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
   const fire = (e, type) => e.dispatchEvent(new Event(type, { bubbles: true }));
+  if (s.absent) return document.querySelector(s.absent) ? 'UNEXPECTED ' + s.absent : 'ok';
   if (s.check) return document.querySelector(s.check) ? 'ok' : 'CHECK FAILED ' + s.check;
   if (s.nav) {
     document.querySelectorAll('[data-nav-group]').forEach((g) => {

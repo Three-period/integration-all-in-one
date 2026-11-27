@@ -2,9 +2,11 @@
 import { can } from '../../domain/permissions.js';
 import { App } from '../../core/app.js';
 import { commonHead } from '../../components/shell.js';
-import { person, tag } from '../../core/dom.js';
+import { esc, person, tag } from '../../core/dom.js';
 import { rolePolicy, widgetMeta } from '../../data/roles.js';
 import { currentLayout } from '../../store/layout.js';
+import { projects } from '../../data/projects.js';
+import { flowStore } from '../../store/lifecycle.js';
 import { state } from '../../store/state.js';
 import { renderApprovalWidget } from '../../features/stage-approval.js';
 
@@ -31,6 +33,55 @@ function fillRows(ids, sizes) {
     last[1] = last[2] + (12 - used);
   }
   return rows.map(([id, fill]) => [id, fill]);
+}
+
+function projectNotices() {
+  if (state.role !== 'developer') return '';
+  const notices = Object.entries(flowStore)
+    .filter(([id, flow]) => projects[id] && flow.creationNotice?.recipient === state.user.username)
+    .sort(([, a], [, b]) => b.creationNotice.at.localeCompare(a.creationNotice.at));
+  const repairs = (state.bugRecords || []).filter(
+    (row) =>
+      projects[row.projectId] &&
+      row.testFeedback &&
+      row.status === '待整改' &&
+      row.resolver === state.user.name,
+  );
+  if (!notices.length && !repairs.length) return '';
+  const items =
+    repairs
+      .map(
+        (row) =>
+          '<li class="approval-row"><div><strong>测试退回整改 · ' +
+          esc(row.name) +
+          '</strong><small>' +
+          esc(projects[row.projectId].name) +
+          ' · ' +
+          esc(row.id) +
+          '</small></div><button class="btn" data-action="open-repair" data-project="' +
+          esc(row.projectId) +
+          '">查看整改</button></li>',
+      )
+      .join('') +
+    notices
+      .map(
+        ([id, { creationNotice }]) =>
+          '<li class="approval-row"><div><strong>新建项目 · ' +
+          esc(projects[id].name) +
+          '</strong><small>' +
+          esc(creationNotice.creator) +
+          ' 创建 · ' +
+          esc(new Date(creationNotice.at).toLocaleString('zh-CN', { hour12: false })) +
+          '</small></div><button class="btn" data-action="open-project" data-project="' +
+          esc(id) +
+          '">查看项目</button></li>',
+      )
+      .join('');
+  return (
+    '<section class="card card-pad" data-project-notices><h3 class="section-title">项目通知</h3><ul class="approval-list">' +
+    items +
+    '</ul></section>'
+  );
 }
 
 export function renderWorkbench() {
@@ -72,7 +123,7 @@ export function renderWorkbench() {
     '我的研发工作台',
     '聚合个人待办、项目进展、审批流程与研发质量数据。',
     `<button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
-  )}${tabs}<div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
+  )}${tabs}${projectNotices()}<div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
     layout.filter((id) => allowed.includes(id)),
     sizes,
   )

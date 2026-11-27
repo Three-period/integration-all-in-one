@@ -5,7 +5,6 @@ import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
 import { getHandoffCommit, getReleaseGate } from './version-anchor.js';
-import { testingFeedback } from './test-feedback.js';
 import { project, state } from '../store/state.js';
 
 /** V54 文档驱动的阶段审批 */
@@ -160,7 +159,6 @@ export function initDocumentApproval() {
           '">＋ 新建测试报告</button>'
         : '') +
       '</div></div>' +
-      testingFeedback(kind) +
       '<div class="v54-report-tools"><input class="input search" data-v54-report-query placeholder="搜索报告名称 / 负责人 / 版本" value="' +
       escReportText(state.v54ReportQuery || '') +
       '">' +

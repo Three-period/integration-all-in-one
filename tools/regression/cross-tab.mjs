@@ -18,6 +18,7 @@ for (const scenario of scenarios) {
         await tab.goto(url, { waitUntil: 'load' });
       }
       assert.equal(await tab.evaluate(loginAs, user), 'ok');
+      assert.ok(await tab.$('#dashboardGrid'), user + ' should land on the personal dashboard');
       pages.set(user, tab);
     }
     let page;
@@ -107,6 +108,9 @@ const { browser, page: manager, fresh, errors } = await openPage(url);
 try {
   await fresh();
   assert.equal(await manager.evaluate(loginAs, 'pjm'), 'ok');
+  const dev = await browser.newPage();
+  await dev.goto(url);
+  assert.equal(await dev.evaluate(loginAs, 'dev'), 'ok');
   const approvers = [];
   for (const username of ['director', 'rdlead']) {
     const tab = await browser.newPage();
@@ -124,6 +128,19 @@ try {
     }
   }, title);
   await manager.click('[data-v47=create-project]');
+  await dev.waitForFunction(
+    (name) => document.querySelector('[data-project-notices]')?.textContent.includes(name),
+    {},
+    title,
+  );
+  await dev.reload();
+  await dev.waitForSelector('[data-project-notices] [data-action=open-project]');
+  await dev.click('[data-project-notices] [data-action=open-project]');
+  await dev.waitForFunction(
+    (name) => document.querySelector('#crumb').textContent.includes(name),
+    {},
+    title,
+  );
   const additional = '[data-approver-stage=planning][data-approver-role=rdManager]';
   await manager.waitForSelector(additional, { visible: true });
   await manager.bringToFront();

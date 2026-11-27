@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROLE_LABELS, can, landingFor } from '../../src/domain/permissions.js';
+import { ROLE_LABELS, can } from '../../src/domain/permissions.js';
 
 describe('permissions', () => {
   it('defines all nine roles', () => {
@@ -30,11 +30,5 @@ describe('permissions', () => {
     expect(can('project', 'project.configure')).toBe(true);
     expect(can('product', 'project.configure')).toBe(true);
     expect(can('rdDirector', 'project.configure')).toBe(false);
-  });
-
-  it('lands each role on its own interface', () => {
-    expect(landingFor('developer')).toEqual({ view: 'project-lifecycle', stage: 'development' });
-    expect(landingFor('tester')).toEqual({ view: 'project-lifecycle', stage: 'testing' });
-    expect(landingFor('rdDirector')).toEqual({ view: 'dashboard' });
   });
 });

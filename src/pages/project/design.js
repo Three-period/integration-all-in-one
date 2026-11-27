@@ -340,7 +340,7 @@ function designCategoryCount(category) {
 }
 
 function designInlineSelect(values, current, id, field, locked) {
-  if (locked) return field === 'status' ? designStatusTag(current) : esc(current);
+  if (locked) return esc(current);
   return (
     '<select class="design-inline-select" data-design-inline-field="' +
     field +
@@ -632,7 +632,7 @@ function baseRenderDesign() {
         '">' +
         esc(item.version) +
         '</button></td><td>' +
-        designInlineSelect(designStatuses(), item.status, item.id, 'status', locked) +
+        designStatusTag(item.status) +
         '</td><td>' +
         esc(item.template) +
         '</td><td>' +
@@ -814,7 +814,8 @@ export function bindDesignEvents() {
     var inline = e.target.closest('[data-design-inline-field]');
     if (inline) {
       var record = designRecord(inline.dataset.designId);
-      record[inline.dataset.designInlineField] = inline.value;
+      if (inline.dataset.designInlineField !== 'priority' || isDesignLocked(record)) return;
+      record.priority = inline.value;
       state.designSelected = record.id;
       App.render();
       showToast('设计文档字段已更新');

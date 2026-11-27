@@ -1,7 +1,6 @@
 /** 设计导航、可选测试报告、冒烟报告与用例选择（V53）。 */
 import { App } from '../core/app.js';
 import { showToast } from '../components/toast.js';
-import { FINAL_DESIGN_STATUSES } from '../domain/design.js';
 import { isTestKindEnabled as isTestKindEnabledRule } from '../domain/testing.js';
 import {
   isDesignLocked,
@@ -37,17 +36,6 @@ export function initDesignTestingScope() {
     function (e) {
       var field = e.target.closest('[data-design-inline-field]');
       if (!field) return;
-      // 评审结果只能由审核人在设计文档审核中给出。
-      if (
-        field.dataset.designInlineField === 'status' &&
-        FINAL_DESIGN_STATUSES.includes(field.value)
-      ) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        App.render();
-        showToast('评审结果需由审核人审核给出，请在文档详情中提交审核', 'warn');
-        return;
-      }
       if (
         state.designCategory === '全部' ||
         !isDesignTypeApplicable(state.designCategory) ||
