@@ -21,7 +21,7 @@ export function initStageGate() {
       e.stopImmediatePropagation();
       var d = getDevReview();
       if (
-        d.role !== 'reviewer' ||
+        state.role !== 'reviewer' ||
         !isFormalReviewReady() ||
         !['高风险必查', 'AI 未有效覆盖', '独立抽检'].every(function (k) {
           return d.manual.some(function (x) {

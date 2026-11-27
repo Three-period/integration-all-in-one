@@ -5,6 +5,7 @@ import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
 import { getHandoffCommit, getReleaseGate } from './version-anchor.js';
+import { testingFeedback } from './test-feedback.js';
 import { project, state } from '../store/state.js';
 
 /** V54 文档驱动的阶段审批 */
@@ -13,7 +14,7 @@ export function initDocumentApproval() {
    * No changes to V52 Commit lineage, R3 approval or I–IV branch mapping. */
 
   const selectedReports = new Map();
-  const selectionKey = kind => state.projectId + '/' + kind;
+  const selectionKey = (kind) => state.projectId + '/' + kind;
   var REPORT_KINDS = ['smoke', 'single', 'long', 'system'];
   var REPORT_NAMES = {
     smoke: '冒烟测试报告',
@@ -113,7 +114,7 @@ export function initDocumentApproval() {
     });
     var items = rows
       .map(function (r) {
-        var view = !enabled || r.status !== '草稿';
+        var view = !enabled || r.status !== '草稿' || (r.commit && r.commit !== getHandoffCommit());
         return (
           '<tr><td><button class="testing-link" data-v54-report="open" data-kind="' +
           kind +
@@ -151,7 +152,7 @@ export function initDocumentApproval() {
         : '') +
       '<div class="testing-report-head"><div><h3>' +
       REPORT_NAMES[kind] +
-      '</h3><p>当前项目测试报告列表 · 报告提交后统一在流程视图审核</p></div>' +
+      '</h3></div>' +
       '<div class="testing-report-actions">' +
       (enabled && !getReleaseGate().testPass
         ? '<button class="btn primary" data-v54-report="new" data-kind="' +
@@ -159,6 +160,7 @@ export function initDocumentApproval() {
           '">＋ 新建测试报告</button>'
         : '') +
       '</div></div>' +
+      testingFeedback(kind) +
       '<div class="v54-report-tools"><input class="input search" data-v54-report-query placeholder="搜索报告名称 / 负责人 / 版本" value="' +
       escReportText(state.v54ReportQuery || '') +
       '">' +
@@ -234,7 +236,11 @@ export function initDocumentApproval() {
     renderReportDrawer(
       kind,
       row,
-      isReportKindEnabled(kind) && row.status === '草稿' ? 'edit' : 'view',
+      isReportKindEnabled(kind) &&
+        row.status === '草稿' &&
+        (!row.commit || row.commit === getHandoffCommit())
+        ? 'edit'
+        : 'view',
     );
   }
   function newReport(kind) {
@@ -282,6 +288,10 @@ export function initDocumentApproval() {
       return;
     }
     var row = App.getTestReport(kind);
+    if (row.commit && row.commit !== z.commit) {
+      showToast('该报告属于历史提测版本，请为当前 Commit 新建报告', 'warn');
+      return;
+    }
     var root = document.querySelector('#drawer [data-v491-doc="' + kind + '"]');
     if (root) {
       // V491 comments/formatting use v37Record(kind), which now resolves the

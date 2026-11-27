@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { ROLE_LABELS, can, landingFor } from '../../src/domain/permissions.js';
 
 describe('permissions', () => {
-  it('defines all ten roles', () => {
-    expect(Object.keys(ROLE_LABELS)).toHaveLength(10);
+  it('defines all nine roles', () => {
+    expect(Object.keys(ROLE_LABELS)).toHaveLength(9);
     expect(ROLE_LABELS.qualityManager).toBe('质量主管');
   });
 
   it('keeps the current role rules', () => {
-    expect(can('supervisor', 'operations.view')).toBe(true);
+    for (const role of ['rdDirector', 'rdManager', 'testManager', 'qualityManager']) {
+      expect(can(role, 'operations.view')).toBe(true);
+      expect(can(role, 'approval.decide')).toBe(true);
+    }
+    for (const role of Object.keys(ROLE_LABELS)) expect(can(role, 'dev.workspace')).toBe(true);
     expect(can('project', 'operations.view')).toBe(false);
     expect(can('reviewer', 'dev.workspace')).toBe(true);
     expect(can('reviewer', 'dev.submit')).toBe(false);
@@ -31,7 +35,6 @@ describe('permissions', () => {
   it('lands each role on its own interface', () => {
     expect(landingFor('developer')).toEqual({ view: 'project-lifecycle', stage: 'development' });
     expect(landingFor('tester')).toEqual({ view: 'project-lifecycle', stage: 'testing' });
-    expect(landingFor('supervisor')).toEqual({ view: 'ops-projects' });
     expect(landingFor('rdDirector')).toEqual({ view: 'dashboard' });
   });
 });

@@ -14,6 +14,7 @@ const storageKey = 'rd-platform:workflow:v1:' + new URL('.', document.baseURI).p
 // commit business data need to enter the cross-tab transaction.
 const commands = {
   action: 'confirm-delete-project',
+  feedback: 'submit close-verified',
   'approval-action': 'submit confirm',
   v47: 'create-project save-basic inline-save inline-comment inline-freeze',
   'req-action': 'save submit comment',

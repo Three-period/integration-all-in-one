@@ -99,7 +99,7 @@ export function renderAnchoredReleaseVersions() {
       : '<button class="btn primary" data-v52-release="publish">执行版本发布</button>'
     : '<button class="btn primary" disabled>执行版本发布</button>';
   return (
-    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>版本发布</h3><p>发布评审 / 文档归档 / 版本发布 · Mock 演示</p></div></div><div class="closing-form">' +
+    '<section class="closing-panel"><div class="closing-panel-head"><div><h3>版本发布</h3></div></div><div class="closing-form">' +
     renderVersionBanner() +
     '<div class="kv-grid"><div class="kv"><label>发布版本</label><div>' +
     esc(z.version || '—') +
@@ -116,7 +116,7 @@ export function renderAnchoredReleaseVersions() {
     '</div></div></div><div class="form-foot">' +
     reviewButton +
     publishButton +
-    '</div><div class="mini-note">发布评审与正式发布分别记录，二者均绑定测试审核通过的同一 Commit。</div></div></section>'
+    '</div></div></section>'
   );
 }
 

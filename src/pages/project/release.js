@@ -251,7 +251,7 @@ function releaseEmergencyForm() {
       true,
       false,
     ) +
-    '</div><div class="closing-form-section"><h4>审批说明</h4><div class="notice warn"><i>!</i><span>紧急下发属于高风险操作，必须完成审批后才可执行。</span></div></div>' +
+    '</div>' +
     renderEmergencyReview() +
     '<div class="closing-form-actions"><button class="btn" data-closing-page-action="section" data-closing-section="emergency">取消</button><button class="btn" data-closing-page-action="save-emergency">保存草稿</button><button class="btn primary" data-closing-page-action="submit-emergency">提交审批</button><button class="btn warning" data-closing-page-action="dispatch-emergency" ' +
     (approved ? '' : 'disabled') +
@@ -262,7 +262,7 @@ App.releaseEmergencyForm = releaseEmergencyForm;
 
 function renderEmergencyReview() {
   return (
-    '<div class="closing-form-section"><h4>模拟审批操作（演示）</h4><p class="mini-note">模拟审批记录，不引入真实权限模型。仅审批中可处理。</p><div class="v35-row"><button class="btn primary" data-v37-emergency="approve" ' +
+    '<div class="closing-form-section"><h4>模拟审批操作（演示）</h4><div class="v35-row"><button class="btn primary" data-v37-emergency="approve" ' +
     (state.closingEmergencyStatus === '审批中' ? '' : 'disabled') +
     '>模拟审批通过</button><button class="btn danger" data-v37-emergency="reject" ' +
     (state.closingEmergencyStatus === '审批中' ? '' : 'disabled') +

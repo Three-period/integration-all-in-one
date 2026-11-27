@@ -140,7 +140,7 @@ function renderSidebar() {
     '<div class="asset-sidebar-entry"><div class="nav-title">业务资产</div>' +
     navItem('业务资产管理', '▣', 'asset-gallery', v === 'asset-gallery') +
     '</div>' +
-    // 运营看板仅部门主管可见。
+    // 按运营看板权限显示入口。
     (can(state.role, 'operations.view')
       ? '<div class="nav-title">运营管理</div>' +
         navGroup('运营看板', '▥', 'ops', opsActive, opsChildren)

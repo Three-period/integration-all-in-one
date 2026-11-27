@@ -6,7 +6,6 @@ export const ROLE_LABELS = {
   project: '项目经理',
   developer: '开发工程师',
   tester: '测试工程师',
-  supervisor: '部门主管',
   reviewer: '检视工程师',
   ...APPROVER_ROLES,
 };
@@ -14,9 +13,9 @@ export const ROLE_LABELS = {
 /** 操作 → 允许的角色。 */
 const PERMISSIONS = {
   /** 运营看板 */
-  'operations.view': ['supervisor'],
+  'operations.view': Object.keys(APPROVER_ROLES),
   /** 开发阶段工作台（开发与检视两种视图） */
-  'dev.workspace': ['developer', 'reviewer'],
+  'dev.workspace': Object.keys(ROLE_LABELS),
   /** 冒烟、自测、提交 Commit、申请检视、提测 */
   'dev.submit': ['developer'],
   /** 专业检视、问题裁定、检视准出 */
@@ -41,7 +40,6 @@ const LANDING = {
   developer: { view: 'project-lifecycle', stage: 'development' },
   reviewer: { view: 'project-lifecycle', stage: 'development' },
   tester: { view: 'project-lifecycle', stage: 'testing' },
-  supervisor: { view: 'ops-projects' },
 };
 
 export function landingFor(role) {

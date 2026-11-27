@@ -140,7 +140,7 @@ function closingDetailBody(item) {
     esc(z.published ? z.published.version : '—') +
     '</div></div><div class="kv"><label>正式发布 Commit</label><div>' +
     esc(z.published ? z.published.commit : '—') +
-    '</div></div></div><p class="mini-note">提交结项时自动固化本次正式发布的版本与 Commit，不允许引用其他版本。</p></div>'
+    '</div></div></div></div>'
   );
 }
 App.closingDetailBody = closingDetailBody;
@@ -217,7 +217,7 @@ function renderClosingList() {
     })
     .join('');
   return (
-    '<section class="release-panel"><div class="release-panel-head"><div><h3>项目结项</h3><p>管理项目结项申请、交付物清单与审批状态。</p></div><div class="release-actions"><button class="btn primary" data-release-page-action="create">＋ 新建结项</button></div></div><div class="release-toolbar"><input class="input search" data-release-search placeholder="搜索项目名称 / 项目编号 / 负责人" value="' +
+    '<section class="release-panel"><div class="release-panel-head"><div><h3>项目结项</h3></div><div class="release-actions"><button class="btn primary" data-release-page-action="create">＋ 新建结项</button></div></div><div class="release-toolbar"><input class="input search" data-release-search placeholder="搜索项目名称 / 项目编号 / 负责人" value="' +
     esc(state.releaseQuery) +
     '"><button class="btn" data-release-page-action="toggle-filter">筛选</button><select class="input" data-release-filter="status"><option>全部项目状态</option>' +
     ['待结项', '进行中', '已结项']

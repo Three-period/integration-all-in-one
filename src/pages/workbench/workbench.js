@@ -3,7 +3,7 @@ import { can } from '../../domain/permissions.js';
 import { App } from '../../core/app.js';
 import { commonHead } from '../../components/shell.js';
 import { person, tag } from '../../core/dom.js';
-import { rolePolicy, roles, widgetMeta } from '../../data/roles.js';
+import { rolePolicy, widgetMeta } from '../../data/roles.js';
 import { currentLayout } from '../../store/layout.js';
 import { state } from '../../store/state.js';
 import { renderApprovalWidget } from '../../features/stage-approval.js';
@@ -72,7 +72,7 @@ export function renderWorkbench() {
     '我的研发工作台',
     '聚合个人待办、项目进展、审批流程与研发质量数据。',
     `<button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
-  )}${tabs}<div class="notice"><i>◈</i><span><b>${roles[state.role]}工作台</b> · 角色权限决定可见数据范围，个人布局只能在已授权卡片中调整。当前可见 ${allowed.length} 类卡片。</span></div><div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
+  )}${tabs}<div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
     layout.filter((id) => allowed.includes(id)),
     sizes,
   )

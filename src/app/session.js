@@ -27,6 +27,7 @@ function applySession(user) {
   state.projectId = lastProject[user.username] || defaultProject;
   state.user = user;
   state.role = user.role;
+  state.developmentView = user.role === 'reviewer' ? 'reviewer' : 'developer';
   state.customizerOpen = false;
   state.editingLayout = false;
   const landing = landingFor(user.role);

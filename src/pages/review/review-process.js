@@ -29,6 +29,12 @@ import {
   reviewApprovalState,
 } from '../../domain/review-gates.js';
 
+import {
+  feedbackEvidence,
+  versionList,
+  markFeedbackReviewed,
+} from '../../features/test-feedback.js';
+
 let oldAI;
 let oldPerformAi;
 
@@ -76,7 +82,6 @@ function model(d) {
     d.reviewV5 = createReviewModel();
   }
   var m = d.reviewV5;
-  if (m.process) m.process.currentCommit = d.commit;
   // Existing V55.6 demo/older state: import only a real formalRequest belonging to an existing Commit.
   if (
     !m.process &&
@@ -149,7 +154,7 @@ function createReview(d) {
     p = m.process;
   if (!p) {
     p = {
-      id: newId('PROC', [{ id: '' }]),
+      id: newId('PROC', (d.reviewArchives || []).map((a) => a.process).filter(Boolean)),
       currentCommit: d.commit,
       firstReviewCommit: d.commit,
       firstFormalTaskId: '',
@@ -158,7 +163,7 @@ function createReview(d) {
     };
     m.process = p;
   }
-  var taskId = newId('REV', m.tasks),
+  var taskId = newId('REV', [...(d.reviewArchives || []).flatMap((a) => a.tasks), ...m.tasks]),
     task = {
       taskId: taskId,
       processId: p.id,
@@ -240,27 +245,12 @@ function selectedIssues(d, m) {
 }
 
 function evidencePanel(d) {
-  var run = currentRun(d);
   return devPanel(
     '检视资料',
-    '<div class="v5-evidence"><b>GitLab 仓库 / Commit</b><p><button class="v43-evidence-link" data-v43="commit">' +
-      h(d.commit || '暂无') +
-      ' ↗</button></p>' +
-      '<small>' +
-      h(d.repo || 'Mock GitLab') +
-      ' / ' +
-      h(d.branch || '—') +
-      '</small></div>' +
+    versionList(d) +
       '<div class="v5-evidence"><b>需求与设计依据</b><p>软件规格书、架构、概要、详细设计</p><button class="v43-evidence-link" data-v43="design">查看设计依据 ›</button></div>' +
-      '<div class="v5-evidence"><b>AI 检视资料</b><p>文件一致性、文件正确性、方案与代码一致性、点检项检查</p>' +
-      '<button class="btn" data-v5="ai-details">查看四项检视详细资料</button></div>' +
-      '<div class="v5-evidence"><b>AI 执行记录</b><p>批次：' +
-      h((run && run.id) || '未执行') +
-      '</p><small>受检 Commit：' +
-      h((run && run.commit) || d.commit || '—') +
-      '；结果：' +
-      h((run && run.result) || '未执行') +
-      '</small></div>',
+      '<div class="v5-evidence"><b>AI 检视资料</b><p>文件一致性、文件正确性、方案与代码一致性、点检项检查</p><button class="btn" data-v5="ai-details">查看四项检视详细资料</button></div>' +
+      feedbackEvidence(),
   );
 }
 
@@ -354,12 +344,6 @@ function issueCard(d, m, t) {
         h(i.title) +
         '</small></td>' +
         '<td>' +
-        h(i.evidence || '—') +
-        '</td><td>' +
-        h(i.dispute || '—') +
-        '</td><td>' +
-        h(i.commit || '—') +
-        '</td><td>' +
         h(i.status) +
         '</td><td><button class="btn" data-v5="issue-detail" data-id="' +
         h(i.id) +
@@ -373,7 +357,7 @@ function issueCard(d, m, t) {
     });
   });
   return devPanel(
-    '① 开发待裁定问题',
+    '开发待裁定问题',
     '<div class="v5-toolbar"><span>待裁定 ' +
       eligible.length +
       ' 条 · 选中 ' +
@@ -392,9 +376,8 @@ function issueCard(d, m, t) {
       '<button class="btn" data-v5="batch-meeting" ' +
       (!canEdit ? 'disabled' : '') +
       '>发起线下裁定评审</button></div>' +
-      '<div class="table-wrap"><table class="v5-table"><thead><tr><th>选择</th><th>问题</th><th>AI证据</th><th>开发异议</th><th>Commit</th><th>状态</th><th>查看</th></tr></thead><tbody>' +
-      (rows ||
-        '<tr><td colspan="7" class="v5-empty">本轮没有待裁定问题，可并行开展人工专业检视。</td></tr>') +
+      '<div class="table-wrap"><table class="v5-table"><thead><tr><th>选择</th><th>问题</th><th>状态</th><th>查看</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="4" class="v5-empty">本轮没有待裁定问题。</td></tr>') +
       '</tbody></table></div>' +
       (meeting.length
         ? '<div class="v5-note"><b>关联会议：</b>' +
@@ -412,15 +395,14 @@ function issueCard(d, m, t) {
             })
             .join('') +
           '</div>'
-        : '') +
-      '<div class="v35-notice">已进入线下评审的 issueId 会被独占锁定，不能再参加普通反馈或其他会议。</div>',
+        : ''),
   );
 }
 
 function manualCard(d, m, t) {
   var n = counts(d, m);
   return devPanel(
-    '② 人工专业检视',
+    '人工专业检视',
     '<div class="v5-row"><strong>' +
       n +
       ' / 3 已完成</strong><span>' +
@@ -432,17 +414,16 @@ function manualCard(d, m, t) {
       '</span>' +
       '<button class="btn primary" data-v5="manual-open" ' +
       (!can(state.role, 'review.perform') || t.status === '已完成' ? 'disabled' : '') +
-      '>开展人工专业检视</button></div>' +
-      '<div class="v35-notice">三项独立保存，允许发现问题。发现的问题进入结构化整改清单；完成 3/3 不代表阻断问题已经闭环。追加轮次复用已完成记录。</div>',
+      '>开展人工专业检视</button></div>',
   );
 }
 
 function feedbackCard(d, m, t) {
   return devPanel(
-    '③ 规则反馈',
+    '规则反馈',
     '<div class="v5-row"><span>候选记录 ' +
       m.feedback.length +
-      ' 条（不参与准出门禁）</span><button class="btn" data-v5="feedback-open" ' +
+      ' 条</span><button class="btn" data-v5="feedback-open" ' +
       (can(state.role, 'review.perform') && t.status !== '已完成' ? '' : 'disabled') +
       '>新增规则反馈</button></div>' +
       (m.feedback.length
@@ -467,8 +448,7 @@ function feedbackCard(d, m, t) {
             })
             .join('') +
           '</div>'
-        : '<div class="v5-empty">暂无候选规则反馈。</div>') +
-      '<div class="v35-notice">候选反馈不会直接修改生效规则；若属于必须整改的代码问题，请在人工检视中新增结构化整改项。</div>',
+        : '<div class="v5-empty">暂无候选规则反馈。</div>'),
   );
 }
 
@@ -482,7 +462,7 @@ function exitPanel(d, m) {
     })
     .join('、');
   return devPanel(
-    '准出确认 · 专业检视页面内嵌',
+    '准出确认',
     '<div class="v5-gates"><div class="v5-gate"><b>G1：必须处理的问题全部闭环</b>' +
       '<div>' +
       h(
@@ -501,25 +481,22 @@ function exitPanel(d, m) {
       '>确认检视通过并进入测试节点</button>' +
       (already
         ? '<span class="tag green">已准出 · ' + h(m.process.approval.commit) + '</span>'
-        : '<span class="mini-note">仅检视工程师可最终批准，不要求开发再次提交提测 Commit。</span>') +
+        : '') +
       '</div>',
   );
 }
 
 function professionalPage(d, m) {
-  var t = chosenTask(m),
-    p = m.process;
-  if (!p || !t)
-    return '<div class="v35-notice warn">尚无正式人工检视任务。请由开发工程师完成自主整改后发起人工检视申请。</div>';
-  if (t.status !== '已完成') markTask(d, m);
+  const t = chosenTask(m) || { issueIds: [], status: '已完成' };
+
   var left = issueCard(d, m, t) + manualCard(d, m, t) + feedbackCard(d, m, t);
   return (
+    exitPanel(d, m) +
     '<div class="v5-columns"><section class="v5-left">' +
     left +
     '</section><aside class="v5-right">' +
     evidencePanel(d) +
-    '</aside></div>' +
-    exitPanel(d, m, t)
+    '</aside></div>'
   );
 }
 
@@ -644,7 +621,7 @@ function meetingHtml(group) {
       });
     })
     .filter(Boolean);
-  var locked = group.status === '待线下评审';
+  var locked = group.status === '待线下评审' && can(state.role, 'review.perform');
   return (
     '<div class="v5-root"><div class="v35-notice">会议组 ' +
     h(group.groupId) +
@@ -662,7 +639,7 @@ function meetingHtml(group) {
     (!locked ? 'readonly' : '') +
     '></label>' +
     '<label>会议纪要（必填，富文本）</label><div class="v5-editor-tools">' +
-    editorButtons('v5Minutes') +
+    (locked ? editorButtons('v5Minutes') : '') +
     '</div>' +
     '<div class="v5-editor" id="v5Minutes" contenteditable="' +
     (locked ? 'true' : 'false') +
@@ -715,7 +692,7 @@ function meetingHtml(group) {
 
 function openMeeting(group) {
   var body = meetingHtml(group),
-    locked = group.status === '待线下评审';
+    locked = group.status === '待线下评审' && can(state.role, 'review.perform');
   openDrawer(
     '线下裁定评审 · ' + group.groupId,
     body,
@@ -1292,6 +1269,7 @@ function approve(d, m) {
   var p = project();
   p.status = '进行中';
   p.flowStatus = '测试阶段';
+  markFeedbackReviewed(d.commit, at);
   p.progress = Math.max(Number(p.progress) || 0, 60);
   state.lifecycleStage = 'testing';
   state.projectSection = 'lifecycle';
@@ -1396,7 +1374,6 @@ export function initReviewProcess() {
     var r = currentRun(d);
     if (!r || r.id === oldRun) return;
     var m = model(d);
-    if (m.process) m.process.currentCommit = d.commit;
     d.issues.slice(oldCount).forEach(function (i) {
       if (!i.originCommit) i.originCommit = i.commit;
       i.latestCommit = d.commit;
@@ -1495,6 +1472,7 @@ export function initReviewProcess() {
   App.openReviewerTask = function (pid) {
     if (!projects[pid]) return;
     state.projectId = pid;
+    state.developmentView = 'reviewer';
     var d = data(),
       m = model(d);
     m.selectedTaskId = (m.tasks[m.tasks.length - 1] || {}).taskId || '';
@@ -1616,6 +1594,7 @@ export function initReviewProcess() {
         var pid = b.dataset.pid;
         if (!projects[pid]) return;
         state.projectId = pid;
+        state.developmentView = 'reviewer';
         d = data();
         m = model(d);
         m.selectedTaskId = b.dataset.task;
@@ -1632,7 +1611,10 @@ export function initReviewProcess() {
         }
         return;
       }
-      if (!can(state.role, 'review.perform') && action !== 'editor-format') {
+      if (
+        !can(state.role, 'review.perform') &&
+        !['ai-details', 'issue-detail', 'meeting-open'].includes(action)
+      ) {
         showToast('仅检视工程师可编辑检视内容', 'warn');
         return;
       }
@@ -1643,6 +1625,9 @@ export function initReviewProcess() {
       if (action === 'issue-detail') {
         openIssue(b.dataset.id);
         return;
+      }
+      if (!m.process || m.process.approval) {
+        if (!['meeting-open', 'editor-format'].includes(action)) return;
       }
       if (action === 'batch-feedback') {
         openBatchFeedback(d, m);
@@ -1754,7 +1739,7 @@ export function initReviewProcess() {
       var node = event.target.closest(
         '[data-v35="confirm-dispute-batch"],[data-v35="confirm-dispute"]',
       );
-      if (!node || state.lifecycleStage !== 'development') return;
+      if (!node || state.lifecycleStage !== 'development' || state.role !== 'developer') return;
       event.preventDefault();
       event.stopImmediatePropagation();
       var d = data(),

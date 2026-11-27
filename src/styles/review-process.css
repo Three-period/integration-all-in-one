@@ -27,7 +27,7 @@
 }
 .v5-columns {
   display: grid;
-  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
   gap: 15px;
   align-items: start;
 }

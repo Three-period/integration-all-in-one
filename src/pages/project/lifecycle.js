@@ -110,7 +110,14 @@ export function bindReadonlyGuard() {
       if (!inReadonlyScope(e.target)) return;
       const el = e.target.closest('button, a, [role="button"], [data-action]');
       if (!el) return;
-      if (VIEW_ACTION.test(actionName(el)) || el.classList.contains('modal-close')) return;
+      if (
+        el.matches(
+          '[data-v43="design"],[data-v5="choose-task"],[data-v5="ai-details"],[data-v5="issue-detail"],a[href]',
+        ) ||
+        VIEW_ACTION.test(actionName(el)) ||
+        el.classList.contains('modal-close')
+      )
+        return;
       e.preventDefault();
       e.stopImmediatePropagation();
       showToast('该阶段尚未开始，仅可查看', 'warn');

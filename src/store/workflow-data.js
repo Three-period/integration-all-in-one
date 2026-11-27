@@ -41,6 +41,7 @@ const developmentFields = [
   'disputes',
   'approval',
   'handoff',
+  'reviewArchives',
   'log',
   'seq',
   'smokeResult',

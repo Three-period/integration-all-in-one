@@ -66,6 +66,7 @@ import { initLifecycleFlow } from './features/lifecycle-flow.js';
 import { initInlineDocuments } from './features/inline-documents.js';
 import { initStageGate } from './features/stage-gate.js';
 import { initDesignTestingScope } from './features/design-testing-scope.js';
+import { initTestFeedback } from './features/test-feedback.js';
 import { initDocumentApproval } from './features/document-approval.js';
 import { initReadonlyReportDrawers } from './features/readonly-report-drawers.js';
 import { initReviewProcess } from './pages/review/review-process.js';
@@ -106,6 +107,7 @@ const bootSequence = [
   initInlineDocuments, // V47 需求/设计抽屉内联文档
   initStageGate, // V48 阶段门禁与集中审批
   initDesignTestingScope, // V53 设计导航 / 可选测试报告 / 冒烟报告
+  initTestFeedback,
   initDocumentApproval, // V54 文档驱动的阶段审批
   initReadonlyReportDrawers, // V54.1 报告抽屉只读
   initReviewProcess, // V56 检视流程 V5

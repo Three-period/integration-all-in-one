@@ -10,7 +10,6 @@ export const ACCOUNTS = [
   { username: 'dev', name: '孙宁', role: 'developer', department: '软件一科' },
   { username: 'qa', name: '赵敏', role: 'tester', department: '质量部' },
   { username: 'reviewer', name: '李明', role: 'reviewer', department: '软件一科' },
-  { username: 'lead', name: '周航', role: 'supervisor', department: '研发中心' },
   { username: 'director', name: '陈立', role: 'rdDirector', department: '研发中心' },
   { username: 'rdlead', name: '刘洋', role: 'rdManager', department: '软件一科' },
   { username: 'testlead', name: '王芳', role: 'testManager', department: '质量部' },

@@ -246,7 +246,7 @@ function ops3ProjectAnalytics() {
 
 function renderOps2() {
   if (!can(state.role, 'operations.view'))
-    return '<section class="page ops2-page"><div class="notice warn">运营看板仅部门主管可查看。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
+    return '<section class="page ops2-page"><div class="notice warn">当前角色没有运营看板的查看权限。</div><button class="btn primary" data-v47="go-home">返回个人工作台</button></section>';
   var tab = ops2Tab();
   if (tab === 'review' && !can(state.role, 'operations.view')) {
     state.view = 'ops-projects';

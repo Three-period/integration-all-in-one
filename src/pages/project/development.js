@@ -1,4 +1,5 @@
 /** 开发阶段：开发报告与仓库信息。 */
+import { feedbackList } from '../../features/test-feedback.js';
 import { can } from '../../domain/permissions.js';
 import { getDevReview } from '../../store/lifecycle.js';
 import { App } from '../../core/app.js';
@@ -198,16 +199,32 @@ function saveDevelopmentReport(mode) {
 }
 
 function renderDevelopment() {
-  if (!can(state.role, 'dev.workspace'))
-    return '<div class="notice warn">开发阶段工作台仅开发工程师和检视工程师可用。</div>';
-  getDevReview().role = state.role === 'reviewer' ? 'reviewer' : 'developer';
   var d = getDevReview(),
     ready = getDevReadiness(),
     r = latestAiRun();
   var root = '<div class="development-reference-page v35-root">';
-  if (d.role === 'reviewer') return root + App.renderReviewerWorkspace(d) + '</div>';
+  root +=
+    '<nav class="v5-tabs" aria-label="开发阶段工作台">' +
+    [
+      ['developer', '开发工作台'],
+      ['reviewer', '检视工作台'],
+    ]
+      .map(
+        ([view, label]) =>
+          '<button data-workspace="view-' +
+          view +
+          '" class="' +
+          (state.developmentView === view ? 'active' : '') +
+          '">' +
+          label +
+          '</button>',
+      )
+      .join('') +
+    '</nav>';
+  if (state.developmentView === 'reviewer') return root + App.renderReviewerWorkspace(d) + '</div>';
   return (
     root +
+    feedbackList('测试退回整改') +
     '<div class="v35-dev-layout"><section class="v35-ide"><div class="v35-ide-top"><strong>开发工作区 · 在线 IDE / AI 编程工具</strong>' +
     devBadge('开发空间预留') +
     '</div><div class="v35-ide-area"><div class="v35-ide-empty"><div style="font-size:30px;color:#688bc3">⌘</div><h3>在线 IDE / AI 编程工作区</h3><p>原型预留开发主空间。真实编程服务待后续接入；当前以右侧四张卡片完成代码检视业务演示。</p></div></div></section><aside class="v35-side">' +
@@ -253,11 +270,19 @@ App.renderDevelopment = renderDevelopment;
 /** 开发阶段交互 */
 export function bindDevelopmentEvents() {
   document.addEventListener('click', function (e) {
+    const tab = e.target.closest('[data-workspace]');
+    if (tab) {
+      state.developmentView = tab.dataset.workspace.slice(5);
+      App.render();
+      return;
+    }
     var el = e.target.closest('[data-development-action]');
     if (!el) return;
     e.preventDefault();
     e.stopPropagation();
     var action = el.dataset.developmentAction;
+    if (!can(state.role, 'dev.submit') && !['cancel', 'close', 'open-repo'].includes(action))
+      return;
     if (action === 'edit-repo') {
       developmentRepoDrawer();
       return;

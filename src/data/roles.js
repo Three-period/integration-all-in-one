@@ -33,18 +33,6 @@ export const rolePolicy = {
   ],
   developer: ['summary', 'todo', 'activity', 'projects', 'development', 'testing'],
   tester: ['summary', 'todo', 'activity', 'projects', 'testing', 'risks'],
-  supervisor: [
-    'summary',
-    'todo',
-    'activity',
-    'projects',
-    'requirements',
-    'development',
-    'testing',
-    'approvals',
-    'risks',
-    'team',
-  ],
 };
 
 rolePolicy.reviewer = ['summary', 'todo', 'activity', 'projects'];
@@ -60,16 +48,6 @@ export const defaultLayouts = {
   project: ['summary', 'todo', 'activity', 'projects', 'development', 'testing', 'risks', 'team'],
   developer: ['summary', 'todo', 'activity', 'development', 'testing', 'projects'],
   tester: ['summary', 'todo', 'activity', 'testing', 'projects', 'risks'],
-  supervisor: [
-    'summary',
-    'todo',
-    'activity',
-    'projects',
-    'requirements',
-    'testing',
-    'risks',
-    'team',
-  ],
 };
 
 defaultLayouts.reviewer = ['summary', 'todo', 'activity', 'projects'];

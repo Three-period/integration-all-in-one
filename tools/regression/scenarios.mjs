@@ -74,6 +74,77 @@ const releaseAndClose = [
 
 export const scenarios = [
   {
+    name: '测试退回、修复送检、回归失败与同一缺陷关闭',
+    steps: [
+      ...developerSubmitsForReview('pass'),
+      { sel: '[data-v5=dev-submit]' },
+      { sel: '[data-action=close-drawer]' },
+      ...reviewerApproves,
+      ...testerSubmitsReports,
+      ...['smoke', 'single', 'long', 'system'].flatMap((kind) => [
+        { sel: '[data-testing-section=' + kind + ']' },
+        { check: '[data-feedback=open-return][data-kind=' + kind + ']' },
+      ]),
+      ...['首轮', '次轮'].flatMap((round, index) => [
+        { sel: index ? '[data-feedback=open-return][data-id]' : '[data-feedback=open-return]' },
+        { sel: '[data-feedback=submit]', toast: '请填写问题现象' },
+        {
+          fill: {
+            '[data-return-field=phenomenon]': round + '断线未重连',
+            '[data-return-field=requirement]': '恢复重试',
+            '[data-return-field=expected]': '自动重连',
+          },
+        },
+        { sel: '[data-feedback=submit]', toast: '已退回开发整改' },
+        { check: '[data-stage=development].is-current' },
+        login('reviewer'),
+        stage('development'),
+        { sel: '[data-v5=view-professional]' },
+        { sel: '[data-feedback=view-defect]' },
+        { check: '#drawer.show' },
+        { sel: '[data-action=close-drawer]' },
+        ...developerSubmitsForReview('pass').flatMap((step) =>
+          step.sel === '[data-v35=save-repo]'
+            ? [
+                { sel: step.sel, toast: '请填写本次 Commit 的整改说明' },
+                {
+                  fill: {
+                    '#repairSummary': round + '增加重连',
+                    '#v35Repo': 'https://gitlab.example/' + round,
+                  },
+                },
+                step,
+              ]
+            : [step],
+        ),
+        { sel: '[data-v5=dev-submit]' },
+        { sel: '[data-action=close-drawer]' },
+        login('reviewer'),
+        stage('development'),
+        { sel: '[data-v5=view-todos]' },
+        ...reviewerApproves.slice(2),
+        login('qa'),
+        stage('testing'),
+        { sel: '[data-testing-section=system]' },
+        { check: '[data-feedback=close-verified]' },
+      ]),
+      { sel: '[data-feedback=close-verified]', toast: '缺陷已关闭' },
+      login('pjm'),
+      nav('project-lifecycle'),
+      stage('development'),
+      { sel: '[data-workspace=view-reviewer]' },
+      { sel: '[data-v5=view-professional]' },
+      { check: '[data-v5=approve][disabled]' },
+      { sel: '[data-v5=ai-details]' },
+      { sel: '[data-action=close-drawer]' },
+      { sel: '[data-feedback=view-version]', nth: 2 },
+      { sel: '[data-action=close-drawer]' },
+      { sel: '[data-workspace=view-developer]' },
+      { sel: '[data-v35=open][data-kind=repo]' },
+      { check: '#drawer [data-feedback=view-version]' },
+    ],
+  },
+  {
     name: '冒烟结果未通过时不能申请 AI 检视',
     steps: [
       ...developerSubmitsForReview('pass', '失败').slice(0, -1),

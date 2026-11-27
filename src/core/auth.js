@@ -28,7 +28,8 @@ export const mockAuthProvider = {
   },
   currentUser() {
     try {
-      return JSON.parse(sessionStorage.getItem(SESSION_KEY)) || null;
+      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+      return ACCOUNTS.find((account) => account.username === saved?.username) || null;
     } catch {
       return null;
     }

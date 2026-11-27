@@ -1,5 +1,4 @@
 /** 统一 Mock 生命周期（V47）：阶段流转、角色门禁、项目创建与运营数据。 */
-import { can } from '../domain/permissions.js';
 import { documentId, flowStore, getDevReview, getFlow } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { openDrawer, openModal } from '../components/overlays.js';
@@ -230,10 +229,6 @@ export function projectDesignDocTypes() {
 /** V47 统一 Mock 生命周期与角色门禁 */
 export function initLifecycleFlow() {
   App.openAiResultsEvidence = function () {
-    if (!can(state.role, 'review.perform')) {
-      showToast('仅检视工程师可查看 AI 检视资料', 'warn');
-      return;
-    }
     var d = getDevReview(),
       r = latestAiRun();
     var names = ['文件一致性', '文件正确性', '方案与代码一致性', '点检项检查'];
@@ -336,7 +331,18 @@ export function initLifecycleFlow() {
         );
       })
       .join('');
-    openDrawer('AI 四类检查 · 文件/规则/整改闭环', notice + groups);
+    openDrawer(
+      'AI 四类检查 · 文件/规则/整改闭环',
+      '<h4>AI 执行记录</h4>' +
+        (d.runs
+          .filter((x) => x.commit === d.commit)
+          .slice()
+          .reverse()
+          .map((x) => row(x.id, [x.commit, x.result, x.at].filter(Boolean).join(' · ')))
+          .join('') || row('未执行', '当前版本暂无批次')) +
+        notice +
+        groups,
+    );
   };
   document.addEventListener(
     'click',

@@ -15,6 +15,7 @@ import {
 } from '../domain/dev-review.js';
 import { isRecheckRun as isRecheckRunRule } from '../domain/review-gates.js';
 import { syncHandoff } from './version-anchor.js';
+import { bindRepairCommit, repairsDue, versionList } from './test-feedback.js';
 import { state } from '../store/state.js';
 
 /* V35: Same-task, same-developer, same-commit mock lifecycle for development & review. */
@@ -123,7 +124,7 @@ function renderDevSummaryCard(title, status, note, type, badge) {
     escText(status) +
     '</div><div class="v35-card-note">' +
     escText(note) +
-    '</div><div class="v35-card-foot"><span class="v35-mini">点击查看 / 操作</span>' +
+    '</div><div class="v35-card-foot"><span class="v35-mini">查看详情</span>' +
     devButton('打开详情', 'open', 'data-kind="' + type + '"', 'primary') +
     '</div></section>'
   );
@@ -162,7 +163,11 @@ function openRepoDrawer() {
         escText(d.branch) +
         '"></div><div class="v35-field"><label>当前 Commit（输入新的提交 SHA / 版本号）</label><input id="v35Commit" placeholder="例如 a7d42f1" value="' +
         escText(d.commit) +
-        '"></div><div class="v35-row">' +
+        '"></div>' +
+        (repairsDue().length
+          ? '<div class="v35-field"><label for="repairSummary">整改说明 *</label><textarea id="repairSummary" required></textarea></div>'
+          : '') +
+        '<div class="v35-row">' +
         devButton(
           '模拟新 Commit',
           'generate-commit',
@@ -726,6 +731,32 @@ export function initDevReview() {
       closeDrawer();
       return;
     }
+    if (state.role !== 'developer') {
+      if (act !== 'open') return;
+      const kind = b.dataset.kind;
+      if (kind === 'ai') return App.openAiResultsEvidence();
+      if (kind === 'repo') return openDrawer('代码仓库关联', versionList(d));
+      const smoke = kind === 'smoke';
+      const records = Array.from(smoke ? d.smokes : d.selfTests).reverse();
+      const prep = smoke ? d.prep?.smoke : d.prep?.self;
+      if (prep) records.unshift({ ...prep, commit: '待提交 Commit', owner: d.developer });
+      openDrawer(
+        smoke ? '冒烟测试记录' : '自测报告',
+        records
+          .map((row) =>
+            devPanel(
+              esc(row.commit),
+              '<p>' +
+                esc([row.owner, row.at, row.result].filter(Boolean).join(' · ')) +
+                '</p><p>' +
+                esc(row.text) +
+                '</p>',
+            ),
+          )
+          .join('') || '<p>暂无记录。</p>',
+      );
+      return;
+    }
     if (act === 'open') {
       ({
         repo: openRepoDrawer,
@@ -769,10 +800,28 @@ export function initDevReview() {
         showToast('此 Commit 已存在，请使用新提交编号', 'warn');
         return;
       }
+      const fixSummary = document.querySelector('#repairSummary')?.value.trim() || '';
+      if (repairsDue().length && !fixSummary) {
+        showToast('请填写本次 Commit 的整改说明', 'warn');
+        return;
+      }
+      const previous = d.commits.find((c) => c.commit === d.commit);
+      if (previous) {
+        previous.repo ??= d.repo;
+        previous.branch ??= d.branch;
+      }
       d.repo = document.querySelector('#v35Repo').value.trim();
       d.branch = document.querySelector('#v35Branch').value.trim();
       d.commit = commit;
-      d.commits.push({ commit: commit, owner: owner, at: nowStamp() });
+      if (d.reviewV5?.process) d.reviewV5.process.currentCommit = commit;
+      bindRepairCommit(d, {
+        commit,
+        owner,
+        at: nowStamp(),
+        repo: d.repo,
+        branch: d.branch,
+        fixSummary,
+      });
       d.smokes.push(Object.assign({}, p.smoke, { commit: commit, owner: owner }));
       d.selfTests.push(Object.assign({}, p.self, { commit: commit, owner: owner }));
       d.prep = { owner: owner, smoke: null, self: null };

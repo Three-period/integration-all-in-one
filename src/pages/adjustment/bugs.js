@@ -1,3 +1,5 @@
+import { bugBlank, ensureBugRecords } from '../../store/bugs.js';
+import { openFeedbackDetail } from '../../features/test-feedback.js';
 /** 项目调整 — 缺陷管理（V1.6）。 */
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
@@ -7,39 +9,11 @@ import { $, esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { changeAdjustmentTabs } from './changes.js';
 import { adjustmentProjectId, projects as allProjects } from '../../data/projects.js';
-import { project, state } from '../../store/state.js';
+import { state } from '../../store/state.js';
 
 let bugAppSurface;
 
 /* V1.6：项目调整—缺陷管理。仅替换缺陷管理内容，变更与风险保持原页面。 */
-function bugBlank() {
-  return {
-    id: '自动生成',
-    name: '',
-    projectId: state.projectId,
-    project: project().name,
-    severity: '一般',
-    product: '液冷控制算法',
-    expected: '',
-    status: '待开始',
-    reviewer: '组织架构自动带出',
-    resolver: '问题解决人选择',
-    updated: '-',
-    dwell: '-',
-    creator: '何盈',
-    created: '2026-08-16',
-    planned: '',
-    actual: '',
-    version: '系统自动带出',
-    summary: '',
-    description: '',
-    conclusion: '',
-    comments: [],
-    relations: [],
-    versions: [],
-  };
-}
-
 function bugInit() {
   if (state.bugReady) return;
   state.bugReady = true;
@@ -51,153 +25,7 @@ function bugInit() {
   state.bugMode = 'edit';
   state.bugSelected = 'DFT-202608-0198';
   state.bugDraft = null;
-  if (!allProjects.algorithm) state.bugRecords ??= [];
-  state.bugRecords ??= [
-    {
-      id: 'DFT-202608-0198',
-      name: '高并发设备消息上报丢包',
-      projectId: 'algorithm',
-      project: '液冷控制算法预研（示例项目）',
-      severity: '严重',
-      product: '液冷控制算法',
-      expected: '2026-08-18',
-      status: '进行中',
-      reviewer: '组织架构自动带出',
-      resolver: '孙宁',
-      updated: '2026-08-16 14:20',
-      dwell: '3 天',
-      creator: '赵敏',
-      created: '2026-08-08',
-      planned: '2026-08-17',
-      actual: '-',
-      version: 'V2.6',
-      summary: '高并发场景下设备消息存在丢包现象。',
-      description:
-        '在 1000 台设备并发上报时，部分设备消息未能进入消息队列，服务端日志出现连续丢包记录。',
-      conclusion: '初步定位为消息队列分区处理能力不足，已提交修复构建等待测试验证。',
-      comments: [
-        {
-          name: '孙宁',
-          time: '2026-08-16 14:20',
-          text: '修复构建已提交，等待测试人员验证高并发场景。',
-        },
-        { name: '赵敏', time: '2026-08-15 16:30', text: '已补充复现步骤和压力测试数据。' },
-      ],
-      relations: [
-        { type: '需求', id: 'REQ-142', title: '高并发设备消息上报', meta: '需求阶段 · 关联需求' },
-        {
-          type: '用例',
-          id: 'TC-0822',
-          title: '高并发设备消息上报',
-          meta: '测试阶段 · 关联测试用例',
-        },
-        {
-          type: '任务',
-          id: 'DEV-038',
-          title: '消息队列并行处理优化',
-          meta: '开发阶段 · 负责人：孙宁',
-        },
-        {
-          type: '变更',
-          id: 'CHG-202608-004',
-          title: '补充并发量指标',
-          meta: '项目调整 · 关联变更',
-        },
-      ],
-      versions: [
-        {
-          version: 'V1.1',
-          status: '当前版本',
-          creator: '赵敏',
-          time: '2026-08-16 14:20',
-          summary: '补充修复构建与验证结论。',
-        },
-        {
-          version: 'V1.0',
-          status: '已替代',
-          creator: '赵敏',
-          time: '2026-08-08 10:15',
-          summary: '首次提报高并发消息上报丢包。',
-        },
-      ],
-    },
-    {
-      id: 'DFT-202608-0197',
-      name: '断线重连状态同步延迟',
-      projectId: 'algorithm',
-      project: '液冷控制算法预研（示例项目）',
-      severity: '一般',
-      product: '液冷控制算法',
-      expected: '2026-08-20',
-      status: '待开始',
-      reviewer: '组织架构自动带出',
-      resolver: '李明',
-      updated: '2026-08-15 09:40',
-      dwell: '-',
-      creator: '赵敏',
-      created: '2026-08-09',
-      planned: '2026-08-19',
-      actual: '-',
-      version: 'V2.6',
-      summary: '设备重连后状态同步存在延迟。',
-      description: '网络恢复后设备状态在服务端更新不及时，偶发出现页面状态与设备实际状态不一致。',
-      conclusion: '待开发人员确认复现条件和修复方案。',
-      comments: [],
-      relations: [
-        { type: '需求', id: 'REQ-139', title: '设备断线后自动重连', meta: '需求阶段 · 关联需求' },
-        {
-          type: '用例',
-          id: 'TC-0821',
-          title: '设备断线后自动重连',
-          meta: '测试阶段 · 关联测试用例',
-        },
-      ],
-      versions: [
-        {
-          version: 'V1.0',
-          status: '当前版本',
-          creator: '赵敏',
-          time: '2026-08-09 11:00',
-          summary: '创建断线重连状态同步缺陷。',
-        },
-      ],
-    },
-    {
-      id: 'DFT-202608-0191',
-      name: '能耗报表导出格式错位',
-      projectId: 'algorithm',
-      project: '液冷控制算法预研（示例项目）',
-      severity: '建议项',
-      product: '设备云平台',
-      expected: '2026-08-12',
-      status: '已完成',
-      reviewer: '组织架构自动带出',
-      resolver: '李明',
-      updated: '2026-08-12 17:05',
-      dwell: '已关闭',
-      creator: '赵敏',
-      created: '2026-08-05',
-      planned: '2026-08-11',
-      actual: '2026-08-12',
-      version: 'V2.6',
-      summary: '导出报表时部分字段出现格式错位。',
-      description: '按区域导出能耗报表时，表头与数据列存在轻微偏移。',
-      conclusion: '已完成样式修复并通过回归验证。',
-      comments: [{ name: '赵敏', time: '2026-08-12 17:05', text: '回归验证通过，缺陷已关闭。' }],
-      relations: [
-        { type: '用例', id: 'TC-0824', title: '历史告警记录导出', meta: '测试阶段 · 关联测试用例' },
-      ],
-      versions: [
-        {
-          version: 'V1.0',
-          status: '当前版本',
-          creator: '赵敏',
-          time: '2026-08-12 17:05',
-          summary: '样式修复完成并验证通过。',
-        },
-      ],
-    },
-  ];
+  ensureBugRecords();
 }
 
 function bugRecord(id) {
@@ -328,19 +156,25 @@ function bugTable() {
           '</td><td>' +
           bugSeverityTag(r.severity) +
           '</td><td>' +
-          bugSelect(
-            'status',
-            bugStatuses(),
-            r.status,
-            'data-bug-inline="status" data-bug-id="' + esc(r.id) + '"',
-          ) +
+          (r.testFeedback
+            ? esc(r.status)
+            : bugSelect(
+                'status',
+                bugStatuses(),
+                r.status,
+                'data-bug-inline="status" data-bug-id="' + esc(r.id) + '"',
+              )) +
           '</td><td>' +
           esc(r.updated || '—') +
           '</td><td><button class="op" data-bug-page-action="open" data-bug-id="' +
           esc(r.id) +
-          '">查看详情</button><button class="op" data-bug-page-action="verify" data-bug-id="' +
-          esc(r.id) +
-          '">提交验证</button></td></tr>'
+          '">查看详情</button>' +
+          (r.testFeedback
+            ? ''
+            : '<button class="op" data-bug-page-action="verify" data-bug-id="' +
+              esc(r.id) +
+              '">提交验证</button>') +
+          '</td></tr>'
         );
       })
       .join('') +
@@ -354,7 +188,7 @@ function renderBugManagement() {
     ? '<div class="bug-filter-panel"><label>流程状态</label>' +
       bugSelect(
         'filter-status',
-        bugStatuses().concat(['全部']),
+        bugStatuses().concat(['待整改', '待检视', '待回归验证', '已关闭', '全部']),
         state.bugStatusFilter,
         'data-bug-filter="status"',
       ) +
@@ -564,6 +398,7 @@ function openBugDrawer(id, mode) {
   state.bugTab = 'detail';
   if (state.bugMode === 'create') state.bugDraft = bugBlank();
   var r = bugCurrent();
+  if (r.testFeedback) return openFeedbackDetail(r);
   openDrawer(
     state.bugMode === 'create' ? '新建缺陷' : '缺陷详情 · ' + r.id,
     bugDrawerBody(r),
@@ -838,7 +673,7 @@ export function initBugManagement() {
     var inline = e.target.closest('[data-bug-inline]');
     if (inline) {
       var record = bugRecord(inline.dataset.bugId);
-      if (record?.id !== inline.dataset.bugId) return;
+      if (record?.id !== inline.dataset.bugId || record.testFeedback) return;
       record.status = e.target.value;
       record.updated = '刚刚';
       state.bugSelected = record.id;

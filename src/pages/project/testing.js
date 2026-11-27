@@ -1,6 +1,7 @@
 /** 测试阶段：用例、测试报告与缺陷。 */
 import { isTestKindEnabled } from '../../domain/testing.js';
 import { renderVersionBanner } from '../../features/version-anchor.js';
+import { projectFeedback, openFeedbackDetail } from '../../features/test-feedback.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -514,11 +515,11 @@ App.testingReportInfo = testingReportInfo;
 function testingDefectRows() {
   App.testingInit();
   var query = (state.testingDefectQuery || '').toLowerCase();
-  return state.testingDefects.filter(function (item) {
+  return [...projectFeedback(), ...state.testingDefects].filter(function (item) {
     return (
-      item.project === project().name &&
+      (item.testFeedback ? item.projectId === state.projectId : item.project === project().name) &&
       (!query ||
-        (item.id + ' ' + item.name + ' ' + item.solver + ' ' + item.project)
+        (item.id + ' ' + item.name + ' ' + (item.resolver || item.solver) + ' ' + item.project)
           .toLowerCase()
           .indexOf(query) > -1)
     );
@@ -703,6 +704,8 @@ function testingDefectDrawerFoot() {
 
 function openTestingDefectDrawer(id, mode) {
   App.testingInit();
+  const feedback = projectFeedback().find((row) => row.id === id);
+  if (feedback) return openFeedbackDetail(feedback);
   state.testingDefectMode = mode || 'edit';
   state.testingDefectSelected = id || state.testingDefects[0].id;
   if (state.testingDefectMode === 'create') state.testingDefectDraft = null;
@@ -747,7 +750,7 @@ export function renderTestingDefects() {
         '</td><td>' +
         testingStatusTag(item.status) +
         '</td><td>' +
-        esc(item.solver) +
+        esc(item.resolver || item.solver) +
         '</td><td>' +
         esc(item.expected) +
         '</td><td>' +

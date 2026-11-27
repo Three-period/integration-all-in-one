@@ -53,6 +53,47 @@ for (const scenario of scenarios) {
       // Let both delivered storage events and queued UI actions finish before the next click.
       await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 20)));
     }
+    if (scenario.steps.some((step) => step.sel === '[data-feedback=close-verified]')) {
+      const qa = pages.get('qa');
+      await qa.reload();
+      const { development, records, approvalRequests } = await qa.evaluate(() => {
+        const key = Object.keys(localStorage).find((k) => k.startsWith('rd-platform:workflow:'));
+        return JSON.parse(localStorage.getItem(key));
+      });
+      const bugs = records.bugRecords.filter((row) => row.testFeedback);
+      assert.equal(bugs.length, 1);
+      const [bug] = bugs;
+      assert.equal(bug.status, '已关闭');
+      assert.equal(bug.testFeedback.kind, 'system');
+      const commits = development[bug.projectId].commits;
+      assert.equal(commits.length, 3);
+      assert.equal(approvalRequests.find((req) => req.stage === 'testing').status, '已失效');
+      assert.deepEqual(
+        bug.testFeedback.rounds.map((r) => r.verification.result),
+        ['未通过', '通过'],
+      );
+      for (const [index, round] of bug.testFeedback.rounds.entries()) {
+        assert.equal(round.foundCommit, commits[index].commit);
+        assert.equal(round.expected, '自动重连');
+        assert.equal(round.requirement, '恢复重试');
+        const repaired = commits[index + 1];
+        assert.deepEqual(repaired.defectIds, [bug.id]);
+        assert.equal(round.review.commit, repaired.commit);
+        assert.equal(round.verification.commit, repaired.commit);
+        assert.equal(round.repairs[0].summary, repaired.fixSummary);
+      }
+      assert.notEqual(commits[1].repo, commits[2].repo);
+      await qa.evaluate(runStep, { nav: 'project-adjustment' });
+      await qa
+        .waitForSelector('[data-action=adjust-tab][data-tab=defects]')
+        .then((el) => el.click());
+      const details = '[data-bug-page-action=open][data-bug-id="' + bug.id + '"] button';
+      await qa.waitForSelector(details);
+      await qa.click(details);
+      await qa.waitForFunction(() =>
+        document.querySelector('#drawer.show #drawerBody')?.textContent.includes('第 2 轮'),
+      );
+    }
     assert.deepEqual(errors, []);
     console.log('PASS', scenario.name, '(' + pages.size + ' tabs)');
   } finally {

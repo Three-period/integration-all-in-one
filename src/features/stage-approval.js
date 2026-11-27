@@ -15,6 +15,7 @@ import {
   stageApprovers,
 } from '../domain/approvals.js';
 import { missingDesignReviews } from '../domain/design.js';
+import { projectFeedback } from './test-feedback.js';
 import { approvalRequests, getFlow, getVersionAnchor } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { esc } from '../core/dom.js';
@@ -40,10 +41,7 @@ export const APPROVAL_TITLES = {
 };
 
 /** 需求、设计在详情抽屉中逐份提交；立项、测试、发布在阶段页面整体提交。 */
-const SUBMIT_IN_DRAWER = {
-  requirements: '在需求详情中点击「提交」即可发起审核。',
-  design: '在设计文档详情中点击「提交」即可发起审核，每份文档单独审核。',
-};
+const SUBMIT_IN_DRAWER = new Set(['requirements', 'design']);
 
 function approverNames(roles) {
   return roles.map((r) => APPROVER_ROLES[r]).join(' / ');
@@ -103,6 +101,8 @@ function submitBlocker(stage, deliverable) {
   if (stage === 'testing') {
     const z = getReleaseGate();
     if (!z.commit) return '尚无正式移交的开发版本，无法提交测试审核';
+    if (projectFeedback().some((row) => row.status !== '已关闭'))
+      return '请先完成测试退回缺陷的回归验证';
     const check = App.testReportRequirements();
     if (check.missing.length) return '请先提交 ' + check.missing.join('、');
   }
@@ -356,6 +356,8 @@ function lastDecisionNote(stage) {
   );
   const last = decided[decided.length - 1];
   if (!last) return '';
+  if (last.status === '已失效')
+    return '<p class="approval-last">原版本审核已失效 · ' + esc(last.invalidReason) + '</p>';
   const d = last.decisions[last.decisions.length - 1];
   return (
     '<p class="approval-last ' +
@@ -439,8 +441,7 @@ function stageChecklist(stage) {
 }
 
 function submitButton(stage) {
-  if (SUBMIT_IN_DRAWER[stage])
-    return '<span class="mini-note">' + SUBMIT_IN_DRAWER[stage] + '</span>';
+  if (SUBMIT_IN_DRAWER.has(stage)) return '';
   if (isStageDone(stage) || pendingOf(state.projectId, stage).length) return '';
   const blocker = submitBlocker(stage, {});
   return (
@@ -466,9 +467,13 @@ export function renderApprovalBar(stage) {
     APPROVAL_TITLES[stage] +
     ' ' +
     statusTag(stage) +
-    '</h3><p>审核角色：' +
-    esc(approverNames(stageApprovers(project(), stage))) +
-    '（任意一位审核即可，可在「基本信息」中调整）</p></div><div class="approval-bar-actions">' +
+    '</h3>' +
+    (stage === 'planning'
+      ? '<p>审核角色：' +
+        esc(approverNames(stageApprovers(project(), stage))) +
+        '（任意一位审核即可，可在「基本信息」中调整）</p>'
+      : '') +
+    '</div><div class="approval-bar-actions">' +
     submitButton(stage) +
     '</div></div>' +
     stageChecklist(stage) +
