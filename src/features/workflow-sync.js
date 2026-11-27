@@ -1,6 +1,9 @@
 import { App } from '../core/app.js';
 import { currentUser } from '../core/auth.js';
 import { showToast } from '../components/toast.js';
+import { closeDrawer, closeModal } from '../components/overlays.js';
+import { reconcileProjectSelection, state } from '../store/state.js';
+import { projects } from '../data/projects.js';
 import { onlineDocs } from '../store/lifecycle.js';
 import { restoreWorkflow, workflowData } from '../store/workflow-data.js';
 
@@ -10,6 +13,7 @@ const storageKey = 'rd-platform:workflow:v1:' + new URL('.', document.baseURI).p
 // Existing handlers own all decisions and stage transitions. Only commands that
 // commit business data need to enter the cross-tab transaction.
 const commands = {
+  action: 'confirm-delete-project',
   'approval-action': 'submit confirm',
   v47: 'create-project save-basic inline-save inline-comment inline-freeze',
   'req-action': 'save submit comment',
@@ -87,7 +91,26 @@ export function initWorkflowSync() {
   function readLatest() {
     const value = localStorage.getItem(storageKey);
     if (value === lastValue) return false;
-    if (value) restoreWorkflow(JSON.parse(value));
+    if (value) {
+      restoreWorkflow(JSON.parse(value));
+      const openProjectWasDeleted = state.view.startsWith('project-') && !projects[state.projectId];
+      const modalProject = document.querySelector('#modalRoot.show [data-owner-project]')?.dataset
+        .ownerProject;
+      const drawerProject = document.querySelector('#drawer.show')?.dataset.ownerProject;
+      const drawerDeleted = openProjectWasDeleted || (drawerProject && !projects[drawerProject]);
+      if (drawerDeleted || (modalProject && !projects[modalProject])) {
+        if (drawerDeleted) {
+          closeDrawer();
+          document.querySelector('#drawerBody').replaceChildren();
+          document.querySelector('#drawerFoot').replaceChildren();
+        }
+        closeModal();
+        document.querySelector('#modalRoot').replaceChildren();
+        dirtyInput = null;
+        pendingRender = true;
+      }
+      reconcileProjectSelection();
+    }
     lastValue = value;
     return !!value;
   }
@@ -123,10 +146,15 @@ export function initWorkflowSync() {
     const actor = currentUser().username;
     const form = control.closest('#drawer, #modalRoot, #appView');
     const type = event.type;
+    const projectAtClick = state.view.startsWith('project-') ? state.projectId : null;
     withWriteLock(() => {
       // A queued double click or a closed form must not execute on a different screen.
       if (!control.isConnected || control.disabled || currentUser()?.username !== actor) return;
       if (readLatest()) pendingRender = true;
+      if (!control.isConnected || (projectAtClick && !projects[projectAtClick])) {
+        renderIfReady();
+        return;
+      }
       const before = JSON.stringify(workflowData());
       for (const box of dirtyDocuments) {
         if (!box.isConnected) dirtyDocuments.delete(box);

@@ -5,6 +5,7 @@ import { commonHead } from '../../components/shell.js';
 import { showToast } from '../../components/toast.js';
 import { $, esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
+import { adjustmentProjectId, projects as allProjects } from '../../data/projects.js';
 import { project, state } from '../../store/state.js';
 
 let changeAppSurface;
@@ -14,7 +15,8 @@ function changeBlank() {
   return {
     id: '自动生成',
     name: '',
-    project: project().name || '液冷控制算法预研（示例项目）',
+    projectId: state.projectId,
+    project: project().name,
     business: 'IDC / SPT',
     reviewer: '组织架构自动带出',
     category: '需求变更',
@@ -43,10 +45,12 @@ function changeInit() {
   state.changeMode = 'edit';
   state.changeSelected = 'CHG-202608-004';
   state.changeDraft = null;
+  if (!allProjects.algorithm) state.changeRecords ??= [];
   state.changeRecords ??= [
     {
       id: 'CHG-202608-004',
       name: '补充并发量指标',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       business: 'IDC / SPT',
       reviewer: '组织架构自动带出',
@@ -92,6 +96,7 @@ function changeInit() {
     {
       id: 'CHG-202608-002',
       name: '调整消息队列架构',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       business: 'IDC',
       reviewer: '组织架构自动带出',
@@ -546,6 +551,8 @@ function collectChange() {
     var key = input.dataset.changeInput;
     if (key !== 'filter-status' && key !== 'filter-category') r[key] = input.value;
   });
+  if (allProjects[r.projectId]?.name !== r.project)
+    r.projectId = adjustmentProjectId({ project: r.project });
   r.updated = '刚刚';
   return r;
 }
@@ -760,6 +767,7 @@ export function initChangeManagement() {
     var inline = e.target.closest('[data-change-inline]');
     if (inline) {
       var record = changeRecord(inline.dataset.changeId);
+      if (record?.id !== inline.dataset.changeId) return;
       record.status = e.target.value;
       record.updated = '刚刚';
       state.changeSelected = record.id;

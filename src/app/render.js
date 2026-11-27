@@ -1,4 +1,5 @@
 /** 根渲染：按 state.view 渲染当前页面、侧边栏与面包屑。 */
+import { removeDeletedProjectSamples } from '../data/projects.js';
 import { renderAssetGallery } from '../pages/assets.js';
 import { App } from '../core/app.js';
 import { bindPageEvents } from './events.js';
@@ -15,9 +16,10 @@ import {
   renderTasks,
   renderWorkbench,
 } from '../pages/workbench/workbench.js';
-import { state } from '../store/state.js';
+import { reconcileProjectSelection, state } from '../store/state.js';
 
 function render() {
+  reconcileProjectSelection();
   // 只读标记由全生命周期页按当前阶段重新设置。
   document.body.removeAttribute('data-stage-readonly');
   App.renderSidebar();
@@ -42,6 +44,7 @@ function render() {
     'asset-gallery': renderAssetGallery,
   }[view]();
   $('#appView').innerHTML = html;
+  removeDeletedProjectSamples($('#appView'));
   bindPageEvents();
   if (state.customizerOpen) openCustomizer(false);
 }

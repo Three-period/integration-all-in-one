@@ -6,6 +6,7 @@ import { showToast } from '../../components/toast.js';
 import { $, esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { changeAdjustmentTabs } from './changes.js';
+import { adjustmentProjectId, projects as allProjects } from '../../data/projects.js';
 import { project, state } from '../../store/state.js';
 
 let riskAppSurface;
@@ -15,7 +16,8 @@ function riskBlank() {
   return {
     id: '自动生成',
     name: '',
-    project: project().name || '液冷控制算法预研（示例项目）',
+    projectId: state.projectId,
+    project: project().name,
     level: '中',
     status: '待开始',
     reviewer: '组织架构自动带出',
@@ -43,10 +45,12 @@ function riskInit() {
   state.riskMode = 'edit';
   state.riskSelected = 'RSK-202608-001';
   state.riskDraft = null;
+  if (!allProjects.algorithm) state.riskRecords ??= [];
   state.riskRecords ??= [
     {
       id: 'RSK-202608-001',
       name: '整机联调环境交付延期',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       level: '高',
       status: '进行中',
@@ -97,6 +101,7 @@ function riskInit() {
     {
       id: 'RSK-202608-002',
       name: '第三方协议接口兼容问题',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       level: '中',
       status: '待开始',
@@ -131,6 +136,7 @@ function riskInit() {
     {
       id: 'RSK-202608-003',
       name: '测试资源与其他项目冲突',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       level: '低',
       status: '已完成',
@@ -340,7 +346,7 @@ function riskMetaRow(label, value) {
 }
 
 function riskDetailPanel(r) {
-  var projects = [r.project, '设备云平台 3.0', '边缘计算网关适配'];
+  var projects = [...new Set([r.project, ...Object.values(allProjects).map((p) => p.name)])];
   return (
     '<div class="risk-detail-note">风险编号、审核人、创建人、版本号与时间字段按项目权限自动生成或带出；风险状态变化会同步项目健康度与预警信息。</div><div class="form-grid">' +
     riskField('风险名称', 'name', r.name, false, false, false) +
@@ -508,6 +514,7 @@ function openRiskDrawer(id, mode) {
     state.riskMode === 'create' ? '新建风险' : '风险详情 · ' + r.id,
     riskDrawerBody(r),
     riskDrawerFoot(r),
+    adjustmentProjectId(r),
   );
   $('#drawer').classList.add('req-drawer-large');
 }
@@ -520,6 +527,8 @@ function collectRisk() {
     var key = input.dataset.riskInput;
     if (key !== 'filter-status' && key !== 'filter-level') r[key] = input.value;
   });
+  if (allProjects[r.projectId]?.name !== r.project)
+    r.projectId = adjustmentProjectId({ project: r.project });
   r.updated = '刚刚';
   return r;
 }
@@ -767,6 +776,7 @@ export function initRiskManagement() {
     var inline = e.target.closest('[data-risk-inline]');
     if (inline) {
       var record = riskRecord(inline.dataset.riskId);
+      if (record?.id !== inline.dataset.riskId) return;
       record.status = e.target.value;
       record.updated = '刚刚';
       state.riskSelected = record.id;

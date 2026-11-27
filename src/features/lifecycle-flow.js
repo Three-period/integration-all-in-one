@@ -1,6 +1,6 @@
 /** 统一 Mock 生命周期（V47）：阶段流转、角色门禁、项目创建与运营数据。 */
 import { can } from '../domain/permissions.js';
-import { flowStore, getDevReview, getFlow } from '../store/lifecycle.js';
+import { documentId, flowStore, getDevReview, getFlow } from '../store/lifecycle.js';
 import { App } from '../core/app.js';
 import { openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
@@ -179,12 +179,12 @@ function createProject() {
     );
     return;
   }
-  var id = 'demo-' + Date.now(),
-    code =
-      'PRJ' +
-      new Date().toISOString().slice(0, 10).replace(/-/g, '') +
-      '-' +
-      String(Object.keys(projects).length + 1).padStart(2, '0');
+  const id = documentId('demo');
+  const prefix = 'PRJ' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-';
+  const usedCodes = new Set(Object.values(projects).map((row) => row.code));
+  let sequence = Object.keys(projects).length + 1;
+  let code = prefix + String(sequence).padStart(2, '0');
+  while (usedCodes.has(code)) code = prefix + String(++sequence).padStart(2, '0');
   projects[id] = Object.assign(
     {
       code: code,

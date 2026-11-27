@@ -9,7 +9,7 @@ import { esc } from '../core/dom.js';
 import { logout } from '../core/auth.js';
 import { closeDrawer, closeModal } from '../components/overlays.js';
 import { renderLogin } from '../pages/login.js';
-import { state } from '../store/state.js';
+import { reconcileProjectSelection, state } from '../store/state.js';
 
 let boot = null;
 let booted = false;
@@ -35,6 +35,7 @@ function applySession(user) {
     state.lifecycleStage = landing.stage;
     state.projectSection = 'lifecycle';
   }
+  reconcileProjectSelection();
   const initial = esc(user.name.slice(0, 1));
   document.querySelectorAll('.top-avatar, .profile-avatar').forEach((el) => {
     el.innerHTML = initial;

@@ -21,6 +21,8 @@ const PERMISSIONS = {
   'dev.submit': ['developer'],
   /** 专业检视、问题裁定、检视准出 */
   'review.perform': ['reviewer'],
+  /** 删除项目及其关联的模拟记录 */
+  'project.delete': ['project'],
   /** 配置项目各阶段的审核角色 */
   'project.configure': ['product', 'project'],
   /** 阶段审核（具体阶段的审核角色由项目配置决定，见 approvals.js） */

@@ -6,6 +6,7 @@ import { showToast } from '../../components/toast.js';
 import { $, esc, tag } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
 import { changeAdjustmentTabs } from './changes.js';
+import { adjustmentProjectId, projects as allProjects } from '../../data/projects.js';
 import { project, state } from '../../store/state.js';
 
 let bugAppSurface;
@@ -15,7 +16,8 @@ function bugBlank() {
   return {
     id: '自动生成',
     name: '',
-    project: project().name || '液冷控制算法预研（示例项目）',
+    projectId: state.projectId,
+    project: project().name,
     severity: '一般',
     product: '液冷控制算法',
     expected: '',
@@ -49,10 +51,12 @@ function bugInit() {
   state.bugMode = 'edit';
   state.bugSelected = 'DFT-202608-0198';
   state.bugDraft = null;
+  if (!allProjects.algorithm) state.bugRecords ??= [];
   state.bugRecords ??= [
     {
       id: 'DFT-202608-0198',
       name: '高并发设备消息上报丢包',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       severity: '严重',
       product: '液冷控制算法',
@@ -120,6 +124,7 @@ function bugInit() {
     {
       id: 'DFT-202608-0197',
       name: '断线重连状态同步延迟',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       severity: '一般',
       product: '液冷控制算法',
@@ -160,6 +165,7 @@ function bugInit() {
     {
       id: 'DFT-202608-0191',
       name: '能耗报表导出格式错位',
+      projectId: 'algorithm',
       project: '液冷控制算法预研（示例项目）',
       severity: '建议项',
       product: '设备云平台',
@@ -381,7 +387,7 @@ function bugMetaRow(label, value) {
 }
 
 function bugDetailPanel(r) {
-  var projects = [r.project, '设备云平台 3.0', '边缘计算网关适配'];
+  var projects = [...new Set([r.project, ...Object.values(allProjects).map((p) => p.name)])];
   var products = [r.product, '设备云平台', '边缘计算网关'];
   return (
     '<div class="bug-detail-note">缺陷编号、审核人、创建人、时间与问题版本按项目权限自动生成或带出；严重缺陷未关闭时会影响发布预检。</div><div class="form-grid">' +
@@ -562,6 +568,7 @@ function openBugDrawer(id, mode) {
     state.bugMode === 'create' ? '新建缺陷' : '缺陷详情 · ' + r.id,
     bugDrawerBody(r),
     bugDrawerFoot(r),
+    adjustmentProjectId(r),
   );
   $('#drawer').classList.add('req-drawer-large');
 }
@@ -574,6 +581,8 @@ function collectBug() {
     var key = input.dataset.bugInput;
     if (key !== 'filter-status' && key !== 'filter-severity') r[key] = input.value;
   });
+  if (allProjects[r.projectId]?.name !== r.project)
+    r.projectId = adjustmentProjectId({ project: r.project });
   r.updated = '刚刚';
   return r;
 }
@@ -829,6 +838,7 @@ export function initBugManagement() {
     var inline = e.target.closest('[data-bug-inline]');
     if (inline) {
       var record = bugRecord(inline.dataset.bugId);
+      if (record?.id !== inline.dataset.bugId) return;
       record.status = e.target.value;
       record.updated = '刚刚';
       state.bugSelected = record.id;

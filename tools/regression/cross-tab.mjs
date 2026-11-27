@@ -124,6 +124,91 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log('PASS 新建项目、双主管同时审批、自动回写与刷新恢复');
+
+  // Delete the actual project created above, while a second role is viewing its detail.
+  const other = approvers[0];
+  const id = records[0].projectId;
+  await other.evaluate(runStep, { nav: 'portfolio' });
+  assert.equal(await other.$('[data-action="delete-project"]'), null);
+  await other.click(`[data-action="open-project"][data-project="${id}"]`);
+  await other.waitForFunction(
+    (name) => document.querySelector('#crumb').textContent.includes(name),
+    {},
+    title,
+  );
+  const remove = `[data-action="delete-project"][data-project="${id}"]`;
+  await manager.click(remove);
+  await manager.waitForFunction(
+    (name) => document.querySelector('#modalRoot.show').textContent.includes(name),
+    {},
+    title,
+  );
+  await manager.click('#modalRoot [data-action=close-modal]');
+  assert.ok(await manager.$(remove));
+  await manager.click('[data-action=toggle-project-view]');
+  await manager.click(remove);
+  await manager.click('#modalRoot [data-action=confirm-delete-project]');
+  await manager.waitForFunction((sel) => !document.querySelector(sel), {}, remove);
+  await other.waitForFunction(() =>
+    document.querySelector('#crumb').textContent.includes('项目集'),
+  );
+  await manager.reload();
+  await manager.evaluate(runStep, { nav: 'portfolio' });
+  assert.equal(await manager.$(remove), null);
+  const remaining = await manager.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('rd-platform:workflow:'));
+    return JSON.parse(localStorage.getItem(key));
+  });
+  assert.equal(JSON.stringify(remaining).includes(id), false);
+  assert.deepEqual(Object.keys(remaining.projects).sort(), [
+    'algorithm',
+    'cloud',
+    'gateway',
+    'thermal',
+  ]);
+  for (const seed of Object.keys(remaining.projects)) {
+    await manager.click(`[data-action="delete-project"][data-project="${seed}"]`);
+    await manager.click('#modalRoot [data-action=confirm-delete-project]');
+    await manager.waitForFunction(
+      (pid) => !document.querySelector(`[data-action="delete-project"][data-project="${pid}"]`),
+      {},
+      seed,
+    );
+  }
+  await manager.reload();
+  await manager.evaluate(runStep, { nav: 'portfolio' });
+  await manager.waitForFunction(() =>
+    document.querySelector('#appView').textContent.includes('暂无项目'),
+  );
+  await manager.click('[data-action=new-project]');
+  await manager.waitForSelector('#modalRoot.show [data-v47=create-project]');
+  // A deletion also withdraws a live approval with its confirmation modal open.
+  const replacement = '重新建项并撤销待办';
+  await manager.evaluate((name) => {
+    for (const field of document.querySelectorAll('#modalRoot [data-v47-field][required]')) {
+      if (!field.readOnly) field.value = field.dataset.v47Field === 'name' ? name : '验收值';
+    }
+  }, replacement);
+  await manager.click('[data-v47=create-project]');
+  await other.evaluate(runStep, { nav: 'dashboard' });
+  await manager.waitForSelector('[data-approval-action=submit][data-stage=planning]', {
+    visible: true,
+  });
+  await manager.click('[data-approval-action=submit][data-stage=planning]');
+  await other.waitForSelector(approve, { visible: true });
+  await other.click(approve);
+  await other.waitForSelector('#modalRoot.show [data-approval-action=confirm]', { visible: true });
+  await manager.evaluate(runStep, { nav: 'portfolio' });
+  await manager.click('[data-action=delete-project]');
+  await manager.click('#modalRoot [data-action=confirm-delete-project]');
+  await other.waitForFunction(
+    () => !document.querySelector('#modalRoot.show, [data-approval-action=decide]'),
+  );
+  await manager.waitForFunction(() =>
+    document.querySelector('#appView').textContent.includes('暂无项目'),
+  );
+  assert.deepEqual(errors, []);
+  console.log('PASS 经理删除、取消与权限隔离、跨页退出、关联记录清理、刷新及空项目集');
 } finally {
   await browser.close();
 }

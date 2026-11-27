@@ -1,5 +1,6 @@
 /** Durable business records for the cross-tab demo. Never serialize the whole UI state. */
-import { projects } from '../data/projects.js';
+import { can } from '../domain/permissions.js';
+import { adjustmentProjectId, projects } from '../data/projects.js';
 import { projectRecords, state } from './state.js';
 import {
   approvalRequests,
@@ -79,7 +80,35 @@ export function workflowData() {
   };
 }
 
+const reportMaps = ['v54Reports', 'v37Reports', 'v37PublishReview', 'v37Published'];
+const adjustments = ['changeRecords', 'riskRecords', 'bugRecords'];
+
+function removeProjectData(id) {
+  for (const field of adjustments) {
+    if (!state[field]) continue;
+    state[field] = state[field].filter((row) => adjustmentProjectId(row) !== id);
+  }
+  for (const map of [projects, projectRecords, devReviewStore, flowStore, versionAnchorStore])
+    delete map[id];
+  for (const field of reportMaps) if (state[field]) delete state[field][id];
+  for (const key of Object.keys(stageDocs)) if (key.startsWith(id + ':')) delete stageDocs[key];
+  for (const key of Object.keys(onlineDocs)) if (key.split(':')[1] === id) delete onlineDocs[key];
+  for (const key of Object.keys(state.v33Commits || {}))
+    if (key.startsWith(id + '|')) delete state.v33Commits[key];
+  for (let i = approvalRequests.length - 1; i >= 0; i--)
+    if (approvalRequests[i].projectId === id) approvalRequests.splice(i, 1);
+}
+
+export function deleteProject(id, role) {
+  if (!can(role, 'project.delete') || !Object.hasOwn(projects, id)) return false;
+  removeProjectData(id);
+  return true;
+}
+
 export function restoreWorkflow(data, rollback = false) {
+  for (const id of Object.keys(projects)) {
+    if (!Object.hasOwn(data.projects, id)) removeProjectData(id);
+  }
   if (rollback) {
     for (const [target, saved] of [
       [projects, data.projects],

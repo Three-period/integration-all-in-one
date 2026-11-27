@@ -306,7 +306,9 @@ function openDecision(id, decision) {
       '"></textarea></label></div>',
     '<button class="btn" data-action="close-modal">取消</button><button class="btn ' +
       (approve ? 'primary' : 'danger') +
-      '" data-approval-action="confirm" data-id="' +
+      '" data-approval-action="confirm" data-owner-project="' +
+      esc(req.projectId) +
+      '" data-id="' +
       esc(id) +
       '" data-decision="' +
       decision +

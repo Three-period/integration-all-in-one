@@ -7394,3 +7394,10 @@ button:disabled {
   gap: 9px;
   flex-wrap: wrap;
 }
+
+.project-card .portfolio-delete {
+  width: auto;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--red);
+}

@@ -45,5 +45,12 @@ for (const field of [
 }
 
 export function project() {
-  return projects[state.projectId] || projects.thermal;
+  return projects[state.projectId];
+}
+
+/** Leave a removed project before any view can recreate its records. */
+export function reconcileProjectSelection() {
+  if (projects[state.projectId]) return;
+  state.projectId = Object.keys(projects)[0] || null;
+  if (state.view.startsWith('project-')) state.view = 'portfolio';
 }

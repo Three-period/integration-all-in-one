@@ -1,4 +1,5 @@
 /** 检视工程师任务入口与主管 AI 检视运营（V41）。 */
+import { projects } from '../../data/projects.js';
 import { App } from '../../core/app.js';
 import { esc } from '../../core/dom.js';
 import { setView } from '../../core/navigation.js';
@@ -43,7 +44,7 @@ export function renderReviewOperations() {
       closed: 5,
       duration: 3.7,
     },
-  ];
+  ].filter((row) => projects[row.pid]);
   var total = data.reduce(function (a, x) {
       return a + x.runs;
     }, 0),

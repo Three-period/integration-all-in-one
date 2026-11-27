@@ -65,3 +65,18 @@ export const projects = {
     health: '健康',
   },
 };
+
+// Some dashboards contain fixed demo rows rather than live workflow records.
+export function removeDeletedProjectSamples(container) {
+  for (const row of container.querySelectorAll('[data-sample-projects]')) {
+    if (row.dataset.sampleProjects.split(' ').some((id) => !projects[id])) row.remove();
+  }
+}
+
+// Older adjustment records stored the project name without its ID.
+export function adjustmentProjectId(record) {
+  if (record.projectId) return record.projectId;
+  if (record.project === '液冷控制算法预研（示例项目）') return 'algorithm';
+  const matches = Object.keys(projects).filter((id) => projects[id].name === record.project);
+  return matches.length === 1 ? matches[0] : null;
+}

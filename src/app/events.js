@@ -4,7 +4,8 @@ import { closeDrawer, modalForm, openDrawer, openModal } from '../components/ove
 import { showToast } from '../components/toast.js';
 import { $, $$, person, tag } from '../core/dom.js';
 import { projectView, setView } from '../core/navigation.js';
-import { projects } from '../data/projects.js';
+import { confirmProjectDeletion, requestProjectDeletion } from '../pages/portfolio.js';
+import { projects, removeDeletedProjectSamples } from '../data/projects.js';
 import { defaultLayouts } from '../data/roles.js';
 import {
   closeCustomizer,
@@ -113,10 +114,17 @@ export function bindGlobal() {
         showToast('已恢复当前角色默认布局');
         break;
       case 'open-project':
-        state.projectId = el.dataset.project || 'thermal';
+        if (!projects[el.dataset.project]) return;
+        state.projectId = el.dataset.project;
         state.projectSection = 'basic';
         setView('project-basic');
         showToast(`已进入项目：${projects[state.projectId].name}`);
+        break;
+      case 'delete-project':
+        requestProjectDeletion(el.dataset.project);
+        break;
+      case 'confirm-delete-project':
+        confirmProjectDeletion(el.dataset.project);
         break;
       case 'project-more':
         e.stopPropagation();
@@ -154,8 +162,9 @@ export function bindGlobal() {
       case 'open-notifications':
         openDrawer(
           '通知中心',
-          `<div class="notice warn"><i>!</i><span>你有 2 条待审批流程、1 条严重缺陷验证提醒。</span></div><div class="mini-list-row"><i class="mini-avatar">流</i><div class="grow"><strong>液冷控制算法预研 · 项目立项申请</strong><small>待你审批 · 10 分钟前</small></div><button class="op" data-action="approve-flow">处理</button></div><div class="mini-list-row"><i class="mini-avatar">缺</i><div class="grow"><strong>DFT-0198 已完成修复，请验证</strong><small>智能温控平台 · 1 小时前</small></div><button class="op" data-action="verify-defect">处理</button></div>`,
+          `<div class="notice warn"><i>!</i><span>你有 2 条待审批流程、1 条严重缺陷验证提醒。</span></div><div class="mini-list-row" data-sample-projects="algorithm"><i class="mini-avatar">流</i><div class="grow"><strong>液冷控制算法预研 · 项目立项申请</strong><small>待你审批 · 10 分钟前</small></div><button class="op" data-action="approve-flow">处理</button></div><div class="mini-list-row" data-sample-projects="thermal"><i class="mini-avatar">缺</i><div class="grow"><strong>DFT-0198 已完成修复，请验证</strong><small>智能温控平台 · 1 小时前</small></div><button class="op" data-action="verify-defect">处理</button></div>`,
         );
+        removeDeletedProjectSamples($('#drawerBody'));
         break;
       case 'new-project':
         openModal(
@@ -180,7 +189,7 @@ export function bindGlobal() {
         openDrawer(
           '编辑项目',
           modalForm('project', [
-            { label: '项目名称', required: true, value: project().name },
+            { label: '项目名称', required: true, value: project()?.name || '' },
             { label: '项目类型', required: true, select: true, value: project().type },
             { label: '负责人', required: true, value: project().ownerDetail },
             { label: '计划结束时间', required: true, value: project().end },
@@ -320,7 +329,7 @@ export function bindGlobal() {
           action === 'new-ecn' ? '新建 ECN 表单' : '新建 PCN 表单',
           modalForm('notice', [
             { label: '变更单号', value: '系统自动生成' },
-            { label: '项目名称', value: project().name },
+            { label: '项目名称', value: project()?.name || '' },
             { label: '版本号', required: true, value: 'V2.6' },
             { label: '变更类型', required: true, select: true },
             { label: '变更描述', required: true, area: true, wide: true },
@@ -490,7 +499,7 @@ export function bindGlobal() {
           '指派任务',
           modalForm('assign', [
             { label: '任务名称', required: true, placeholder: '输入任务名称' },
-            { label: '关联项目', required: true, value: project().name },
+            { label: '关联项目', required: true, value: project()?.name || '' },
             { label: '截止时间', required: true, placeholder: '选择日期' },
           ]),
         );
@@ -498,7 +507,7 @@ export function bindGlobal() {
       case 'open-task':
         openDrawer(
           '任务详情 · 补充能耗数据边界说明',
-          `<div class="kv-grid"><div class="kv"><label>关联项目</label><div>${project().name}</div></div><div class="kv"><label>关联需求</label><div>REQ-146</div></div><div class="kv"><label>截止时间</label><div class="down">2026-08-12 18:00</div></div><div class="kv"><label>当前进度</label><div>40%</div></div><div class="kv"><label>预估 / 实际工时</label><div>8h / 3h</div></div><div class="kv"><label>状态</label><div>${tag('进行中', 'blue')}</div></div></div><div class="detail-section"><h4>任务描述</h4><p>补充能耗数据在不同设备类型、区域和异常值下的边界规则，并同步更新需求文档。</p></div>`,
+          `<div class="kv-grid"><div class="kv"><label>关联项目</label><div>${project()?.name || ''}</div></div><div class="kv"><label>关联需求</label><div>REQ-146</div></div><div class="kv"><label>截止时间</label><div class="down">2026-08-12 18:00</div></div><div class="kv"><label>当前进度</label><div>40%</div></div><div class="kv"><label>预估 / 实际工时</label><div>8h / 3h</div></div><div class="kv"><label>状态</label><div>${tag('进行中', 'blue')}</div></div></div><div class="detail-section"><h4>任务描述</h4><p>补充能耗数据在不同设备类型、区域和异常值下的边界规则，并同步更新需求文档。</p></div>`,
         );
         break;
       case 'update-task':
@@ -610,7 +619,8 @@ export function bindActionEvents() {
         return;
       }
       if (a === 'ops-open-project') {
-        state.projectId = el.dataset.project || 'thermal';
+        if (!projects[el.dataset.project]) return;
+        state.projectId = el.dataset.project;
         state.overviewTab = 'dashboard';
         setView('project-overview');
         showToast('已下钻至项目概况');
@@ -626,7 +636,8 @@ export function bindActionEvents() {
         return;
       }
       if (a === 'ops-drill-risk') {
-        state.projectId = el.dataset.project || 'thermal';
+        if (!projects[el.dataset.project]) return;
+        state.projectId = el.dataset.project;
         state.adjustmentTab = el.textContent.includes('项目调整') ? 'changes' : 'risks';
         setView(el.textContent.includes('项目调整') ? 'project-adjustment' : 'project-overview');
         return;
