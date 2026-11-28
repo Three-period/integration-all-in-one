@@ -1,25 +1,27 @@
-name: Deploy GitHub Pages
+name: Build GitHub Pages
 
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/deploy-pages.yml'
+      - 'app.html'
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'vite.config.js'
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: github-pages
+  group: github-pages-build
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,10 +32,19 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vite build --base /integration-all-in-one/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - run: pnpm run build
+        env:
+          VITE_BASE_PATH: /integration-all-in-one/
+      - name: Publish built files to the Pages source branch
+        run: |
+          mkdir -p assets
+          rsync -a --delete dist/assets/ assets/
+          cp dist/index.html index.html
+          touch .nojekyll
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A -- index.html assets .nojekyll
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish GitHub Pages build"
+            git push origin HEAD:main
+          fi

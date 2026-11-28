@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="codex-preview" content="development" />
+    <title>一体化产品研发系统 · V55.5 原型</title>
+  </head>
+  <body>
+    <div class="app">
+      <div class="brand"><span class="brand-mark"></span><span>一体化研发平台</span></div>
+      <header class="topbar">
+        <button
+          class="nav-toggle"
+          data-shell-action="toggle-nav"
+          aria-label="打开导航"
+          aria-expanded="false"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+        <div class="crumb" id="crumb">个人工作台 / <strong>仪表盘</strong></div>
+        <div class="global-search">
+          ⌕<input id="globalSearch" placeholder="搜索项目、需求、任务或缺陷" />
+        </div>
+        <button class="top-icon" data-action="open-notifications" title="消息" aria-label="消息">
+          <svg class="top-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2 2 0 0 0 4 0" /></svg><span class="dot"></span></button
+        ><button
+          class="avatar top-avatar"
+          data-profile-action="toggle"
+          aria-label="打开个人菜单"
+          title="个人菜单"
+        >
+          何
+        </button>
+        <div class="profile-menu" id="profileMenu">
+          <div class="profile-menu-head">
+            <span class="avatar profile-avatar">何</span>
+            <div><strong>何盈</strong><small>产品经理 · 软件一科</small></div>
+          </div>
+          <button data-profile-action="personal">个人信息</button
+          ><button data-profile-action="password">修改密码</button
+          ><button class="danger" data-profile-action="logout">退出登录</button>
+        </div>
+      </header>
+      <aside class="sidebar" id="sidebar"></aside>
+      <div class="nav-mask" data-shell-action="close-nav"></div>
+      <main class="workspace"><div id="appView"></div></main>
+    </div>
+    <aside class="customizer" id="customizer">
+      <div class="customizer-head">
+        <h3>自定义工作台</h3>
+        <button class="modal-close" data-action="close-customizer">×</button>
+      </div>
+      <div class="customizer-body" id="customizerBody"></div>
+      <div class="customizer-foot">
+        <button class="btn" data-action="reset-layout">恢复角色默认</button
+        ><button class="btn primary" data-action="save-layout">保存布局</button>
+      </div>
+    </aside>
+    <div class="drawer-mask" id="drawerMask" data-action="close-drawer"></div>
+    <div class="drawer" id="drawer">
+      <div class="drawer-head">
+        <h3 id="drawerTitle">详情</h3>
+        <button class="modal-close" data-action="close-drawer">×</button>
+      </div>
+      <div class="drawer-body" id="drawerBody"></div>
+      <div class="drawer-foot" id="drawerFoot"></div>
+    </div>
+    <div class="modal-mask" id="modalRoot"></div>
+    <div class="toast-root" id="toastRoot"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
