@@ -1,0 +1,363 @@
+/*
+ * 自适应布局（最后加载，覆盖各页面样式）。
+ * 断点：≥1280 桌面（固定侧栏）；768–1279 平板（侧栏改为抽屉，菜单按钮打开）；<768 手机（单列）。
+ */
+
+/* 通用：内容区不再强制最小宽度；表格在自身容器内横向滚动。 */
+.workspace {
+  min-width: 0;
+}
+:where(#appView, #drawer, #modalRoot) div:has(> table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.nav-toggle,
+.nav-mask {
+  display: none;
+}
+
+/* 工作台卡片：同一行等高，边缘对齐。 */
+.dashboard-grid {
+  align-items: stretch;
+}
+.dashboard-grid > .widget {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-grid > .widget > :last-child {
+  flex: 1;
+}
+
+/* 平板与小屏桌面：侧栏改为抽屉 */
+@media (max-width: 1279px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .topbar {
+    grid-column: 1;
+    padding: 0 16px;
+    gap: 12px;
+  }
+  .workspace {
+    grid-column: 1;
+  }
+  .nav-toggle {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .nav-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+  .brand,
+  .sidebar {
+    position: fixed;
+    left: 0;
+    width: 248px;
+    z-index: 36;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .brand {
+    top: 0;
+    height: 60px;
+  }
+  .sidebar {
+    top: 60px;
+    bottom: 0;
+    box-shadow: 12px 0 30px rgba(16, 24, 40, 0.12);
+  }
+  body.nav-open .brand,
+  body.nav-open .sidebar {
+    transform: none;
+  }
+  body.nav-open .nav-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(16, 24, 40, 0.36);
+  }
+  .grid.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .dashboard-grid > .widget,
+  .dashboard-grid > .widget.span-6 {
+    grid-column: span 3;
+  }
+  .dashboard-grid > .widget.span-8,
+  .dashboard-grid > .widget.span-12 {
+    grid-column: span 6;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .dashboard-grid > [data-widget='summary'] + [data-widget='notices'] {
+    grid-column: span 3;
+  }
+}
+
+/* 手机：单列布局 */
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .crumb {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .global-search {
+    display: none;
+  }
+  .page {
+    padding: 14px 12px 28px;
+  }
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .head-actions {
+    justify-content: flex-start;
+  }
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-grid > .widget,
+  .dashboard-grid > .widget.span-6,
+  .dashboard-grid > .widget.span-8,
+  .dashboard-grid > .widget.span-12 {
+    grid-column: auto;
+  }
+  .project-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .banner-meta {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+  :where(#appView) table {
+    min-width: 640px;
+  }
+  .drawer {
+    width: 100vw;
+    right: -100vw;
+  }
+  .drawer.req-drawer-large {
+    width: 100vw;
+    right: -100vw;
+  }
+  .drawer.show,
+  .drawer.req-drawer-large.show {
+    right: 0;
+  }
+  .modal-mask {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    width: 100vw;
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
+  }
+  .stage-tabs .stage-tab {
+    min-width: 0;
+    padding: 0 10px;
+  }
+}
+
+.top-icon-svg {
+  width: 18px;
+  height: 18px;
+  color: #475467;
+}
+
+/* 工作台：桌面按顺序排列，末尾卡片补满整行（见 workbench.js fillRows） */
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-auto-flow: row;
+  }
+  .dashboard-grid > .widget[data-fill='6'] {
+    grid-column: span 6;
+  }
+  .dashboard-grid > .widget[data-fill='8'] {
+    grid-column: span 8;
+  }
+  .dashboard-grid > .widget[data-fill='10'] {
+    grid-column: span 10;
+  }
+  .dashboard-grid > .widget[data-fill='12'] {
+    grid-column: span 12;
+  }
+}
+
+/* 条形统计（工作台需求进展、项目概况进度） */
+.bar-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text);
+}
+.bar-row .track {
+  height: 8px;
+  border-radius: 999px;
+  background: #eef1f5;
+  overflow: hidden;
+}
+.bar-row .fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.bar-row b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 页签行在窄屏上横向滚动，不换行 */
+.workbench-tabs,
+.tabs,
+.ops2-tabs,
+.req-lifecycle-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.workbench-tabs button,
+.tabs .tab,
+.ops2-tabs .ops2-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 平板：需求页三栏改为「分类 + 列表」，详情移到下方 */
+@media (max-width: 1279px) {
+  .req-page-grid {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+  .req-page-grid > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+  .req-two-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .v35-review-3 {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+}
+
+/* 手机：各页面的「侧栏 + 内容」两栏布局改为上下排列，侧栏变为横向滚动的分类条 */
+@media (max-width: 767px) {
+  .project-layout,
+  .doc-layout,
+  .settings-nav,
+  .help-card,
+  .req-detail-panel,
+  .req-drawer-layout,
+  .req-page-grid,
+  .req-page-grid.req-page-grid-table-only,
+  .req-inline-detail-panel,
+  .development-stage-layout,
+  .v33-dev-original .development-stage-layout,
+  .testing-stage-layout,
+  .closing-stage-layout,
+  .release-stage-layout,
+  .settings2-layout,
+  .help2-layout,
+  .v35-dev-layout,
+  .v35-review-layout,
+  .v35-review-3,
+  .v5-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .req-page-grid > :nth-child(3),
+  .req-page-grid-table-only .req-list-panel {
+    grid-column: auto;
+  }
+  .v35-ide,
+  .v35-ide-area {
+    min-height: 0;
+    height: auto;
+  }
+  .v35-ide-area {
+    padding: 20px 12px;
+  }
+  .testing-subnav,
+  .closing-subnav,
+  .release-subnav,
+  .req-category-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 6px;
+  }
+  .testing-subnav > *,
+  .closing-subnav > *,
+  .release-subnav > *,
+  .req-category-nav > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .testing-toolbar,
+  .req-create-row {
+    flex-wrap: wrap;
+  }
+  .testing-toolbar .push {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .lc-flow-head {
+    align-items: flex-start;
+  }
+}
+
+/* 开发页：左侧工作区与右侧卡片列底边对齐 */
+.v35-dev-layout {
+  align-items: stretch;
+}
+.v35-dev-layout > .v35-ide {
+  display: flex;
+  flex-direction: column;
+}
+.v35-dev-layout > .v35-ide > .v35-ide-area {
+  flex: 1;
+}
+
+/* 手机：提示条置于底部按钮栏之上，左右留边 */
+@media (max-width: 767px) {
+  .toast-root {
+    left: 12px;
+    right: 12px;
+    bottom: 84px;
+  }
+  .toast {
+    text-align: center;
+  }
+}

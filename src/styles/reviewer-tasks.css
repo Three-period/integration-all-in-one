@@ -1,0 +1,76 @@
+.v41-note {
+  padding: 10px 12px;
+  background: #f8fbff;
+  border: 1px solid #dce7fa;
+  color: #526785;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.v41-bar-row {
+  display: grid;
+  grid-template-columns: 135px 1fr 45px;
+  align-items: center;
+  gap: 12px;
+  margin: 15px 0;
+  font-size: 11px;
+}
+.v41-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v41-bar-track {
+  height: 14px;
+  background: #eef2f6;
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+}
+.v41-bar-track i,
+.v41-bar-track b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: #a7c8fa;
+}
+.v41-bar-track b {
+  height: 7px;
+  top: 3.5px;
+  background: #043491;
+}
+.v41-caption {
+  font-size: 10px;
+  color: #98a2b3;
+}
+.v41-quality {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.v41-quality > div {
+  padding: 12px;
+  background: #f7f9fc;
+  border-radius: 5px;
+}
+.v41-quality span {
+  font-size: 10px;
+  color: #667085;
+  display: block;
+}
+.v41-quality b {
+  font-size: 20px;
+}
+.v41-progress {
+  display: grid;
+  grid-template-columns: 125px 1fr 44px;
+  gap: 9px;
+  align-items: center;
+  margin: 12px 0;
+  font-size: 10px;
+}
+.v41-progress b {
+  text-align: right;
+}

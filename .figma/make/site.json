@@ -1,0 +1,10 @@
+{
+  "description": "I can’t determine the application’s purpose from this request; it describes project setup and deployment verification, not user-facing functionality.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,0 +1,29 @@
+.req-category-nav .v53-doc-inactive {
+  color: #a1a8b5 !important;
+  background: #f6f7f9 !important;
+}
+.req-category-nav .v53-doc-inactive .req-category-count {
+  color: #a1a8b5 !important;
+}
+.testing-subnav [data-v53-inactive] {
+  color: #a1a8b5 !important;
+  background: #f7f8fa !important;
+}
+.v53-readonly-hint {
+  padding: 11px 14px;
+  border-bottom: 1px solid #e6eaf0;
+  font-size: 12px;
+  color: #667085;
+  background: #f8fafc;
+}
+.v53-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 500;
+}
+.v53-select-label input {
+  accent-color: #165dff;
+}
