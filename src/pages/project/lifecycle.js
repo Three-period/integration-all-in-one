@@ -103,7 +103,7 @@ function actionName(el) {
  */
 export function bindReadonlyGuard() {
   function inReadonlyScope(target) {
-    if (!target.closest) return false;
+    if (!target.closest || target.closest('[data-profile-action]')) return false;
     if (target.closest('.stage-block[data-readonly]')) return true;
     return (
       document.body.hasAttribute('data-stage-readonly') && !!target.closest('#drawer, #modalRoot')

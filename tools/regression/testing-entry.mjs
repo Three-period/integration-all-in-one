@@ -74,10 +74,10 @@ try {
   await qa.click('[data-feedback=submit]');
   await qa.waitForSelector('[data-stage=development].is-current');
   assert.equal(await qa.$('#drawer.show'), null);
-  const dev = await browser.newPage();
-  await dev.setViewport({ width: 1440, height: 900 });
-  dev.on('pageerror', (error) => errors.push(error.message));
-  await dev.goto(url);
+  // A viewer's open testing page becomes read-only again immediately after the return.
+  await tab.waitForSelector('body[data-stage-readonly]');
+  const dev = tab;
+  await dev.bringToFront();
   assert.equal(await dev.evaluate(loginAs, 'dev'), 'ok');
   await dev.waitForSelector('[data-project-notices] [data-action=open-dev-project]');
   assert.ok(
@@ -92,8 +92,33 @@ try {
   await dev.click('[data-feedback=view-defect]');
   assert.match(await dev.$eval('#drawerBody', (el) => el.textContent), /模拟重连失败/);
   await clickDrawer(dev, '.drawer-head [data-action=close-drawer]');
+  await dev.waitForSelector('#drawer.show', { hidden: true });
   await dev.click('[data-workspace=view-reviewer]');
-  await dev.click('[data-feedback=view-version]');
+  await dev.waitForSelector('[data-workspace=view-reviewer].active');
+  const version = '[data-feedback=view-version][data-commit="7b91c3e4"]';
+  await dev.waitForSelector(version, { visible: true, timeout: 5000 });
+  await dev.$eval(version, (el) => el.scrollIntoView({ block: 'center' }));
+  await dev
+    .waitForFunction(
+      (selector) => {
+        const el = document.querySelector(selector);
+        const r = el.getBoundingClientRect();
+        const target = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(target);
+      },
+      { timeout: 5000 },
+      version,
+    )
+    .catch(async (error) => {
+      const info = await dev.$eval(version, (el) => {
+        const r = el.getBoundingClientRect();
+        const target = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return { html: el.outerHTML, rect: r.toJSON(), target: target?.outerHTML.slice(0, 300) };
+      });
+      throw new Error(JSON.stringify(info), { cause: error });
+    });
+  await dev.click(version);
+  await dev.waitForSelector('#drawer.show [data-commit-link]', { timeout: 5000 });
   assert.ok(await dev.$('#drawerBody a[href="https://gitlab.example.com/ipd/thermal-firmware"]'));
   assert.ok(
     await dev.$(
