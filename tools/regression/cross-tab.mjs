@@ -134,8 +134,8 @@ try {
     title,
   );
   await dev.reload();
-  await dev.waitForSelector('[data-project-notices] [data-action=open-project]');
-  await dev.click('[data-project-notices] [data-action=open-project]');
+  await dev.waitForSelector('[data-project-notices] [data-action=open-dev-project]');
+  await dev.click('[data-project-notices] [data-action=open-dev-project]');
   await dev.waitForFunction(
     (name) => document.querySelector('#crumb').textContent.includes(name),
     {},

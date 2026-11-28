@@ -4,6 +4,7 @@ import { closeDrawer, openDrawer } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { $, esc } from '../core/dom.js';
 import { isTestKindEnabled, reportReadiness as reportReadinessRule } from '../domain/testing.js';
+import { returnControl } from './test-feedback.js';
 import { getHandoffCommit, getReleaseGate } from './version-anchor.js';
 import { project, state } from '../store/state.js';
 
@@ -184,7 +185,7 @@ export function initDocumentApproval() {
     var enabled = isReportKindEnabled(kind);
     state.testingSection = kind;
     state.v37ReportTab = 'detail';
-    var readOnly = !enabled || mode === 'view' || getReleaseGate().testPass;
+    var readOnly = state.role !== 'tester' || !enabled || mode === 'view' || getReleaseGate().testPass;
     var detail =
       '<div class="v54-report-drawer"><div class="v54-drawer-meta">' +
       '<label>报告名称<input class="input" data-v54-field="name" value="' +
@@ -216,6 +217,7 @@ export function initDocumentApproval() {
       foot +=
         '<button class="btn" data-v54-report="save">保存草稿</button>' +
         '<button class="btn primary" data-v54-report="submit">提交报告</button>';
+    if (row.commit === getHandoffCommit()) foot += returnControl(kind);
     openDrawer(
       (mode === 'new' ? '新建' : '') + REPORT_NAMES[kind] + ' · ' + (readOnly ? '查看' : '编辑'),
       detail,

@@ -5,6 +5,7 @@ import { ROLE_LABELS } from '../domain/permissions.js';
 export const roles = ROLE_LABELS;
 
 export const widgetMeta = {
+  notices: ['项目通知',''],
   summary: ['数据摘要', '本人参与项目与关键指标'],
   todo: ['我的待办', '待审批、任务、缺陷与需求'],
   activity: ['最近动态', '@我的评论与对象变更'],

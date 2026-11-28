@@ -16,6 +16,8 @@ const PERMISSIONS = {
   'operations.view': Object.keys(APPROVER_ROLES),
   /** 开发阶段工作台（开发与检视两种视图） */
   'dev.workspace': Object.keys(ROLE_LABELS),
+  /** 测试阶段执行、提交及退回 */
+  'testing.execute': ['tester'],
   /** 冒烟、自测、提交 Commit、申请检视、提测 */
   'dev.submit': ['developer'],
   /** 专业检视、问题裁定、检视准出 */

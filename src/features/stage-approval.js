@@ -89,6 +89,7 @@ function missingDesigns() {
 
 /** 提交前检查：返回不能提交的原因，可以提交时返回空字符串。 */
 function submitBlocker(stage, deliverable) {
+  if (stage === 'testing' && state.role !== 'tester') return '由测试工程师提交测试审核';
   if (!isStagePrereqMet(stage)) return '上一阶段尚未完成，暂不能提交审核';
   if (isStageDone(stage) && stage !== 'design') return '本阶段已审核通过';
   const pending = pendingOf(state.projectId, stage);
@@ -330,7 +331,7 @@ function statusTag(stage) {
 }
 
 function pendingRow(req) {
-  const actions = canDecide(req, state.role)
+  const actions = req.stage !== 'testing' && canDecide(req, state.role)
     ? '<button class="btn" data-approval-action="decide" data-decision="reject" data-id="' +
       esc(req.id) +
       '">退回</button><button class="btn primary" data-approval-action="decide" data-decision="approve" data-id="' +

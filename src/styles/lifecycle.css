@@ -740,3 +740,28 @@ body[data-stage-readonly] #drawer :is(input, textarea, select, [contenteditable=
 .lc-node.kind-approval.is-current small {
   color: #d92d20;
 }
+
+.test-return-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.test-return-bar h3 {
+  margin: 0;
+}
+.test-return-bar small,
+.return-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+button[data-feedback='open-return']:not([data-id]) {
+  background: #a93322;
+  color: white;
+  border-color: #a93322;
+  font-weight: 600;
+}
+.testing-feedback {
+  margin-bottom: 12px;
+}

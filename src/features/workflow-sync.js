@@ -13,7 +13,7 @@ const storageKey = 'rd-platform:workflow:v1:' + new URL('.', document.baseURI).p
 // Existing handlers own all decisions and stage transitions. Only commands that
 // commit business data need to enter the cross-tab transaction.
 const commands = {
-  action: 'confirm-delete-project',
+  action: 'confirm-delete-project open-testing-sample',
   feedback: 'submit close-verified',
   'approval-action': 'submit confirm',
   v47: 'create-project save-basic inline-save inline-comment inline-freeze',
@@ -32,7 +32,7 @@ const commands = {
   'release-page-action': 'review-save review-submit',
   'release-drawer-action': 'save submit',
   'testing-drawer-action': 'save submit save-defect submit-defect',
-  'testing-page-action': 'modal-save',
+  'testing-page-action': 'modal-save execute-case',
   'change-drawer-action': 'save submit continue comment link',
   'risk-drawer-action': 'save submit continue close-risk comment link',
   'bug-drawer-action': 'save continue verify close-bug comment link',
@@ -51,6 +51,7 @@ const changeSelector = [
   '[data-change-inline]',
   '[data-risk-inline]',
   '[data-bug-inline]',
+  '[data-testing-inline]',
 ].join(',');
 
 // On plain HTTP, Web Locks may be unavailable. An empty IndexedDB read-write

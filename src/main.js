@@ -20,6 +20,7 @@ import './styles/lifecycle.css';
 import './styles/login.css';
 import './styles/responsive.css';
 
+import { initTestingAccess } from './features/testing-access.js';
 import { initWorkflowSync } from './features/workflow-sync.js';
 import { currentUser } from './core/auth.js';
 import { enterApp, setBoot, showLogin } from './app/session.js';
@@ -72,6 +73,7 @@ import { initReadonlyReportDrawers } from './features/readonly-report-drawers.js
 import { initReviewProcess } from './pages/review/review-process.js';
 
 const bootSequence = [
+  initTestingAccess,
   initWorkflowSync,
   bindReadonlyGuard, // 未开始阶段只读保护（需最先注册，先于其他捕获阶段监听）
   bindActionEvents, // V1.3 全局 data-action 事件分发

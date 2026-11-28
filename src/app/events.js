@@ -5,6 +5,7 @@ import { showToast } from '../components/toast.js';
 import { $, $$, person, tag } from '../core/dom.js';
 import { projectView, setView } from '../core/navigation.js';
 import { confirmProjectDeletion, requestProjectDeletion } from '../pages/portfolio.js';
+import { selectTestingSample } from '../data/testing-sample.js';
 import { projects, removeDeletedProjectSamples } from '../data/projects.js';
 import { defaultLayouts } from '../data/roles.js';
 import {
@@ -113,7 +114,18 @@ export function bindGlobal() {
         renderCustomizer();
         showToast('已恢复当前角色默认布局');
         break;
-      case 'open-repair':
+      case 'open-testing-sample':
+      case 'open-testing-project':
+        if (state.role !== 'tester') return;
+        if (action === 'open-testing-sample') selectTestingSample();
+        else if (projects[el.dataset.project]) state.projectId = el.dataset.project;
+        else return;
+        state.testingSection = 'cases';
+        state.projectSection = 'lifecycle';
+        state.lifecycleStage = 'testing';
+        setView('project-lifecycle');
+        break;
+      case 'open-dev-project':
         if (state.role !== 'developer' || !projects[el.dataset.project]) return;
         state.projectId = el.dataset.project;
         state.developmentView = 'developer';

@@ -1,7 +1,7 @@
 /** 测试阶段：用例、测试报告与缺陷。 */
 import { isTestKindEnabled } from '../../domain/testing.js';
 import { renderVersionBanner } from '../../features/version-anchor.js';
-import { projectFeedback, openFeedbackDetail } from '../../features/test-feedback.js';
+import { returnControl, projectFeedback, openFeedbackDetail } from '../../features/test-feedback.js';
 import { App } from '../../core/app.js';
 import { closeDrawer, openDrawer, openModal } from '../../components/overlays.js';
 import { showToast } from '../../components/toast.js';
@@ -381,7 +381,7 @@ function openTestingCaseDrawer(id, mode) {
   openDrawer(
     (state.testingCaseMode === 'create' ? '新建测试用例 · ' : '测试用例 · ') + record.name,
     testingCaseDrawerBody(record),
-    testingCaseDrawerFoot(),
+    testingCaseDrawerFoot() + returnControl(''),
   );
   $('#drawer').classList.add('req-drawer-large');
 }

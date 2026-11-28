@@ -1,4 +1,5 @@
 /** Each return, repair and regression refers to the same project defect and exact Commit. */
+import { SAMPLE_REPO, SAMPLE_COMMIT, SAMPLE_BRANCH } from '../data/testing-sample.js';
 import { App } from '../core/app.js';
 import { esc } from '../core/dom.js';
 import { project, state } from '../store/state.js';
@@ -9,7 +10,7 @@ import {
   documentId,
   getDevReview,
 } from '../store/lifecycle.js';
-import { closeModal, openDrawer, openModal } from '../components/overlays.js';
+import { closeDrawer, closeModal, openDrawer, openModal } from '../components/overlays.js';
 import { showToast } from '../components/toast.js';
 import { isTestKindEnabled } from '../domain/testing.js';
 import { getReleaseGate } from './version-anchor.js';
@@ -136,27 +137,37 @@ function commitAddress(address, commit) {
     return '';
   }
 }
+function gitlabLink(url, { mock = false, commit = false } = {}) {
+  const attributes =
+    (commit ? ' data-commit-link' : '') +
+    (mock ? ' data-feedback="preview-gitlab"' : ' target="_blank" rel="noopener noreferrer"');
+  return (
+    '<a href="' +
+    esc(url) +
+    '"' +
+    attributes +
+    '>' +
+    esc(url) +
+    '</a>' +
+    (mock ? ' <small>示例</small>' : '')
+  );
+}
 function repoLink(address) {
-  if (!address) return '未记录';
   try {
     const url = new URL(/^[\w.-]+\//.test(address) ? 'https://' + address : address);
-    if (['https:', 'http:'].includes(url.protocol))
-      return (
-        '<a href="' +
-        esc(url.href) +
-        '" target="_blank" rel="noopener noreferrer">' +
-        esc(address) +
-        '</a>'
-      );
+    if (['https:', 'http:'].includes(url.protocol)) {
+      return gitlabLink(url.href, { mock: url.href === SAMPLE_REPO });
+    }
   } catch {
-    /* Older demo records may have a repository label instead of a URL. */
+    // Older demo records may have a repository label instead of a URL.
   }
-  return esc(address);
+  const sample = gitlabLink(SAMPLE_REPO, { mock: true });
+  return address ? esc(address) + ' · ' + sample : sample;
 }
 export function versionList(d) {
   return (
     '<div class="v5-evidence"><b>GitLab 仓库 / Commit</b><p>当前关联　' +
-    repoLink(d.repo) +
+    repoLink(d.repo || SAMPLE_REPO) +
     ' · ' +
     esc(d.branch) +
     '</p>' +
@@ -175,31 +186,41 @@ export function versionList(d) {
           button('view-version', '查看', { commit: c.commit }) +
           '</div>',
       )
-      .join('') || '<p>暂无提交版本。</p>') +
+      .join('') ||
+      '<p>示例版本 · ' +
+        SAMPLE_COMMIT +
+        ' ' +
+        button('view-version', '查看', { commit: SAMPLE_COMMIT }) +
+        '</p>') +
     '</div>'
   );
 }
 function openVersion(d, commit) {
-  const record = d.commits.find((c) => c.commit === commit);
+  const record =
+    d.commits.find((c) => c.commit === commit) ||
+    (!d.commits.length && commit === SAMPLE_COMMIT
+      ? {
+          repo: SAMPLE_REPO,
+          commit,
+          branch: SAMPLE_BRANCH,
+          owner: '开发工程师（示例）',
+          at: '示例记录',
+        }
+      : null);
   if (!record) return;
   const active = commit === d.commit;
   const address = record.repo ?? (active ? d.repo : '');
-  const link = commitAddress(address, commit);
+  const realLink = commitAddress(address, commit);
+  const link = realLink || commitAddress(SAMPLE_REPO, SAMPLE_COMMIT);
   const approval =
     (active && d.approval) || d.reviewArchives?.find((x) => x.commit === commit)?.approval;
   openDrawer(
     'GitLab 版本 · ' + commit,
     '<p>仓库地址　' +
-      repoLink(address) +
+      repoLink(address || SAMPLE_REPO) +
       '</p>' +
       '<p>GitLab 提交链接　' +
-      (link
-        ? '<a data-commit-link href="' +
-          esc(link) +
-          '" target="_blank" rel="noopener noreferrer">' +
-          esc(link) +
-          '</a>'
-        : '未记录有效仓库地址') +
+      gitlabLink(link, { commit: true, mock: !realLink || address === SAMPLE_REPO }) +
       '</p>' +
       line('分支', record.branch ?? (active ? d.branch : '未记录')) +
       line('开发提交', record.owner + ' · ' + record.at) +
@@ -225,31 +246,40 @@ function openVersion(d, commit) {
   );
 }
 
+export function returnControl(kind) {
+  const gate = getReleaseGate();
+  const reason =
+    state.role !== 'tester'
+      ? '仅测试工程师可退回'
+      : !gate.commit
+        ? '等待检视通过并移交测试版本'
+        : gate.testPass
+          ? '本版本测试审核已通过'
+          : kind && !isTestKindEnabled(project(), kind)
+            ? '项目未启用该测试环节'
+            : '';
+  const context = { kind, commit: gate.commit, project: state.projectId };
+  if (reason)
+    return (
+      '<span class="return-hint">' +
+      esc(reason) +
+      '</span> <button class="btn" disabled>退回开发整改</button>'
+    );
+  return button('open-return', '退回开发整改', context);
+}
+
 export function testingFeedback(section) {
   const gate = getReleaseGate();
   const kind = Object.hasOwn(kinds, section) ? section : '';
-  const reason = !gate.commit
-    ? '等待检视准出并移交测试版本'
-    : gate.testPass
-      ? '本版本测试审核已通过'
-      : kind && !isTestKindEnabled(project(), kind)
-        ? '项目未启用该测试环节'
-        : '';
-  const tester = state.role === 'tester';
-  const canReturn = tester && !reason;
   const context = { kind, commit: gate.commit, project: state.projectId };
+  const canReturn = state.role === 'tester' && gate.commit && !gate.testPass;
   const rows = projectFeedback().filter((row) => !kind || row.testFeedback.kind === kind);
-  if (!tester && !rows.length) return '';
   return (
-    '<section class="card card-pad testing-feedback"><div class="testing-report-head"><h3>测试反馈</h3>' +
-    (canReturn
-      ? button('open-return', '退回开发整改', context)
-      : tester
-        ? '<div><span class="mini-note">' +
-          esc(reason) +
-          '</span> <button class="btn" disabled>退回开发整改</button></div>'
-        : '') +
-    '</div>' +
+    '<section class="card card-pad testing-feedback"><div class="test-return-bar"><div><h3>测试反馈</h3>' +
+    (gate.commit ? '<small>提测 Commit · ' + esc(gate.commit) + '</small>' : '') +
+    '</div><div>' +
+    returnControl(kind) +
+    '</div></div>' +
     rows
       .map((row) => {
         const verify =
@@ -345,6 +375,16 @@ export function initTestFeedback() {
     const el = event.target.closest('[data-feedback]');
     if (!el) return;
     const { feedback: action, id, commit, project: pid } = el.dataset;
+    if (action === 'preview-gitlab') {
+      event.preventDefault();
+      openModal(
+        'gitlab-preview',
+        el.hasAttribute('data-commit-link') ? 'GitLab 提交示例' : 'GitLab 仓库示例',
+        line('地址', el.href) + line('分支', SAMPLE_BRANCH),
+        '<button class="btn" data-action="close-modal">关闭</button>',
+      );
+      return;
+    }
     const kind =
       el.dataset.kind ||
       (action === 'submit'
@@ -456,6 +496,7 @@ export function initTestFeedback() {
     else state.bugRecords.unshift(defect);
     returnToDevelopment(d, defect, round);
     closeModal();
+    closeDrawer();
     App.render();
     showToast('已退回开发整改 · ' + defect.id);
   });

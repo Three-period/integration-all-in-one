@@ -102,6 +102,12 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1279px) {
+  .dashboard-grid > [data-widget='summary'] + [data-widget='notices'] {
+    grid-column: span 3;
+  }
+}
+
 /* 手机：单列布局 */
 @media (max-width: 767px) {
   .topbar {

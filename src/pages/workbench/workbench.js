@@ -6,7 +6,8 @@ import { esc, person, tag } from '../../core/dom.js';
 import { rolePolicy, widgetMeta } from '../../data/roles.js';
 import { currentLayout } from '../../store/layout.js';
 import { projects } from '../../data/projects.js';
-import { flowStore } from '../../store/lifecycle.js';
+import { SAMPLE_NAME } from '../../data/testing-sample.js';
+import { devReviewStore, flowStore } from '../../store/lifecycle.js';
 import { state } from '../../store/state.js';
 import { renderApprovalWidget } from '../../features/stage-approval.js';
 
@@ -47,7 +48,7 @@ function projectNotices() {
       row.status === '待整改' &&
       row.resolver === state.user.name,
   );
-  if (!notices.length && !repairs.length) return '';
+
   const items =
     repairs
       .map(
@@ -58,7 +59,7 @@ function projectNotices() {
           esc(projects[row.projectId].name) +
           ' · ' +
           esc(row.id) +
-          '</small></div><button class="btn" data-action="open-repair" data-project="' +
+          '</small></div><button class="btn" data-action="open-dev-project" data-project="' +
           esc(row.projectId) +
           '">查看整改</button></li>',
       )
@@ -72,15 +73,17 @@ function projectNotices() {
           esc(creationNotice.creator) +
           ' 创建 · ' +
           esc(new Date(creationNotice.at).toLocaleString('zh-CN', { hour12: false })) +
-          '</small></div><button class="btn" data-action="open-project" data-project="' +
+          '</small></div><button class="btn" data-action="open-dev-project" data-project="' +
           esc(id) +
           '">查看项目</button></li>',
       )
       .join('');
   return (
-    '<section class="card card-pad" data-project-notices><h3 class="section-title">项目通知</h3><ul class="approval-list">' +
-    items +
-    '</ul></section>'
+    '<div data-project-notices>' +
+    (items
+      ? '<ul class="approval-list">' + items + '</ul>'
+      : '<p class="mini-note">暂无项目通知</p>') +
+    '</div>'
   );
 }
 
@@ -90,7 +93,18 @@ export function renderWorkbench() {
   const layout = currentLayout();
   state.draftVisible = layout.slice();
   const allowed = rolePolicy[state.role];
+  const ids = layout.filter((id) => allowed.includes(id));
+  if (state.role === 'developer') {
+    const summary = ids.indexOf('summary');
+    if (summary >= 0) {
+      ids.splice(summary, 1);
+      ids.unshift('summary', 'notices');
+    } else {
+      ids.unshift('notices');
+    }
+  }
   const widgets = {
+    notices: projectNotices(),
     summary: `<div class="compact-metrics"><div class="compact-metric"><span>参与项目</span><b>6</b></div><div class="compact-metric"><span>本周完成任务</span><b>18</b></div><div class="compact-metric"><span>待处理缺陷</span><b class="down">12</b></div><div class="compact-metric"><span>项目平均进度</span><b>72%</b></div></div>`,
     todo: `<div class="todo"><div class="todo-row" data-sample-projects="algorithm"><button class="check" data-action="open-todo" title="处理审批"></button><div class="todo-title">审批项目立项申请<small>液冷控制算法预研 · 王凯 · 10分钟前</small></div>${tag('逾期', 'red')}</div><div class="todo-row" data-sample-projects="thermal"><button class="check" data-action="open-todo"></button><div class="todo-title">验证缺陷：高并发设备消息上报<small>智能温控平台 V2.6 · 孙宁 · 2小时前</small></div>${tag('高优', 'orange')}</div><div class="todo-row" data-sample-projects="cloud"><button class="check" data-action="open-todo"></button><div class="todo-title">确认需求变更影响范围<small>设备云平台 3.0 · 陈思 · 昨日</small></div>${tag('待处理', 'blue')}</div></div>`,
     activity: `<div class="activity"><div class="activity-item" data-sample-projects="thermal"><i class="mini-avatar">赵</i><p><b>赵敏</b> 在需求评审中@你：请补充能耗数据边界说明<small>10分钟前 · 智能温控平台 V2.6</small></p></div><div class="activity-item" data-sample-projects="cloud"><i class="mini-avatar">孙</i><p><b>孙宁</b> 更新了缺陷 DFT-0198 的修复状态<small>1小时前 · 设备云平台 3.0</small></p></div><div class="activity-item" data-sample-projects="thermal"><i class="mini-avatar">系</i><p>《软件规格书》已生成新版本 V1.3<small>昨日 18:20 · 智能温控平台 V2.6</small></p></div></div>`,
@@ -106,7 +120,35 @@ export function renderWorkbench() {
     widgets.todo = App.renderReviewerTodoWidget();
     widgets.summary = App.renderReviewerSummaryWidget();
   }
+  if (state.role === 'tester') {
+    widgets.todo =
+      '<div class="mini-list">' +
+      Object.entries(devReviewStore)
+        .filter(
+          ([id, d]) =>
+            projects[id] &&
+            d.handoff &&
+            d.approval?.commit === d.commit &&
+            projects[id].flowStatus === '测试阶段',
+        )
+        .map(
+          ([id, d]) =>
+            '<div class="mini-list-row"><div class="grow"><strong>' +
+            esc(projects[id].name) +
+            '</strong><small>待测试 · ' +
+            esc(d.commit) +
+            '</small></div><button class="btn" data-action="open-testing-project" data-project="' +
+            esc(id) +
+            '">进入测试</button></div>',
+        )
+        .join('') +
+      '<div class="mini-list-row"><div class="grow"><strong>' +
+      SAMPLE_NAME +
+      '</strong><small>Mock 项目</small></div><button class="btn primary" data-action="open-testing-sample">打开整改示例</button></div></div>' +
+      widgets.todo;
+  }
   const sizes = {
+    notices: 'span-8',
     summary: 'span-4',
     todo: 'span-8',
     activity: 'span-4',
@@ -123,13 +165,13 @@ export function renderWorkbench() {
     '我的研发工作台',
     '聚合个人待办、项目进展、审批流程与研发质量数据。',
     `<button class="btn ${state.editingLayout ? 'warning' : ''}" data-action="toggle-layout">${state.editingLayout ? '完成编辑' : '⌘ 自定义布局'}</button>`,
-  )}${tabs}${projectNotices()}<div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
-    layout.filter((id) => allowed.includes(id)),
+  )}${tabs}<div class="dashboard-grid ${state.editingLayout ? 'editing-layout' : ''}" id="dashboardGrid">${fillRows(
+    ids,
     sizes,
   )
     .map(
       ([id, fill]) =>
-        `<article class="card widget ${sizes[id]}" data-widget="${id}"${fill ? ` data-fill="${fill}"` : ''} draggable="${state.editingLayout}"><div class="card-head"><span class="card-title">${widgetMeta[id][0]}</span><span><span class="card-note">${widgetMeta[id][1]}</span><span class="widget-grip"> ⋮⋮</span></span></div>${widgets[id]}</article>`,
+        `<article class="card widget ${sizes[id]}" data-widget="${id}"${fill ? ` data-fill="${fill}"` : ''} draggable="${state.editingLayout && id !== 'notices'}"><div class="card-head"><span class="card-title">${widgetMeta[id][0]}</span><span><span class="card-note">${widgetMeta[id][1]}</span><span class="widget-grip"> ⋮⋮</span></span></div>${widgets[id]}</article>`,
     )
     .join('')}</div></section>`;
 }
