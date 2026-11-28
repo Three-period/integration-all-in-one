@@ -741,17 +741,35 @@ body[data-stage-readonly] #drawer :is(input, textarea, select, [contenteditable=
   color: #d92d20;
 }
 
-.test-return-bar {
+.development-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 16px;
+  padding: 8px 12px;
+}
+.development-feedback h3 {
+  margin: 0;
+  padding-block: 6px;
+  font-size: inherit;
+}
+.development-feedback-rows {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+.test-return-bar,
+.test-return-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
 }
 .test-return-bar h3 {
   margin: 0;
+  font-size: 14px;
 }
-.test-return-bar small,
+.testing-feedback small,
 .return-hint {
   color: var(--muted);
   font-size: 12px;
@@ -764,4 +782,18 @@ button[data-feedback='open-return']:not([data-id]) {
 }
 .testing-feedback {
   margin-bottom: 12px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+:is(.development-feedback, .testing-feedback) .v5-row {
+  padding-block: 2px;
+}
+.development-feedback .v5-row:first-child {
+  padding-top: 0;
+}
+.development-feedback .v5-row:last-child {
+  padding-bottom: 0;
+}
+:is(.development-feedback, .testing-feedback) .btn {
+  height: 28px;
 }

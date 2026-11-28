@@ -62,7 +62,21 @@ try {
   await qa.bringToFront();
   await qa.click('[data-testing-section=smoke]');
   await qa.click('[data-v54-report=new]');
-  await clickDrawer(qa, '[data-feedback=open-return]');
+  await qa.waitForSelector('#drawer.show .v54-report-drawer');
+  assert.equal(await qa.$('#drawer.show [data-feedback=open-return]'), null);
+  await clickDrawer(qa, '.drawer-head [data-action=close-drawer]');
+  await qa.waitForSelector('#drawer.show', { hidden: true });
+  await qa.$eval(entry, (el) => el.scrollIntoView({ block: 'center' }));
+  await qa.waitForFunction(
+    (selector) => {
+      const el = document.querySelector(selector);
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    },
+    { timeout: 5000 },
+    entry,
+  );
+  await qa.click(entry);
   await qa.waitForSelector('#modalRoot.show [data-return-field=phenomenon]', { visible: true });
   for (const [field, value] of Object.entries({
     phenomenon: '模拟重连失败',
@@ -136,7 +150,9 @@ try {
     1,
   );
   assert.deepEqual(errors, []);
-  console.log('PASS 测试示例首屏、八种只读角色、报告内实际点击退回、缺陷同步、示例链接和刷新恢复');
+  console.log(
+    'PASS 测试示例首屏、八种只读角色、报告详情无退回按钮、测试页实际点击退回、缺陷同步、示例链接和刷新恢复',
+  );
 } finally {
   await browser.close();
 }

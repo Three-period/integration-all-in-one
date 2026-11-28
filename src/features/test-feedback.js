@@ -62,11 +62,11 @@ function defectRow(row) {
 export function feedbackList(title) {
   const rows = projectFeedback();
   return rows.length
-    ? '<section class="v35-panel"><h3>' +
+    ? '<section class="v35-panel development-feedback"><h3>' +
         esc(title) +
-        '</h3>' +
+        '</h3><div class="development-feedback-rows">' +
         rows.map(defectRow).join('') +
-        '</section>'
+        '</div></section>'
     : '';
 }
 export function feedbackEvidence() {
@@ -275,7 +275,7 @@ export function testingFeedback(section) {
   const canReturn = state.role === 'tester' && gate.commit && !gate.testPass;
   const rows = projectFeedback().filter((row) => !kind || row.testFeedback.kind === kind);
   return (
-    '<section class="card card-pad testing-feedback"><div class="test-return-bar"><div><h3>测试反馈</h3>' +
+    '<section class="card card-pad testing-feedback"><div class="test-return-bar"><div class="test-return-meta"><h3>测试反馈</h3>' +
     (gate.commit ? '<small>提测 Commit · ' + esc(gate.commit) + '</small>' : '') +
     '</div><div>' +
     returnControl(kind) +
